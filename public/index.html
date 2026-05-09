@@ -3627,6 +3627,16 @@ function openQuoteTabDropdown(e, qid) {
   drop.className = 'quote-tab-dropdown';
   drop.style.cssText += `;position:fixed;top:${rect.bottom + 4}px;left:${rect.left}px`;
 
+  // Duplicate quote option
+  const dupItem = document.createElement('div');
+  dupItem.className = 'qtd-item';
+  dupItem.innerHTML = '<span class="qtd-icon">⧉</span><div><div class="qtd-label">Duplicate quote</div><div class="qtd-sub">Copy all items to a new quote</div></div>';
+  dupItem.addEventListener('click', () => {
+    drop.remove();
+    if (qid !== _activeQuoteId) switchToQuote(qid);
+    openWizardDuplicateActive();
+  });
+
   // Close quote option
   const closeItem = document.createElement('div');
   closeItem.className = 'qtd-item';
@@ -3672,7 +3682,7 @@ function openQuoteTabDropdown(e, qid) {
     closeDetailPanel?.();
   });
 
-  [closeItem, deleteItem].forEach(item => drop.appendChild(item));
+  [dupItem, closeItem, deleteItem].forEach(item => drop.appendChild(item));
   document.body.appendChild(drop);
 
   setTimeout(() => document.addEventListener('click', function h() { drop.remove(); document.removeEventListener('click', h); }), 0);
@@ -4286,10 +4296,14 @@ function generateBOM() {
 // ── New Quote Wizard ──────────────────────────────────────────────────────────
 let _wizStep = 1;
 let _wizZones = [];
+let _wizDuplicateSections = null;
+let _wizDuplicateFromRef = '';
 
 function openWizard() {
   _wizStep = 1;
   _wizZones = [];
+  _wizDuplicateSections = null;
+  _wizDuplicateFromRef = '';
   // Pre-fill a quote ref
   const lastRef = _quotes.length ? (_quotes[_quotes.length-1].fields?.quoteRef||'') : '';
   document.getElementById('wiz-quote-ref').value = incrementQuoteRef(lastRef);
@@ -4304,21 +4318,60 @@ function openWizard() {
   setTimeout(() => document.getElementById('wiz-client-name').focus(), 100);
 }
 
+function openWizardDuplicate(ci, ji, qi) {
+  const clients = loadClients();
+  const qq = clients[ci]?.jobs?.[ji]?.quotes?.[qi];
+  if (!qq) return;
+  _wizDuplicateSections = JSON.parse(JSON.stringify(qq.sections || []));
+  _wizDuplicateFromRef = qq.quoteRef || qq.fields?.quoteRef || 'quote';
+  _wizZones = [];
+  const lastRef = _quotes.length ? (_quotes[_quotes.length-1].fields?.quoteRef||'') : '';
+  document.getElementById('wiz-quote-ref').value = incrementQuoteRef(lastRef);
+  ['wiz-client-name','wiz-client-phone','wiz-client-email','wiz-job-name','wiz-job-number','wiz-job-addr','wiz-client-search'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('wiz-zones-list').innerHTML = '';
+  wizShowStep(1);
+  document.getElementById('quote-wizard').style.display = 'flex';
+  setTimeout(() => document.getElementById('wiz-client-search').focus(), 100);
+}
+
+function openWizardDuplicateActive() {
+  saveActiveQuoteState();
+  const q = _quotes.find(q => q.id === _activeQuoteId);
+  if (!q) return;
+  _wizDuplicateSections = JSON.parse(JSON.stringify(q.sections || []));
+  _wizDuplicateFromRef = q.fields?.quoteRef || 'current quote';
+  _wizZones = [];
+  const lastRef = _quotes.length ? (_quotes[_quotes.length-1].fields?.quoteRef||'') : '';
+  document.getElementById('wiz-quote-ref').value = incrementQuoteRef(lastRef);
+  ['wiz-client-name','wiz-client-phone','wiz-client-email','wiz-job-name','wiz-job-number','wiz-job-addr','wiz-client-search'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('wiz-zones-list').innerHTML = '';
+  wizShowStep(1);
+  document.getElementById('quote-wizard').style.display = 'flex';
+  setTimeout(() => document.getElementById('wiz-client-search').focus(), 100);
+}
+
 function closeWizard() {
   document.getElementById('quote-wizard').style.display = 'none';
 }
 
 function wizShowStep(step) {
   _wizStep = step;
+  const isDup = _wizDuplicateSections !== null;
   document.getElementById('wiz-step-1').style.display = step===1 ? '' : 'none';
   document.getElementById('wiz-step-2').style.display = step===2 ? '' : 'none';
-  document.getElementById('wiz-step-label').textContent = 'Step ' + step + ' of 2';
+  document.getElementById('wiz-step-label').textContent = isDup ? ('Copying items from ' + _wizDuplicateFromRef) : ('Step ' + step + ' of 2');
   document.getElementById('wdot-1').classList.toggle('active', step>=1);
   document.getElementById('wdot-2').classList.toggle('active', step>=2);
+  document.getElementById('wdot-2').style.opacity = isDup ? '0.2' : '';
   document.getElementById('wiz-back-btn').style.display = step>1 ? '' : 'none';
-  document.getElementById('wiz-next-btn').style.display = step<2 ? '' : 'none';
-  document.getElementById('wiz-create-btn').style.display = step===2 ? '' : 'none';
-  document.getElementById('wiz-title').textContent = step===1 ? 'Client Details' : 'Add Zones & Rooms';
+  document.getElementById('wiz-next-btn').style.display = (step<2 && !isDup) ? '' : 'none';
+  document.getElementById('wiz-create-btn').style.display = (step===2 || isDup) ? '' : 'none';
+  document.getElementById('wiz-create-btn').textContent = isDup ? 'Duplicate ✓' : 'Create Quote ✓';
+  document.getElementById('wiz-title').textContent = isDup ? 'Duplicate Quote' : (step===1 ? 'Client Details' : 'Add Zones & Rooms');
   if (step===2) { wizRenderZones(); setTimeout(() => document.getElementById('wiz-zone-input').focus(), 100); }
 }
 
@@ -4514,6 +4567,25 @@ function wizCreate() {
     quoteDate:   new Date().toISOString().slice(0,10),
     labourRate: profileRate('pLabourSell', 100), labourCostRate: profileRate('pLabourCost', 75), defaultMarkup: profileRate('pMarkup', 100), depositAmount: profileRate('pDeposit', 20), quoteNotes:''
   };
+
+  // Duplicate mode: copy sections directly, skip zones step
+  if (_wizDuplicateSections !== null) {
+    const copiedSections = JSON.parse(JSON.stringify(_wizDuplicateSections));
+    const nq = _newQuoteState({ fields, sections: copiedSections });
+    _quotes.push(nq);
+    _activeQuoteId = nq.id;
+    _restoreFields(fields);
+    S.sections = copiedSections;
+    _wizDuplicateSections = null;
+    _wizDuplicateFromRef = '';
+    closeWizard();
+    saveQuoteToClientBook({ ...fields, sections: copiedSections });
+    if (_activeTab !== 'quote') switchTab('quote');
+    fullRender();
+    renderQuoteTabs();
+    showToast('Quote duplicated ✓');
+    return;
+  }
 
   const nq = _newQuoteState({ fields, sections:[] });
   _quotes.push(nq);
@@ -9324,6 +9396,7 @@ function renderQuotesAll() {
         '<td style="padding:12px 16px">' + statusDot + '</td>' +
         '<td style="padding:12px 16px;white-space:nowrap" onclick="event.stopPropagation()">' +
           '<button class="btn btn-secondary btn-sm" onclick="openQuoteFromAll(' + i + ')" style="margin-right:6px">Open</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="openWizardDuplicate('+r.clientIdx+','+r.jobIdx+','+r.quoteIdx+')" style="margin-right:6px" title="Duplicate quote">⧉</button>' +
           '<button class="btn btn-secondary btn-sm" onclick="deleteStoredQuote('+r.clientIdx+','+r.jobIdx+','+r.quoteIdx+',\''+esc(r.ref)+'\')" style="color:#ff3b30" title="Delete quote">✕</button>' +
         '</td>' +
         '</tr>';
