@@ -11343,6 +11343,9 @@ function showLandingLogin() {
     return;
   }
 
+  // Reset any fade-out styles left by dismissLanding()
+  el.style.opacity = '1';
+  el.style.transition = '';
   el.style.display = 'flex';
 
   // Populate brand-panel stats
