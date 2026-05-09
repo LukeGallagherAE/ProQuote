@@ -11318,8 +11318,7 @@ function doChangePassword() {
 }
 
 function doSignOut() {
-  if (!confirm('Sign out of ProQuote?')) return;
-  // Clear the remember-me token so the login screen appears next time
+  // Clear the remember-me token so the login screen appears
   const auth = _getAuth();
   if (auth) { delete auth._rememberedUntil; _setAuth(auth); }
   showLandingLogin();
