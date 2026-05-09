@@ -2112,6 +2112,8 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     }
   };
 
+  window._flushStorage = _flushStorage;
+
   const _shim = {
     getItem(key) {
       return Object.prototype.hasOwnProperty.call(_ls, key) ? _ls[key] : null;
@@ -11318,10 +11320,11 @@ function doChangePassword() {
 }
 
 function doSignOut() {
-  // Clear the remember-me token so the login screen appears
   const auth = _getAuth();
   if (auth) { delete auth._rememberedUntil; _setAuth(auth); }
-  showLandingLogin();
+  // Flush auth to server first, then reload — guarantees login screen on next init
+  const flush = window._flushStorage ? window._flushStorage() : Promise.resolve();
+  flush.finally(() => window.location.reload());
 }
 
 function _populateAccountPanel() {
