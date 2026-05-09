@@ -1,4 +1,4 @@
-<!-- ProQuote build: db3d2b2 — sign out reload fix -->
+<!-- ProQuote build: f1a9c3e — sign out sessionStorage fix -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11323,9 +11323,9 @@ function doChangePassword() {
 function doSignOut() {
   const auth = _getAuth();
   if (auth) { delete auth._rememberedUntil; _setAuth(auth); }
-  // Flush auth to server first, then reload — guarantees login screen on next init
-  const flush = window._flushStorage ? window._flushStorage() : Promise.resolve();
-  flush.finally(() => window.location.reload());
+  // sessionStorage survives a reload but not a tab close — used to skip auto-login
+  sessionStorage.setItem('pq_signed_out', '1');
+  window.location.reload();
 }
 
 function _populateAccountPanel() {
@@ -11339,9 +11339,12 @@ function showLandingLogin() {
   const el = document.getElementById('landing');
   if (!el) return;
 
+  // If we just signed out, always show login — skip auto-login check
+  const justSignedOut = sessionStorage.getItem('pq_signed_out');
+  if (justSignedOut) sessionStorage.removeItem('pq_signed_out');
+
   // Auto-login if the user previously checked "Keep me signed in" and it hasn't expired
-  if (auth?._rememberedUntil && auth._rememberedUntil > Date.now()) {
-    // Already remembered — skip straight to the app
+  if (!justSignedOut && auth?._rememberedUntil && auth._rememberedUntil > Date.now()) {
     el.style.display = 'none';
     setTimeout(() => switchTab('dashboard'), 50);
     return;
