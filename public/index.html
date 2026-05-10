@@ -1,4 +1,4 @@
-<!-- ProQuote build: c4a8d2f — server-side JWT auth -->
+<!-- ProQuote build: e7b3f1a — batch delete + JWT auth -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1561,6 +1561,10 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
           <option value="value">Value</option>
           <option value="pending">Pending approval</option>
         </select>
+        <!-- Batch delete controls — shown in select mode -->
+        <button id="qa-cancel-select" onclick="quotesAllExitSelect()" style="display:none;padding:7px 14px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+        <button id="qa-delete-selected" onclick="batchDeleteQuotes()" style="display:none;padding:7px 14px;background:#ff3b30;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Delete selected (0)</button>
+        <button id="qa-select-btn" onclick="quotesAllEnterSelect()" style="padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Select</button>
         <button onclick="openWizard()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           New Quote
@@ -9319,6 +9323,82 @@ function deleteStoredQuote(clientIdx, jobIdx, quoteIdx, ref) {
   closeDetailPanel?.();
 }
 
+// ── Batch select state ───────────────────────────────────────────────────────
+let _qaSelectMode = false;
+let _qaSelected   = new Set(); // stores row keys like "ci:ji:qi"
+
+function quotesAllEnterSelect() {
+  _qaSelectMode = true;
+  _qaSelected.clear();
+  document.getElementById('qa-select-btn').style.display = 'none';
+  document.getElementById('qa-cancel-select').style.display = '';
+  document.getElementById('qa-delete-selected').style.display = '';
+  renderQuotesAll();
+}
+
+function quotesAllExitSelect() {
+  _qaSelectMode = false;
+  _qaSelected.clear();
+  document.getElementById('qa-select-btn').style.display = '';
+  document.getElementById('qa-cancel-select').style.display = 'none';
+  document.getElementById('qa-delete-selected').style.display = 'none';
+  renderQuotesAll();
+}
+
+function qaToggleRow(key) {
+  if (_qaSelected.has(key)) _qaSelected.delete(key);
+  else _qaSelected.add(key);
+  // Update delete button label
+  const btn = document.getElementById('qa-delete-selected');
+  if (btn) btn.textContent = 'Delete selected (' + _qaSelected.size + ')';
+  // Update checkbox visual
+  const cb = document.getElementById('qa-cb-' + key);
+  if (cb) cb.checked = _qaSelected.has(key);
+  // Update select-all checkbox
+  const allCb = document.getElementById('qa-cb-all');
+  if (allCb && window._quotesAllRows) allCb.checked = _qaSelected.size === window._quotesAllRows.length;
+}
+
+function qaToggleAll(checked) {
+  if (!window._quotesAllRows) return;
+  window._quotesAllRows.forEach((r, i) => {
+    const key = r.clientIdx + ':' + r.jobIdx + ':' + r.quoteIdx;
+    if (checked) _qaSelected.add(key);
+    else _qaSelected.delete(key);
+    const cb = document.getElementById('qa-cb-' + key);
+    if (cb) cb.checked = checked;
+  });
+  const btn = document.getElementById('qa-delete-selected');
+  if (btn) btn.textContent = 'Delete selected (' + _qaSelected.size + ')';
+}
+
+function batchDeleteQuotes() {
+  if (!_qaSelected.size) return;
+  const n = _qaSelected.size;
+  if (!confirm('Delete ' + n + ' quote' + (n !== 1 ? 's' : '') + '? This cannot be undone.')) return;
+  const clients = loadClients();
+  // Convert selected keys to sorted indices (delete highest index first to avoid shifting)
+  const toDelete = [..._qaSelected].map(key => {
+    const [ci, ji, qi] = key.split(':').map(Number);
+    return { ci, ji, qi };
+  }).sort((a, b) => b.qi - a.qi || b.ji - a.ji || b.ci - a.ci);
+
+  toDelete.forEach(({ ci, ji, qi }) => {
+    const ref = clients[ci]?.jobs?.[ji]?.quotes?.[qi]?.quoteRef || '';
+    clients[ci]?.jobs?.[ji]?.quotes?.splice(qi, 1);
+    // Close any open tab for this quote
+    const tab = _quotes.find(oq => (oq.fields?.quoteRef || '') === ref);
+    if (tab) _doCloseQuote(tab.id);
+  });
+
+  saveClients(clients);
+  quotesAllExitSelect();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  if (typeof renderClients   === 'function' && document.getElementById('clients-content'))  renderClients();
+  if (typeof renderProjects  === 'function' && document.getElementById('projects-content')) renderProjects();
+  showToast(n + ' quote' + (n !== 1 ? 's' : '') + ' deleted');
+}
+
 function renderQuotesAll() {
   const el = document.getElementById('quotes-all-content');
   const countEl = document.getElementById('quotes-all-count');
@@ -9396,15 +9476,17 @@ function renderQuotesAll() {
     return;
   }
 
+  const selectCol = _qaSelectMode ? '<th style="padding:10px 12px;width:36px"><input type="checkbox" id="qa-cb-all" onchange="qaToggleAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#007aff"></th>' : '';
   el.innerHTML = '<table style="width:100%;border-collapse:collapse">' +
     '<thead><tr style="border-bottom:2px solid var(--border);text-align:left">' +
+    selectCol +
     '<th style="padding:10px 16px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Ref</th>' +
     '<th style="padding:10px 16px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Client</th>' +
     '<th style="padding:10px 16px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Job</th>' +
     '<th style="padding:10px 16px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Created</th>' +
     '<th style="padding:10px 16px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;text-align:right">Total</th>' +
     '<th style="padding:10px 16px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Status</th>' +
-    '<th style="padding:10px 16px"></th>' +
+    (_qaSelectMode ? '' : '<th style="padding:10px 16px"></th>') +
     '</tr></thead><tbody>' +
     rows.map((r, i) => {
       const STATUS_STYLES = {
@@ -9417,18 +9499,26 @@ function renderQuotesAll() {
       const statusDot = '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:'+ss.color+'"><span style="width:7px;height:7px;border-radius:50%;background:'+ss.color+';display:inline-block"></span>'+ss.label+'</span>';
       const _createdTs = r.createdAt || r.saved;
       const savedStr = _createdTs ? new Date(_createdTs).toLocaleDateString('en-AU', {day:'numeric',month:'short',year:'numeric'}) : r.date || '—';
-      return '<tr style="border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer" onclick="openQuoteFromAll('+i+')" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
+      const rowKey = r.clientIdx + ':' + r.jobIdx + ':' + r.quoteIdx;
+      const isSelected = _qaSelected.has(rowKey);
+      const cbCell = _qaSelectMode ? '<td style="padding:12px 12px;width:36px" onclick="event.stopPropagation();qaToggleRow(\''+rowKey+'\')"><input type="checkbox" id="qa-cb-'+rowKey+'" '+(isSelected?'checked':'')+' onchange="qaToggleRow(\''+rowKey+'\')" style="width:15px;height:15px;cursor:pointer;accent-color:#007aff"></td>' : '';
+      const actionsCell = _qaSelectMode ? '' :
+        '<td style="padding:12px 16px;white-space:nowrap" onclick="event.stopPropagation()">' +
+          '<button class="btn btn-secondary btn-sm" onclick="openQuoteFromAll(' + i + ')" style="margin-right:6px">Open</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="openWizardDuplicate('+r.clientIdx+','+r.jobIdx+','+r.quoteIdx+')" style="margin-right:6px" title="Duplicate quote">⧉</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="deleteStoredQuote('+r.clientIdx+','+r.jobIdx+','+r.quoteIdx+',\''+esc(r.ref)+'\')" style="color:#ff3b30" title="Delete quote">✕</button>' +
+        '</td>';
+      const rowClick = _qaSelectMode ? 'onclick="qaToggleRow(\''+rowKey+'\')"' : 'onclick="openQuoteFromAll('+i+')"';
+      const rowBg = isSelected ? 'background:var(--blue-bg)' : '';
+      return '<tr style="border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer;'+rowBg+'" '+rowClick+' onmouseover="this.style.background=\''+(isSelected?'var(--blue-bg)':'var(--surface2)')+'\';" onmouseout="this.style.background=\''+(isSelected?'var(--blue-bg)':'')+'\';">' +
+        cbCell +
         '<td style="padding:12px 16px;font-size:13px;font-weight:700;font-family:monospace">' + esc(r.ref) + '</td>' +
         '<td style="padding:12px 16px;font-size:13px">' + esc(r.clientName) + '</td>' +
         '<td style="padding:12px 16px;font-size:13px;color:var(--muted)">' + esc(r.jobName) + (r.jobNumber ? ' <span style="font-size:11px">#'+esc(r.jobNumber)+'</span>' : '') + '</td>' +
         '<td style="padding:12px 16px;font-size:12px;color:var(--muted)">' + savedStr + '</td>' +
         '<td style="padding:12px 16px;font-size:13px;font-weight:700;text-align:right;font-family:monospace;color:var(--text)">' + (r.total ? '$' + r.total.toLocaleString('en-AU', {minimumFractionDigits:2,maximumFractionDigits:2}) : '<span style="color:var(--muted)">—</span>') + '</td>' +
         '<td style="padding:12px 16px">' + statusDot + '</td>' +
-        '<td style="padding:12px 16px;white-space:nowrap" onclick="event.stopPropagation()">' +
-          '<button class="btn btn-secondary btn-sm" onclick="openQuoteFromAll(' + i + ')" style="margin-right:6px">Open</button>' +
-          '<button class="btn btn-secondary btn-sm" onclick="openWizardDuplicate('+r.clientIdx+','+r.jobIdx+','+r.quoteIdx+')" style="margin-right:6px" title="Duplicate quote">⧉</button>' +
-          '<button class="btn btn-secondary btn-sm" onclick="deleteStoredQuote('+r.clientIdx+','+r.jobIdx+','+r.quoteIdx+',\''+esc(r.ref)+'\')" style="color:#ff3b30" title="Delete quote">✕</button>' +
-        '</td>' +
+        actionsCell +
         '</tr>';
     }).join('') +
     '</tbody></table>';
