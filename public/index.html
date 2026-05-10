@@ -1,4 +1,4 @@
-<!-- ProQuote build: 9c4a2f1 — AI notes + TC PDF attachment -->
+<!-- ProQuote build: d7f4e2a — fix missing auth header on email send -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5874,7 +5874,7 @@ async function confirmSendEmail() {
   try {
     const res = await fetch('/api/email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (window._nativeGetToken() || '') },
       body: JSON.stringify({
         to, subject, body, html,
         clientName: gv('clientName'),
