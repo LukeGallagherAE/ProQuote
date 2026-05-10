@@ -1,4 +1,4 @@
-<!-- ProQuote build: a2d9c7b — login vs signup via /api/auth/status -->
+<!-- ProQuote build: f3e1b8d — reload profile/logo after login -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11649,8 +11649,13 @@ async function submitPassword() {
     }
     // Store token in native localStorage
     if (window._nativeSetToken) window._nativeSetToken(data.token);
-    // Reload storage with new token then enter app
+    // Reload storage with new token then refresh all data-driven UI
     await window._initStorage();
+    // Re-run data loaders that ran at init() time (before we had a token)
+    try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e){}
+    loadProfile();
+    loadCompanyLogo();
+    initStagedMarkupUI();
     document.getElementById('landing').style.display = 'none';
     setTimeout(() => switchTab('dashboard'), 50);
   } catch(e) {
