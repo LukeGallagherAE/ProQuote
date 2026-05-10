@@ -3,6 +3,8 @@ const router     = express.Router();
 const nodemailer = require('nodemailer');
 const path       = require('path');
 const fs         = require('fs');
+const { PDFDocument } = require('pdf-lib');
+const db         = require('../db');
 
 const LOGO_PATH = path.join(__dirname, '../public/logo.png');
 
@@ -80,10 +82,34 @@ router.post('/', async (req, res) => {
   const subject   = customSubject || ['Quote', ref, jobName ? '— ' + jobName : ''].filter(Boolean).join(' ');
 
   try {
-    const [pdf, transporter] = await Promise.all([
+    let [pdf, transporter] = await Promise.all([
       generatePDF(html),
       Promise.resolve(buildTransporter()),
     ]);
+
+    // Append T&C PDF if the user has one stored
+    try {
+      const { rows: tcRows } = await db.query(
+        "SELECT value FROM settings WHERE key = 'proquote_tc_pdf' AND user_id = $1",
+        [req.user.userId]
+      );
+      if (tcRows.length && tcRows[0].value) {
+        const tcBase64 = tcRows[0].value
+          .replace(/^"?data:application\/pdf;base64,/, '')
+          .replace(/"$/, '');
+        const quotePdfDoc = await PDFDocument.load(pdf);
+        const tcPdfDoc    = await PDFDocument.load(Buffer.from(tcBase64, 'base64'));
+        const mergedDoc   = await PDFDocument.create();
+        const quotePages  = await mergedDoc.copyPages(quotePdfDoc, quotePdfDoc.getPageIndices());
+        quotePages.forEach(p => mergedDoc.addPage(p));
+        const tcPages     = await mergedDoc.copyPages(tcPdfDoc, tcPdfDoc.getPageIndices());
+        tcPages.forEach(p => mergedDoc.addPage(p));
+        const mergedPdf   = await mergedDoc.save();
+        pdf = Buffer.from(mergedPdf);
+      }
+    } catch (tcErr) {
+      console.error('[Email] T&C merge failed, sending original PDF:', tcErr.message);
+    }
 
     const logoBuffer = fs.existsSync(LOGO_PATH) ? fs.readFileSync(LOGO_PATH) : null;
 

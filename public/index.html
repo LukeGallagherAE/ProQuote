@@ -1,4 +1,4 @@
-<!-- ProQuote build: f3e1b8d — reload profile/logo after login -->
+<!-- ProQuote build: 9c4a2f1 — AI notes + TC PDF attachment -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1388,6 +1388,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         <button onmousedown="event.preventDefault()" onclick="notesSetSize('5')" title="Large"><span style="font-size:16px;font-weight:600">A</span></button>
       </div>
       <div id="notesEditor" contenteditable="true" class="notes-editor" style="height:80px" oninput="syncNotesEditor()" data-placeholder="Notes, exclusions, scope clarifications…"></div>
+      <button id="ai-notes-btn" onclick="aiSummariseNotes()" style="margin-top:5px;padding:3px 10px;font-size:11px;font-weight:600;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--muted);cursor:pointer;transition:color .15s,border-color .15s,background .15s" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--accent)';this.style.background='var(--surface)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)';this.style.background='var(--surface2)'">✨ AI</button>
     </div>
   </div>
   </div><!-- /sidebar flex wrapper -->
@@ -1842,6 +1843,18 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
           <div class="field"><label>Account number</label><input id="pBankAcc" placeholder="e.g. 12345678" oninput="saveProfile()"></div>
         </div>
 
+        <!-- Terms & Conditions PDF -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Terms &amp; Conditions</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Appended to every emailed and downloaded quote</div>
+          <input type="file" id="tcPdfInput" accept=".pdf" style="display:none" onchange="onTCPdfSelected(this)">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('tcPdfInput').click()">Upload PDF</button>
+            <span id="tcPdfStatus" style="font-size:12px;color:var(--muted)">No file uploaded</span>
+            <button id="tcPdfRemoveBtn" class="btn btn-ghost btn-sm" style="display:none;color:#c0392b;font-size:11px" onclick="removeTCPdf()">Remove</button>
+          </div>
+        </div>
+
       </div>
 
       <!-- RIGHT column: Default Cost Rates + Item Categories + Zone Presets -->
@@ -2057,8 +2070,9 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         </select>
       </div>
     </div>
-    <div style="display:flex;gap:10px;margin-top:20px">
+    <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
       <button class="btn btn-primary" style="flex:1" onclick="doPrintExport()">Export PDF</button>
+      <button class="btn btn-secondary" style="flex:1" id="download-pdf-btn" onclick="doDownloadPDF()">⬇ Download PDF</button>
       <button class="btn btn-secondary" style="flex:1" onclick="doEmailExport()">✉ Email Quote</button>
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
     </div>
@@ -5280,9 +5294,160 @@ function loadProfile(){
     const data = JSON.parse(raw);
     PROFILE_IDS.forEach(id => { if(data[id]!=null){ const el = document.getElementById(id); if(el) el.value = data[id]; } });
   }catch(e){}
+  // Restore T&C PDF status
+  updateTCPdfStatus();
 }
 function profileVal(id){ return document.getElementById(id)?.value || ''; }
 function profileRate(id, fallback){ const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? String(fallback) : String(v); }
+
+// ── T&C PDF ───────────────────────────────────────────────────────────────────
+function updateTCPdfStatus() {
+  const statusEl = document.getElementById('tcPdfStatus');
+  const removeBtn = document.getElementById('tcPdfRemoveBtn');
+  if (!statusEl) return;
+  try {
+    const stored = localStorage.getItem('proquote_tc_pdf');
+    if (stored) {
+      statusEl.textContent = 'T&C PDF uploaded ✓';
+      statusEl.style.color = 'var(--green, #34c759)';
+      if (removeBtn) removeBtn.style.display = '';
+    } else {
+      statusEl.textContent = 'No file uploaded';
+      statusEl.style.color = 'var(--muted)';
+      if (removeBtn) removeBtn.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+function onTCPdfSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      localStorage.setItem('proquote_tc_pdf', e.target.result);
+      const statusEl = document.getElementById('tcPdfStatus');
+      if (statusEl) { statusEl.textContent = file.name + ' uploaded ✓'; statusEl.style.color = 'var(--green, #34c759)'; }
+      const removeBtn = document.getElementById('tcPdfRemoveBtn');
+      if (removeBtn) removeBtn.style.display = '';
+    } catch(e) { alert('Could not save T&C PDF: ' + e.message); }
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function removeTCPdf() {
+  try { localStorage.removeItem('proquote_tc_pdf'); } catch(e) {}
+  updateTCPdfStatus();
+}
+
+// ── AI NOTES ─────────────────────────────────────────────────────────────────
+async function aiSummariseNotes() {
+  const btn = document.getElementById('ai-notes-btn');
+  if (!btn) return;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Thinking…';
+  btn.disabled = true;
+
+  try {
+    syncDOM();
+    const clientName    = document.getElementById('clientName')?.value || '';
+    const jobName       = document.getElementById('jobName')?.value || '';
+    const siteAddr      = document.getElementById('siteAddr')?.value || '';
+    const existingNotes = document.getElementById('quoteNotes')?.value || '';
+
+    // Collect unique zone names from sections
+    const zones = [...new Set(S.sections.map(s => s.name).filter(Boolean))];
+
+    // Collect top items by value (qty * price), max 15
+    const allItems = [];
+    for (const sec of S.sections) {
+      for (const par of sec.parents) {
+        if (!par.name || par.name === 'New Item') continue;
+        const c = calcParent(par);
+        allItems.push({ name: par.name, qty: par.qty || 1, unit: 'EA', value: c.total || 0 });
+      }
+    }
+    allItems.sort((a, b) => b.value - a.value);
+    const items = allItems.slice(0, 15);
+
+    const total = document.getElementById('tInc')?.textContent || '';
+
+    const token = window._nativeGetToken();
+    const resp = await fetch('/api/ai/summarise-notes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (token || ''),
+      },
+      body: JSON.stringify({ clientName, jobName, siteAddr, zones, items, total, existingNotes }),
+    });
+
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'AI request failed');
+
+    // Fill the notes textarea and the visible editor
+    const ta = document.getElementById('quoteNotes');
+    if (ta) ta.value = data.notes;
+    const editor = document.getElementById('notesEditor');
+    if (editor) {
+      editor.innerText = data.notes;
+      editor.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  } catch (err) {
+    alert('AI notes error: ' + err.message);
+  } finally {
+    btn.textContent = originalLabel;
+    btn.disabled = false;
+  }
+}
+
+// ── DOWNLOAD PDF (server-side, with T&C merge) ────────────────────────────────
+async function doDownloadPDF() {
+  const btn = document.getElementById('download-pdf-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+
+  try {
+    syncDOM();
+    const v = id => document.getElementById(id)?.value || '';
+    const ref        = v('quoteRef');
+    const clientName = v('clientName');
+
+    // captureQuoteHTML() silently runs doPrint() without opening a popup
+    const html = captureQuoteHTML();
+    if (!html) { alert('Could not generate quote HTML'); return; }
+
+    const token = window._nativeGetToken();
+    const resp = await fetch('/api/pdf/download', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (token || ''),
+      },
+      body: JSON.stringify({ html }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: 'Unknown error' }));
+      alert('PDF download error: ' + (err.error || resp.statusText));
+      return;
+    }
+
+    const blob = await resp.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = [(ref || 'Quote'), clientName].filter(Boolean).join(' - ') + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('PDF download error: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⬇ Download PDF'; }
+  }
+}
 
 // ── Staged Markup ─────────────────────────────────────────────────────────────
 const STAGED_MARKUP_KEY = 'proquote_staged_markup';

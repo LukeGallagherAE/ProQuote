@@ -22,6 +22,8 @@ app.use('/api/auth',    authRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/quotes',  quotesRoutes);
 app.use('/api/email',   requireAuth, emailRoutes);
+app.use('/api/ai',      require('./routes/ai'));
+app.use('/api/pdf',     requireAuth, require('./routes/pdf'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ ok: true, version: '2.1.0' }));
