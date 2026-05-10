@@ -1,4 +1,6 @@
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+// Force IPv4 DNS resolution — Railway's network doesn't support IPv6
+require('dns').setDefaultResultOrder('ipv4first');
 const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
