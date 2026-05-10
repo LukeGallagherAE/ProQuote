@@ -3,22 +3,14 @@ const router     = express.Router();
 const { PDFDocument } = require('pdf-lib');
 const db         = require('../db');
 
-let _chromiumPath = process.env.CHROME_EXECUTABLE_PATH || null;
-if (!_chromiumPath) {
-  try {
-    const { execSync } = require('child_process');
-    _chromiumPath = execSync('which chromium || which chromium-browser || which google-chrome', { stdio: 'pipe' }).toString().trim();
-  } catch(e) {}
-}
-
 async function generatePDF(html) {
   const puppeteer = require('puppeteer');
   const launchOpts = {
     headless: 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
   };
-  if (_chromiumPath) {
-    launchOpts.executablePath = _chromiumPath;
+  if (process.env.CHROME_EXECUTABLE_PATH) {
+    launchOpts.executablePath = process.env.CHROME_EXECUTABLE_PATH;
   }
   const browser = await puppeteer.launch(launchOpts);
   try {

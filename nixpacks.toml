@@ -1,7 +1,5 @@
-# Install system Chromium via nix — skips Puppeteer's 170MB download
-# and gets cached between Railway builds (cuts build time from 11min → ~2min).
-[phases.setup]
-nixPkgs = ["chromium", "nss", "freetype", "harfbuzz", "ca-certificates", "glib", "gtk3", "alsa-lib"]
-
-[variables]
-PUPPETEER_SKIP_DOWNLOAD = "true"
+# Cache Puppeteer's Chrome download between Railway builds.
+# First build still downloads ~170MB, but subsequent builds reuse the cache (~2min).
+[phases.install]
+cmds = ["npm ci"]
+cacheDirectories = ["/root/.cache/puppeteer", "/root/.npm"]

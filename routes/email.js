@@ -16,13 +16,6 @@ async function generatePDF(html) {
   };
   if (process.env.CHROME_EXECUTABLE_PATH) {
     launchOpts.executablePath = process.env.CHROME_EXECUTABLE_PATH;
-  } else {
-    // Auto-detect system Chromium (installed via nixpkgs on Railway)
-    try {
-      const { execSync } = require('child_process');
-      const p = execSync('which chromium || which chromium-browser || which google-chrome', { stdio: 'pipe' }).toString().trim();
-      if (p) launchOpts.executablePath = p;
-    } catch(e) {}
   }
   const browser = await puppeteer.launch(launchOpts);
   try {
