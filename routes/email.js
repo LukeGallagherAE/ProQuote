@@ -37,7 +37,18 @@ function buildTransporter() {
   const user = process.env.GMAIL_USER;
   const pass = process.env.GMAIL_APP_PASSWORD;
   if (!user || !pass) throw new Error('GMAIL_USER and GMAIL_APP_PASSWORD must be set in .env');
-  return nodemailer.createTransport({ service: 'gmail', auth: { user, pass } });
+  // Use explicit host/port instead of service:'gmail' shorthand.
+  // Port 587 + STARTTLS works on most cloud providers (incl. Railway).
+  // Port 465 (SSL) is often blocked by cloud firewalls.
+  return nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,          // STARTTLS — upgrades automatically
+    auth: { user, pass },
+    connectionTimeout: 60000,
+    greetingTimeout:   30000,
+    socketTimeout:     60000,
+  });
 }
 
 function buildSignatureHTML() {
