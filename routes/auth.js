@@ -16,6 +16,16 @@ function makeToken(user) {
   );
 }
 
+// GET /api/auth/status — public, tells the frontend whether an account exists
+router.get('/status', async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT COUNT(*)::int AS count FROM users');
+    res.json({ hasUsers: rows[0].count > 0 });
+  } catch (err) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   const { username, password } = req.body || {};

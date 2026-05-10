@@ -1,4 +1,4 @@
-<!-- ProQuote build: e7b3f1a — batch delete + JWT auth -->
+<!-- ProQuote build: a2d9c7b — login vs signup via /api/auth/status -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11472,8 +11472,7 @@ function _populateAccountPanel() {
   if (el && auth) el.textContent = 'Signed in as ' + (auth.username || '');
 }
 
-function showLandingLogin() {
-  const auth = _getAuth();
+async function showLandingLogin() {
   const el = document.getElementById('landing');
   if (!el) return;
 
@@ -11503,8 +11502,15 @@ function showLandingLogin() {
     const pEl = document.getElementById('lstat-pipeline'); if (pEl) pEl.textContent = pipeline > 0 ? (typeof fmt === 'function' ? fmt(pipeline) : '$'+(pipeline/1000).toFixed(0)+'k') : '—';
   } catch(e) {}
 
-  if (!auth) {
-    // First time — pre-fill wizard from existing profile if available, then reset to step 1
+  // Ask server whether an account already exists to decide login vs setup
+  let hasUsers = false;
+  try {
+    const r = await fetch('/api/auth/status');
+    if (r.ok) hasUsers = (await r.json()).hasUsers;
+  } catch(e) {}
+
+  if (!hasUsers) {
+    // No account yet — show setup wizard
     const profile = JSON.parse(localStorage.getItem('proquote_profile') || '{}');
     const prefill = { 'setup-name': profile.pPreparedBy, 'setup-biz': profile.pBizName,
                       'setup-phone': profile.pPhone, 'setup-email': profile.pEmail, 'setup-abn': profile.pABN };
@@ -11513,17 +11519,9 @@ function showLandingLogin() {
     document.getElementById('login-setup').style.display = '';
     document.getElementById('login-signin').style.display = 'none';
   } else {
-    // Returning user
+    // Account exists — show login form
     document.getElementById('login-setup').style.display = 'none';
     document.getElementById('login-signin').style.display = '';
-    // Avatar initials from biz name
-    const authInfo = _getAuth();
-    const initials = (authInfo?.biz || authInfo?.username || 'PQ').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    const av = document.getElementById('login-avatar'); if (av) av.textContent = initials;
-    const wl = document.getElementById('login-welcome'); if (wl) wl.textContent = 'Welcome back';
-    const bn = document.getElementById('login-biz-name'); if (bn) bn.textContent = auth.biz || 'ProQuote';
-    // Pre-fill username, clear password
-    const uf = document.getElementById('signin-username'); if (uf) uf.value = auth.username || '';
     const pf = document.getElementById('signin-password'); if (pf) pf.value = '';
     document.getElementById('pin-error').textContent = '';
     setTimeout(() => (document.getElementById('signin-password') || document.getElementById('signin-username'))?.focus(), 80);
