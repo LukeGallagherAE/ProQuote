@@ -8,16 +8,23 @@ const db         = require('../db');
 
 const LOGO_PATH = path.join(__dirname, '../public/logo.png');
 
+// Detect system Chromium once at startup (Railway uses nixpkgs Chromium)
+let _chromiumPath = process.env.CHROME_EXECUTABLE_PATH || null;
+if (!_chromiumPath) {
+  try {
+    const { execSync } = require('child_process');
+    _chromiumPath = execSync('which chromium || which chromium-browser || which google-chrome', { stdio: 'pipe' }).toString().trim();
+  } catch(e) { /* will fall back to puppeteer's bundled Chromium */ }
+}
+
 async function generatePDF(html) {
   const puppeteer = require('puppeteer');
   const launchOpts = {
     headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
   };
-  // Local dev: set CHROME_EXECUTABLE_PATH in .env to use your system Chrome (faster).
-  // On Railway (or any server): leave unset — puppeteer uses its bundled Chromium.
-  if (process.env.CHROME_EXECUTABLE_PATH) {
-    launchOpts.executablePath = process.env.CHROME_EXECUTABLE_PATH;
+  if (_chromiumPath) {
+    launchOpts.executablePath = _chromiumPath;
   }
   const browser = await puppeteer.launch(launchOpts);
   try {
