@@ -1,21 +1,12 @@
 const express    = require('express');
 const router     = express.Router();
-const nodemailer = require('nodemailer');
 const path       = require('path');
 const fs         = require('fs');
 const { PDFDocument } = require('pdf-lib');
 const db         = require('../db');
+const { Resend } = require('resend');
 
 const LOGO_PATH = path.join(__dirname, '../public/logo.png');
-
-// Detect system Chromium once at startup (Railway uses nixpkgs Chromium)
-let _chromiumPath = process.env.CHROME_EXECUTABLE_PATH || null;
-if (!_chromiumPath) {
-  try {
-    const { execSync } = require('child_process');
-    _chromiumPath = execSync('which chromium || which chromium-browser || which google-chrome', { stdio: 'pipe' }).toString().trim();
-  } catch(e) { /* will fall back to puppeteer's bundled Chromium */ }
-}
 
 async function generatePDF(html) {
   const puppeteer = require('puppeteer');
@@ -23,8 +14,15 @@ async function generatePDF(html) {
     headless: 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
   };
-  if (_chromiumPath) {
-    launchOpts.executablePath = _chromiumPath;
+  if (process.env.CHROME_EXECUTABLE_PATH) {
+    launchOpts.executablePath = process.env.CHROME_EXECUTABLE_PATH;
+  } else {
+    // Auto-detect system Chromium (installed via nixpkgs on Railway)
+    try {
+      const { execSync } = require('child_process');
+      const p = execSync('which chromium || which chromium-browser || which google-chrome', { stdio: 'pipe' }).toString().trim();
+      if (p) launchOpts.executablePath = p;
+    } catch(e) {}
   }
   const browser = await puppeteer.launch(launchOpts);
   try {
@@ -40,32 +38,15 @@ async function generatePDF(html) {
   }
 }
 
-function buildTransporter() {
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
-  if (!user || !pass) throw new Error('GMAIL_USER and GMAIL_APP_PASSWORD must be set in .env');
-  // Use explicit host/port instead of service:'gmail' shorthand.
-  // Port 587 + STARTTLS works on most cloud providers (incl. Railway).
-  // Port 465 (SSL) is often blocked by cloud firewalls.
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,          // STARTTLS — upgrades automatically
-    auth: { user, pass },
-    connectionTimeout: 60000,
-    greetingTimeout:   30000,
-    socketTimeout:     60000,
-  });
-}
-
 function buildSignatureHTML() {
+  // Use the publicly-accessible logo URL on Railway, fall back to text only
+  const logoUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/logo.png`
+    : null;
+
   return `
 <table cellpadding="0" cellspacing="0" border="0" style="font-family:-apple-system,Arial,sans-serif;font-size:13px;color:#1a1a1a;line-height:1.6">
-  <tr>
-    <td style="padding-bottom:10px">
-      <img src="cid:adonai-logo" alt="Adonai Electrical" style="height:56px;display:block">
-    </td>
-  </tr>
+  ${logoUrl ? `<tr><td style="padding-bottom:10px"><img src="${logoUrl}" alt="Adonai Electrical" style="height:56px;display:block"></td></tr>` : ''}
   <tr><td><strong>Luke Gallagher</strong> - Director | Licensed Electrician</td></tr>
   <tr><td><strong>Mobile:</strong> 0407 769 296</td></tr>
   <tr><td><strong>Email:</strong> <a href="mailto:Luke@adonaielectrical.com" style="color:#1a1a1a">Luke@adonaielectrical.com</a></td></tr>
@@ -96,14 +77,14 @@ router.post('/', async (req, res) => {
   if (!to)   return res.status(400).json({ error: 'No recipient email address' });
   if (!html) return res.status(400).json({ error: 'No quote HTML provided' });
 
-  const firstName = (clientName || 'there').split(' ')[0];
-  const subject   = customSubject || ['Quote', ref, jobName ? '— ' + jobName : ''].filter(Boolean).join(' ');
+  if (!process.env.RESEND_API_KEY) {
+    return res.status(500).json({ error: 'RESEND_API_KEY is not set — add it in Railway Variables' });
+  }
+
+  const subject = customSubject || ['Quote', ref, jobName ? '— ' + jobName : ''].filter(Boolean).join(' ');
 
   try {
-    let [pdf, transporter] = await Promise.all([
-      generatePDF(html),
-      Promise.resolve(buildTransporter()),
-    ]);
+    let pdf = await generatePDF(html);
 
     // Append T&C PDF if the user has one stored
     try {
@@ -122,53 +103,46 @@ router.post('/', async (req, res) => {
         quotePages.forEach(p => mergedDoc.addPage(p));
         const tcPages     = await mergedDoc.copyPages(tcPdfDoc, tcPdfDoc.getPageIndices());
         tcPages.forEach(p => mergedDoc.addPage(p));
-        const mergedPdf   = await mergedDoc.save();
-        pdf = Buffer.from(mergedPdf);
+        pdf = Buffer.from(await mergedDoc.save());
       }
     } catch (tcErr) {
       console.error('[Email] T&C merge failed, sending original PDF:', tcErr.message);
     }
 
-    const logoBuffer = fs.existsSync(LOGO_PATH) ? fs.readFileSync(LOGO_PATH) : null;
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const fromAddress = `Adonai Electrical <${process.env.GMAIL_USER || 'Luke@adonaielectrical.com'}>`;
+    const pdfFilename = [ref || 'Quote', clientName].filter(Boolean).join(' - ') + '.pdf';
 
-    await transporter.sendMail({
-      from:    `"Adonai Electrical" <${process.env.GMAIL_USER}>`,
-      to,
+    // Send quote to client
+    const { error: sendErr } = await resend.emails.send({
+      from:        fromAddress,
+      to:          [to],
       subject,
-      text:    customBody || '',
-      html:    buildHTMLEmail(customBody),
-      attachments: [
-        {
-          filename:    [ref || 'Quote', clientName].filter(Boolean).join(' - ') + '.pdf',
-          content:     pdf,
-          contentType: 'application/pdf',
-        },
-        ...(logoBuffer ? [{
-          filename:    'logo.png',
-          content:     logoBuffer,
-          cid:         'adonai-logo',
-        }] : []),
-      ],
+      html:        buildHTMLEmail(customBody),
+      text:        customBody || '',
+      attachments: [{ filename: pdfFilename, content: pdf }],
     });
+
+    if (sendErr) throw new Error(sendErr.message || JSON.stringify(sendErr));
 
     // Confirmation email to self
     const sentAt = new Date().toLocaleString('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'short', timeStyle: 'short' });
     const confirmRows = [
-      ['Sent to',     to],
-      ['Client',      clientName  || '—'],
-      ['Job name',    jobName     || '—'],
-      ['Job number',  jobNumber   || '—'],
-      ['Quote ref',   ref         || '—'],
-      ['Site',        siteAddr    || '—'],
-      ['Subject',     subject],
-      ['Sent at',     sentAt],
+      ['Sent to',    to],
+      ['Client',     clientName  || '—'],
+      ['Job name',   jobName     || '—'],
+      ['Job number', jobNumber   || '—'],
+      ['Quote ref',  ref         || '—'],
+      ['Site',       siteAddr    || '—'],
+      ['Subject',    subject],
+      ['Sent at',    sentAt],
     ].map(([label, val]) =>
       `<tr><td style="padding:6px 12px;font-weight:600;white-space:nowrap;color:#555">${label}</td><td style="padding:6px 12px">${val}</td></tr>`
     ).join('');
 
-    await transporter.sendMail({
-      from:    `"ProQuote" <${process.env.GMAIL_USER}>`,
-      to:      process.env.GMAIL_USER,
+    await resend.emails.send({
+      from:    fromAddress,
+      to:      [process.env.GMAIL_USER || 'Luke@adonaielectrical.com'],
       subject: `✅ Quote sent — ${ref || ''}${jobName ? ' — ' + jobName : ''}`,
       html: `<!DOCTYPE html><html><body style="font-family:-apple-system,Arial,sans-serif;font-size:14px;color:#1a1a1a;padding:20px">
         <p style="margin:0 0 16px"><strong>Quote successfully sent.</strong></p>
