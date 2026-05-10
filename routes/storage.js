@@ -1,11 +1,18 @@
-const express = require('express');
-const router = express.Router();
-const db = require('../db');
+const express     = require('express');
+const router      = express.Router();
+const db          = require('../db');
+const requireAuth = require('../middleware/requireAuth');
 
-// GET /api/storage — return all key-value pairs as a flat object
+// All storage routes require authentication
+router.use(requireAuth);
+
+// GET /api/storage — return all key-value pairs for the authenticated user
 router.get('/', async (req, res) => {
   try {
-    const { rows } = await db.query('SELECT key, value FROM settings');
+    const { rows } = await db.query(
+      'SELECT key, value FROM settings WHERE user_id = $1',
+      [req.user.userId]
+    );
     const out = {};
     rows.forEach(r => { out[r.key] = r.value; });
     res.json(out);
@@ -16,22 +23,26 @@ router.get('/', async (req, res) => {
 });
 
 // PUT /api/storage — upsert all key-value pairs from request body
-// Body: { "proquote_profile": "...", "proquote_clients": "[...]", ... }
 router.put('/', async (req, res) => {
   const entries = Object.entries(req.body || {});
   if (!entries.length) return res.json({ ok: true });
 
   try {
-    // Batch upsert using unnest
-    const keys = entries.map(([k]) => k);
-    const vals = entries.map(([, v]) => (typeof v === 'string' ? v : JSON.stringify(v)));
+    const keys   = entries.map(([k]) => k);
+    const vals   = entries.map(([, v]) => (typeof v === 'string' ? v : JSON.stringify(v)));
+    const userId = req.user.userId;
 
-    await db.query(
-      `INSERT INTO settings (key, value, updated_at)
-       SELECT unnest($1::text[]), unnest($2::text[]), NOW()
-       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [keys, vals]
-    );
+    // Batch upsert — include user_id in insert, conflict on (key, user_id)
+    // Since key is currently the PRIMARY KEY we do individual upserts to support user scoping
+    for (let i = 0; i < keys.length; i++) {
+      await db.query(
+        `INSERT INTO settings (key, value, user_id, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (key) DO UPDATE
+           SET value = EXCLUDED.value, user_id = EXCLUDED.user_id, updated_at = NOW()`,
+        [keys[i], vals[i], userId]
+      );
+    }
 
     res.json({ ok: true });
   } catch (err) {
@@ -40,10 +51,13 @@ router.put('/', async (req, res) => {
   }
 });
 
-// DELETE /api/storage/:key — remove a single key
+// DELETE /api/storage/:key — remove a single key for the authenticated user
 router.delete('/:key', async (req, res) => {
   try {
-    await db.query('DELETE FROM settings WHERE key = $1', [req.params.key]);
+    await db.query(
+      'DELETE FROM settings WHERE key = $1 AND user_id = $2',
+      [req.params.key, req.user.userId]
+    );
     res.json({ ok: true });
   } catch (err) {
     console.error('DELETE /api/storage/:key:', err);

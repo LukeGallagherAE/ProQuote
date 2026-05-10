@@ -19,6 +19,21 @@ CREATE TABLE IF NOT EXISTS quotes (
   updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Users table — stores hashed credentials
+CREATE TABLE IF NOT EXISTS users (
+  id            SERIAL PRIMARY KEY,
+  username      TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  biz_name      TEXT DEFAULT '',
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+ALTER TABLE quotes   ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+
+CREATE INDEX IF NOT EXISTS idx_settings_user ON settings(user_id);
+CREATE INDEX IF NOT EXISTS idx_quotes_user   ON quotes(user_id);
+
 -- Trigger to auto-update updated_at on quotes
 CREATE OR REPLACE FUNCTION touch_updated_at()
 RETURNS TRIGGER AS $$

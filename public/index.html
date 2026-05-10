@@ -1,4 +1,4 @@
-<!-- ProQuote build: f1a9c3e — sign out sessionStorage fix -->
+<!-- ProQuote build: c4a8d2f — server-side JWT auth -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1103,7 +1103,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
           <input type="checkbox" id="signin-remember" style="width:15px;height:15px;cursor:pointer;accent-color:#1a4fa0">
           Keep me signed in
         </label>
-        <button class="login-btn" onclick="submitPassword()">Sign in →</button>
+        <button id="signin-submit-btn" class="login-btn" onclick="submitPassword()">Sign in →</button>
         <hr class="login-divider">
         <div style="text-align:center">
           <button class="login-link" onclick="showResetPin()">Forgot password?</button>
@@ -2067,15 +2067,29 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 // All reads/writes go through _ls (in-memory cache), flushed to /api/storage.
 // Each quote is additionally saved individually to /api/quotes/:id.
 (function () {
+  // Keep a direct reference to the real localStorage BEFORE we override it
+  window._nativeLS = window.localStorage;
+
+  // Token helpers — stored in native localStorage so the JWT survives the shim override
+  function getToken() {
+    return window._nativeLS ? window._nativeLS.getItem('pq_jwt') : null;
+  }
+  window._nativeGetToken = getToken;
+  window._nativeSetToken = function(t) { if (window._nativeLS) window._nativeLS.setItem('pq_jwt', t); };
+  window._nativeClearToken = function() { if (window._nativeLS) window._nativeLS.removeItem('pq_jwt'); };
+
   const _ls = {};
   let _flushTimer = null;
   const _quoteSaveTimers = {};
 
   async function _flushStorage() {
+    const token = getToken();
     try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
       await fetch('/api/storage', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(_ls),
       });
     } catch (e) {
@@ -2093,10 +2107,13 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     const id = quote.id;
     if (_quoteSaveTimers[id]) clearTimeout(_quoteSaveTimers[id]);
     _quoteSaveTimers[id] = setTimeout(async () => {
+      const token = getToken();
       try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = 'Bearer ' + token;
         await fetch('/api/quotes/' + id, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(quote),
         });
       } catch (e) {
@@ -2106,8 +2123,11 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   };
 
   window._deleteQuoteFromServer = async function (id) {
+    const token = getToken();
     try {
-      await fetch('/api/quotes/' + id, { method: 'DELETE' });
+      const headers = {};
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      await fetch('/api/quotes/' + id, { method: 'DELETE', headers });
     } catch (e) {
       console.warn('[ProQuote] Quote delete failed:', e);
     }
@@ -2142,14 +2162,21 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 
   // Fetches all persisted data from the server before init() runs
   window._initStorage = async function () {
+    const token = getToken();
+    if (!token) return; // no token — showLandingLogin handles auth
     try {
-      const r = await fetch('/api/storage');
-      if (r.ok) {
-        const data = await r.json();
-        Object.assign(_ls, data);
+      const res = await fetch('/api/storage', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if (res.status === 401) {
+        window._nativeClearToken();
+        return; // token expired — login screen will show
       }
+      if (!res.ok) return;
+      const data = await res.json();
+      Object.assign(_ls, data);
     } catch (e) {
-      console.warn('[ProQuote] Could not reach server — running offline:', e);
+      console.warn('[ProQuote] _initStorage failed:', e);
     }
   };
 })();
@@ -11299,31 +11326,52 @@ function landingOpenActiveQuotes() { dismissLanding(); setTimeout(() => switchTa
 function landingOpenProfile()   { dismissLanding(); setTimeout(() => switchTab('profile'), 100); }
 
 // ── Auth / Login ──────────────────────────────────────────────────────────────
-function _getAuth() { try { return JSON.parse(localStorage.getItem('proquote_auth') || 'null'); } catch(e) { return null; } }
-function _setAuth(data) { localStorage.setItem('proquote_auth', JSON.stringify(data)); }
+function _getAuth() {
+  const token = window._nativeGetToken ? window._nativeGetToken() : null;
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      if (window._nativeClearToken) window._nativeClearToken();
+      return null;
+    }
+    return { username: payload.username, biz: payload.biz, userId: payload.userId, _token: token };
+  } catch(e) { return null; }
+}
+function _setAuth(data) { /* no-op — auth now managed by JWT */ }
 
-function doChangePassword() {
+async function doChangePassword() {
   const cur  = document.getElementById('acc-cur-pass')?.value || '';
   const np1  = document.getElementById('acc-new-pass')?.value || '';
   const np2  = document.getElementById('acc-new-pass2')?.value || '';
   const msg  = document.getElementById('acc-pass-msg');
   const auth = _getAuth();
   if (!auth) { if (msg) { msg.style.color = '#ff3b30'; msg.textContent = 'No account found.'; } return; }
-  if (cur !== auth.password) { if (msg) { msg.style.color = '#ff3b30'; msg.textContent = 'Current password is incorrect.'; } return; }
   if (np1.length < 4) { if (msg) { msg.style.color = '#ff3b30'; msg.textContent = 'New password must be at least 4 characters.'; } return; }
   if (np1 !== np2) { if (msg) { msg.style.color = '#ff3b30'; msg.textContent = 'Passwords don\'t match.'; } return; }
-  _setAuth({ ...auth, password: np1 });
-  if (msg) { msg.style.color = '#30d158'; msg.textContent = '✓ Password updated.'; }
-  document.getElementById('acc-cur-pass').value = '';
-  document.getElementById('acc-new-pass').value = '';
-  document.getElementById('acc-new-pass2').value = '';
-  setTimeout(() => { if (msg) msg.textContent = ''; }, 3000);
+  try {
+    const res = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + auth._token },
+      body: JSON.stringify({ currentPassword: cur, newPassword: np1 })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (msg) { msg.style.color = '#ff3b30'; msg.textContent = data.error || 'Password change failed.'; }
+      return;
+    }
+    if (msg) { msg.style.color = '#30d158'; msg.textContent = '✓ Password updated.'; }
+    document.getElementById('acc-cur-pass').value = '';
+    document.getElementById('acc-new-pass').value = '';
+    document.getElementById('acc-new-pass2').value = '';
+    setTimeout(() => { if (msg) msg.textContent = ''; }, 3000);
+  } catch(e) {
+    if (msg) { msg.style.color = '#ff3b30'; msg.textContent = 'Connection error — try again.'; }
+  }
 }
 
 function doSignOut() {
-  const auth = _getAuth();
-  if (auth) { delete auth._rememberedUntil; _setAuth(auth); }
-  // sessionStorage survives a reload but not a tab close — used to skip auto-login
+  if (window._nativeClearToken) window._nativeClearToken();
   sessionStorage.setItem('pq_signed_out', '1');
   window.location.reload();
 }
@@ -11331,7 +11379,7 @@ function doSignOut() {
 function _populateAccountPanel() {
   const auth = _getAuth();
   const el = document.getElementById('acc-username-display');
-  if (el && auth) el.textContent = 'Signed in as ' + auth.username;
+  if (el && auth) el.textContent = 'Signed in as ' + (auth.username || '');
 }
 
 function showLandingLogin() {
@@ -11343,8 +11391,8 @@ function showLandingLogin() {
   const justSignedOut = sessionStorage.getItem('pq_signed_out');
   if (justSignedOut) sessionStorage.removeItem('pq_signed_out');
 
-  // Auto-login if the user previously checked "Keep me signed in" and it hasn't expired
-  if (!justSignedOut && auth?._rememberedUntil && auth._rememberedUntil > Date.now()) {
+  // Auto-login if a valid JWT token is present
+  if (!justSignedOut && _getAuth()) {
     el.style.display = 'none';
     setTimeout(() => switchTab('dashboard'), 50);
     return;
@@ -11379,7 +11427,8 @@ function showLandingLogin() {
     document.getElementById('login-setup').style.display = 'none';
     document.getElementById('login-signin').style.display = '';
     // Avatar initials from biz name
-    const initials = (auth.biz || auth.name || 'PQ').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const authInfo = _getAuth();
+    const initials = (authInfo?.biz || authInfo?.username || 'PQ').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const av = document.getElementById('login-avatar'); if (av) av.textContent = initials;
     const wl = document.getElementById('login-welcome'); if (wl) wl.textContent = 'Welcome back';
     const bn = document.getElementById('login-biz-name'); if (bn) bn.textContent = auth.biz || 'ProQuote';
@@ -11441,28 +11490,45 @@ function setupBack(fromStep) {
   else if (fromStep === 3) _setupShowStep(2);
 }
 
-function doSetup() {
-  const name  = document.getElementById('setup-name')?.value.trim()   || '';
-  const biz   = document.getElementById('setup-biz')?.value.trim()    || '';
-  const phone = document.getElementById('setup-phone')?.value.trim()  || '';
-  const abn   = document.getElementById('setup-abn')?.value.trim()    || '';
-  const email = document.getElementById('setup-email')?.value.trim()  || '';
-  const uname = document.getElementById('setup-username')?.value.trim() || '';
-  const pass  = document.getElementById('setup-pass')?.value           || '';
+async function doSetup() {
+  const name    = document.getElementById('setup-name')?.value.trim()     || '';
+  const bizName = document.getElementById('setup-biz')?.value.trim()      || '';
+  const phone   = document.getElementById('setup-phone')?.value.trim()    || '';
+  const abn     = document.getElementById('setup-abn')?.value.trim()      || '';
+  const email   = document.getElementById('setup-email')?.value.trim()    || '';
+  const uname   = document.getElementById('setup-username')?.value.trim() || '';
+  const pass    = document.getElementById('setup-pass')?.value             || '';
+  const errEl   = document.getElementById('setup-error-2');
 
-  _setAuth({ name, biz: biz || 'ProQuote', username: uname, password: pass, created: Date.now() });
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: uname, password: pass, biz: bizName || 'ProQuote' })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (errEl) errEl.textContent = data.error || 'Registration failed — try again.';
+      return;
+    }
+    // Store JWT token
+    if (window._nativeSetToken) window._nativeSetToken(data.token);
+  } catch(e) {
+    if (errEl) errEl.textContent = 'Connection error — try again.';
+    return;
+  }
 
   // Pre-fill profile fields from the wizard answers
   try {
     const profile = JSON.parse(localStorage.getItem('proquote_profile') || '{}');
-    if (name)  { profile.pPreparedBy = name; }
-    if (biz)   { profile.pBizName   = biz; }
-    if (phone) { profile.pPhone     = phone; }
-    if (email) { profile.pEmail     = email; }
-    if (abn)   { profile.pABN       = abn; }
+    if (name)    { profile.pPreparedBy = name; }
+    if (bizName) { profile.pBizName   = bizName; }
+    if (phone)   { profile.pPhone     = phone; }
+    if (email)   { profile.pEmail     = email; }
+    if (abn)     { profile.pABN       = abn; }
     localStorage.setItem('proquote_profile', JSON.stringify(profile));
     // Sync live DOM fields if the profile page is already mounted
-    const fields = { pPreparedBy: name, pBizName: biz, pPhone: phone, pEmail: email, pABN: abn };
+    const fields = { pPreparedBy: name, pBizName: bizName, pPhone: phone, pEmail: email, pABN: abn };
     Object.entries(fields).forEach(([id, val]) => {
       const el = document.getElementById(id);
       if (el && !el.value && val) el.value = val;
@@ -11473,51 +11539,46 @@ function doSetup() {
   setTimeout(() => switchTab('dashboard'), 100);
 }
 
-function submitPassword() {
-  const uname = (document.getElementById('signin-username')?.value || '').trim();
-  const pass  = document.getElementById('signin-password')?.value || '';
-  const auth  = _getAuth();
-  const errEl = document.getElementById('pin-error');
-  if (!auth) return;
-  if (uname === auth.username && pass === auth.password) {
-    errEl.textContent = '';
-    // "Keep me signed in" — store a 90-day token
-    const remember = document.getElementById('signin-remember')?.checked;
-    if (remember) {
-      _setAuth({ ...auth, _rememberedUntil: Date.now() + 90 * 24 * 60 * 60 * 1000 });
+async function submitPassword() {
+  const uname  = (document.getElementById('signin-username')?.value || '').trim();
+  const pass   = document.getElementById('signin-password')?.value || '';
+  const errEl  = document.getElementById('pin-error');
+  if (!uname || !pass) { if (errEl) errEl.textContent = 'Enter username and password'; return; }
+  if (errEl) errEl.textContent = '';
+  const btn = document.getElementById('signin-submit-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Signing in…'; }
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: uname, password: pass })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (errEl) errEl.textContent = data.error || 'Invalid credentials';
+      if (btn) { btn.disabled = false; btn.textContent = 'Sign In →'; }
+      return;
     }
-    dismissLanding();
-    setTimeout(() => switchTab('dashboard'), 100);
-  } else {
-    errEl.textContent = 'Incorrect username or password.';
-    const pf = document.getElementById('signin-password');
-    if (pf) { pf.value = ''; pf.focus(); }
+    // Store token in native localStorage
+    if (window._nativeSetToken) window._nativeSetToken(data.token);
+    // Reload storage with new token then enter app
+    await window._initStorage();
+    document.getElementById('landing').style.display = 'none';
+    setTimeout(() => switchTab('dashboard'), 50);
+  } catch(e) {
+    if (errEl) errEl.textContent = 'Connection error — try again';
+    if (btn) { btn.disabled = false; btn.textContent = 'Sign In →'; }
   }
 }
 
 function showResetPin() {
-  if (!confirm('Reset your password? You\'ll be prompted to create a new account. Your data will not be affected.')) return;
-  localStorage.removeItem('proquote_auth');
-  showLandingLogin();
+  if (!confirm('Reset your password? Contact your administrator to reset your credentials.')) return;
+  if (window._nativeClearToken) window._nativeClearToken();
+  sessionStorage.setItem('pq_signed_out', '1');
+  window.location.reload();
 }
 
-// ── Bootstrap default account (runs once if no auth exists) ──────────────────
-(function _bootstrapAuth() {
-  try {
-    if (!localStorage.getItem('proquote_auth')) {
-      localStorage.setItem('proquote_auth', JSON.stringify({
-        name:     'Adonai Electrical',
-        biz:      'Adonai Electrical',
-        username: 'Adonai Electrical',
-        password: 'E7doa6__!',
-        created:  Date.now()
-      }));
-      // Also pre-fill profile with business name if blank
-      const profile = JSON.parse(localStorage.getItem('proquote_profile') || '{}');
-      if (!profile.pBizName) { profile.pBizName = 'Adonai Electrical'; localStorage.setItem('proquote_profile', JSON.stringify(profile)); }
-    }
-  } catch(e) {}
-})();
+// Auth is now managed server-side via JWT — no client-side seeding needed.
 
 // Re-read _customCats now that server data is loaded, then start the app
 window._initStorage().then(() => {
