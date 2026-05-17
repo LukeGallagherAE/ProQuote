@@ -1,4 +1,4 @@
-<!-- ProQuote build: 3e7f9c2 — Dark mode checkbox fix + v2.1 build stamp in nav rail -->
+<!-- ProQuote build: a1d4f8b — Remove baked-in T&C; logo watermark on uploaded T&C pages -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4059,18 +4059,6 @@ function generateClientQuote() {
       <tr><td colspan="3" style="height:12px;padding:0"></td></tr>`;
   }).join('');
 
-  const tcsHtml = (function(){
-    let h='';let inTc=false;
-    ADONAI_TCS.split('\n').forEach(line=>{
-      const t2=line.trim();
-      if(t2==='Quote Terms & Conditions (NSW)'){h+=`<h3 style="font-size:13px;font-weight:700;margin:0 0 8px;color:#1a1a1a;page-break-after:avoid;break-after:avoid">${esc(t2)}</h3>`;inTc=true;return;}
-      if(!inTc) return;
-      if(!t2){h+='<div style="height:6px"></div>';return;}
-      if(/^\d+\)/.test(t2)){const d=t2.indexOf(' – ');if(d>-1)h+=`<p style="font-size:11px;margin-bottom:5px;line-height:1.55;page-break-inside:avoid;break-inside:avoid"><strong style="color:var(--muted)">${esc(t2.slice(0,d+3))}</strong><span style="color:#777">${esc(t2.slice(d+3))}</span></p>`;else h+=`<p style="font-size:11px;margin-bottom:5px;color:#777;line-height:1.55;page-break-inside:avoid;break-inside:avoid">${esc(t2)}</p>`;}
-      else{h+=`<p style="font-size:12px;color:var(--muted);margin-bottom:4px;line-height:1.6;page-break-inside:avoid;break-inside:avoid">${esc(t2)}</p>`;}
-    });
-    return h;
-  }());
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -4219,13 +4207,6 @@ table{width:100%;border-collapse:collapse}
     </div>
   </div>`;
   })()}
-
-  <!-- T&Cs card — always starts a fresh PDF page -->
-  <div class="card" style="page-break-before:always;break-before:page">
-    <div class="card-body">
-      ${tcsHtml}
-    </div>
-  </div>
 
   <div style="text-align:center;font-size:11px;color:#bbb;margin-top:16px">${esc(biz)} · ABN ${esc(abn)} · ${esc(lic)}</div>
 </div>
@@ -6387,36 +6368,8 @@ function doPrint(){
 
 
 
-  // ── T&Cs ── always starts a fresh PDF page; clauses won't split mid-sentence
+  // ── Photos + FOOTER ──
   +photoPageHtml
-  +'<div style="margin-top:4px;page-break-before:always;break-before:page">'
-  +(function(){
-    const lines = ADONAI_TCS.split('\n');
-    let h = '';
-    let inTc = false;
-    lines.forEach(line => {
-      const t2 = line.trim();
-      if(t2==='Quote Terms & Conditions (NSW)'){
-        h+='<div style="font-size:12px;font-weight:700;margin:0 0 6px;color:#1a1a1a;page-break-after:avoid;break-after:avoid">'+esc(t2)+'</div>';
-        inTc=true;
-        return;
-      }
-      if(!inTc) return;
-      if(!t2){h+='<div style="height:6px"></div>';return;}
-      if(/^\d+\)/.test(t2)){
-        const d=t2.indexOf(' – ');
-        if(d>-1){
-          h+='<div style="font-size:10.5px;margin-bottom:4px;line-height:1.55;page-break-inside:avoid;break-inside:avoid"><strong style="color:var(--muted)">'+esc(t2.slice(0,d+3))+'</strong><span style="color:#777">'+esc(t2.slice(d+3))+'</span></div>';
-        } else {
-          h+='<div style="font-size:10.5px;margin-bottom:4px;line-height:1.55;color:#777;page-break-inside:avoid;break-inside:avoid">'+esc(t2)+'</div>';
-        }
-      } else {
-        h+='<div style="font-size:12px;color:var(--muted);margin-bottom:3px;line-height:1.6;page-break-inside:avoid;break-inside:avoid">'+esc(t2)+'</div>';
-      }
-    });
-    return h;
-  }())
-  +'</div>'
 
   // ── FOOTER ──
   +'<div style="margin-top:28px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:10px;color:#ccc">'
