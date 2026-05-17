@@ -1,4 +1,4 @@
-<!-- ProQuote build: a1d4f8b — Remove baked-in T&C; logo watermark on uploaded T&C pages -->
+<!-- ProQuote build: 7c2e1d9 — Line item discounts with auto-hide column -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2564,7 +2564,10 @@ function calcSub(sub, par) {
 function calcParent(par) {
   let matSell=0,labSell=0;
   for (const sub of par.subitems) { const c=calcSub(sub,par); matSell+=c.matSell; labSell+=c.labSell; }
-  return {matSell:matSell*par.qty,labSell:labSell*par.qty,total:(matSell+labSell)*par.qty};
+  const base=(matSell+labSell)*par.qty;
+  const disc=Math.min(Math.max(par.discount||0,0),100)/100;
+  const discAmt=base*disc;
+  return {matSell:matSell*par.qty,labSell:labSell*par.qty,total:base-discAmt,discAmt,base};
 }
 function calcSection(sec) {
   let m=0,l=0,t=0,optT=0;
@@ -2625,6 +2628,7 @@ function syncDOM() {
       // Auto-save as template when item has a real name and filled sub-items
       saveTemplate(par);
       const pq=document.getElementById('pq-'+par.id); if(pq) par.qty=parseFloat(pq.value)||1;
+      const pdisc=document.getElementById('pdisc-'+par.id); if(pdisc) par.discount=parseFloat(pdisc.value)||0;
       for (const sub of par.subitems) {
         const sq=document.getElementById('sq-'+sub.id); if(sq) sub.qty=parseFloat(sq.value)||1;
         const sm=document.getElementById('sm-'+sub.id); if(sm) sub.markup=parseFloat(sm.value)||0;
@@ -4018,18 +4022,21 @@ function generateClientQuote() {
   };
 
   // Build line items
+  const hasDisc = S.sections.some(sec => sec.parents.some(p => (p.discount||0) > 0));
   const lineRows = S.sections.map(sec => {
     const sorted = [...sec.parents].sort((a,b)=>catOrderFn(a.category)-catOrderFn(b.category));
     const pars = sorted.filter(p=>p.subitems.some(s=>s.item||s.customName||s.wireMin||s.instMin));
     if(!pars.length) return '';
     const sc = calcSection(sec);
+    const colSpan = hasDisc ? 4 : 3;
     const groups=[];let lastCat='__none__';
     pars.forEach(par=>{const cat=par.category||'';if(cat!==lastCat){groups.push({cat,pars:[]});lastCat=cat;}groups[groups.length-1].pars.push(par);});
     const groupHtml = groups.map(g=>{
       const col=CAT_COLORS_CQ[g.cat]||'#666';
-      const catRow=g.cat?`<tr><td colspan="3" style="padding:5px 20px 4px;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:${col};background:#fafafa;border-bottom:1px solid var(--border)"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${col};margin-right:6px;vertical-align:middle"></span>${esc(g.cat)}</td></tr>`:'';
+      const catRow=g.cat?`<tr><td colspan="${colSpan}" style="padding:5px 20px 4px;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:${col};background:#fafafa;border-bottom:1px solid var(--border)"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${col};margin-right:6px;vertical-align:middle"></span>${esc(g.cat)}</td></tr>`:'';
       const itemHtml=g.pars.map((par,idx)=>{
         const pc=calcParent(par);const lbl=installLbl(par);const isLast=idx===g.pars.length-1;
+        const discCell=hasDisc?(pc.discAmt>0?`<td style="padding:13px 20px;border-bottom:1px solid ${isLast?'#e0e0e0':'#f0f0f0'};text-align:center;font-size:13px;color:#e03;white-space:nowrap;vertical-align:top;font-weight:600">−${(par.discount||0)}%</td>`:`<td style="padding:13px 20px;border-bottom:1px solid ${isLast?'#e0e0e0':'#f0f0f0'};text-align:center;font-size:13px;color:var(--muted);vertical-align:top">—</td>`):'';
         return `<tr style="background:var(--surface)">
           <td style="padding:13px 20px;border-bottom:1px solid ${isLast?'#e0e0e0':'#f0f0f0'};font-size:13px;vertical-align:top;line-height:1.4">
             <div style="display:flex;align-items:flex-start;gap:12px">
@@ -4042,21 +4049,22 @@ function generateClientQuote() {
             </div>
           </td>
           <td style="padding:13px 20px;border-bottom:1px solid ${isLast?'#e0e0e0':'#f0f0f0'};text-align:center;font-size:13px;color:var(--muted);white-space:nowrap;vertical-align:top">${par.qty}</td>
+          ${discCell}
           <td style="padding:13px 20px;border-bottom:1px solid ${isLast?'#e0e0e0':'#f0f0f0'};text-align:right;font-size:13px;font-weight:700;color:#1a1a1a;vertical-align:top;white-space:nowrap;font-family:monospace">$${pc.total.toFixed(2)}</td>
         </tr>`;
       }).join('');
       return catRow+itemHtml;
     }).join('');
     return `
-      <tr><td colspan="3" style="padding:0"><div style="display:flex;align-items:stretch">
+      <tr><td colspan="${colSpan}" style="padding:0"><div style="display:flex;align-items:stretch">
         <div style="width:4px;background:#007aff;flex-shrink:0"></div>
         <div style="background:var(--blue-bg);padding:10px 16px;font-weight:800;font-size:13px;color:#1a1a1a;flex:1">${esc(sec.name)}</div>
         <div style="background:var(--blue-bg);padding:10px 20px;font-family:monospace;font-weight:700;font-size:13px;color:#007aff">$${sc.total.toFixed(2)}</div>
       </div></td></tr>
       ${groupHtml}
-      <tr style="background:var(--surface2)"><td colspan="2" style="padding:9px 20px;text-align:right;font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px">Subtotal — ${esc(sec.name)}</td>
+      <tr style="background:var(--surface2)"><td colspan="${colSpan-1}" style="padding:9px 20px;text-align:right;font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px">Subtotal — ${esc(sec.name)}</td>
         <td style="padding:9px 20px;text-align:right;font-size:13px;font-weight:800;font-family:monospace">$${sc.total.toFixed(2)}</td></tr>
-      <tr><td colspan="3" style="height:12px;padding:0"></td></tr>`;
+      <tr><td colspan="${colSpan}" style="height:12px;padding:0"></td></tr>`;
   }).join('');
 
 
@@ -4140,6 +4148,7 @@ table{width:100%;border-collapse:collapse}
         <tr style="background:#1a1a1a;color:#fff">
           <th style="padding:12px 20px;text-align:left;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase">Description</th>
           <th style="padding:12px 20px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:60px">Qty</th>
+          ${hasDisc?'<th style="padding:12px 20px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:90px">Discount</th>':''}
           <th style="padding:12px 20px;text-align:right;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:110px">Amount</th>
         </tr>
       </thead>
@@ -4820,9 +4829,10 @@ function renderParent(sid,par,pi,total){
         '</div>'+
         swiHtml+
         '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncDOM();fullRender()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
+        '<div style="display:flex;align-items:center;gap:3px;flex-shrink:0" title="Discount %"><span style="font-size:9px;color:var(--muted)">%</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:12px;padding:3px 5px" placeholder="0" title="Discount (%)"></div>'+
         '<span class="ptotal mat">'+fmt(c.matSell)+'</span>'+
         '<span class="ptotal lab">'+fmt(c.labSell)+'</span>'+
-        '<span class="ptotal tot">'+fmt(c.total)+'</span>'+
+        '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'">'+(c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)+'</span>'+
         '<div class="ph-actions">'+optPill+photoThumb+photoBtn+menuBtn+'</div>'+
       '</div>'+
       '<div style="padding:7px 14px 7px 36px;font-size:11px;color:var(--muted);background:var(--surface2)">'+subCount+' sub-item'+(subCount!==1?'s':'')+' hidden — '+fmt(c.total)+'</div>'+
@@ -4842,9 +4852,10 @@ function renderParent(sid,par,pi,total){
       '</div>'+
       swiHtml+
       '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncDOM();fullRender()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
+      '<div style="display:flex;align-items:center;gap:3px;flex-shrink:0" title="Discount %"><span style="font-size:9px;color:var(--muted)">%</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:12px;padding:3px 5px" placeholder="0" title="Discount (%)"></div>'+
       '<span class="ptotal mat">'+fmt(c.matSell)+'</span>'+
       '<span class="ptotal lab">'+fmt(c.labSell)+'</span>'+
-      '<span class="ptotal tot">'+fmt(c.total)+'</span>'+
+      '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'">'+(c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)+'</span>'+
       '<div class="ph-actions">'+optPill+photoThumb+photoBtn+menuBtn+'</div>'+
     '</div>'+
     descRow+
@@ -6065,6 +6076,7 @@ function doPrint(){
 
   // Build line items
   // ── LINE ITEMS: branch by detail level ─────────────────────────────────
+  const hasDisc = S.sections.some(sec => sec.parents.some(p => (p.discount||0) > 0));
   let lineRows = '';
   if (detail === 'total') {
     lineRows = '<tr><td colspan="4" style="padding:24px 16px;font-size:13px;color:var(--muted);text-align:center;font-style:italic">Please refer to the total below for all electrical works.</td></tr>';
@@ -6139,10 +6151,11 @@ function doPrint(){
       groups[groups.length-1].pars.push(par);
     });
 
+    const pdfColSpan = hasDisc ? 5 : 4;
     const groupHtml = groups.map(g => {
       const catCol = CAT_COLORS_PDF[g.cat] || '#666';
       const catRow = g.cat
-        ? '<tr><td colspan="4" style="padding:5px 16px 4px;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:'+catCol+';background:#fafafa;border-bottom:1px solid var(--border)">'
+        ? '<tr><td colspan="'+pdfColSpan+'" style="padding:5px 16px 4px;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:'+catCol+';background:#fafafa;border-bottom:1px solid var(--border)">'
           + '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+catCol+';margin-right:6px;vertical-align:middle"></span>'
           + esc(g.cat)+'</td></tr>'
         : '';
@@ -6156,6 +6169,10 @@ function doPrint(){
           ? '<input type="checkbox" class="opt-cb" checked data-amt="'+Number(pc.total).toFixed(2)+'" onchange="pdfRecalc()" style="margin-right:6px;width:14px;height:14px;accent-color:#e08000;flex-shrink:0;cursor:pointer">'
           : '';
         const optBadge = isOpt ? '<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;background:#fff3cd;color:#b06000;border:1px solid rgba(200,140,0,.3);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle">Optional</span>' : '';
+        const discCell = hasDisc ? (pc.discAmt>0
+          ? '<td style="padding:11px 16px;border-bottom:1px solid '+(isLast?'#e0e0e0':'#f0f0f0')+';text-align:center;font-size:13px;color:#e03;vertical-align:top;white-space:nowrap;font-weight:600">−'+(par.discount||0)+'%</td>'
+          : '<td style="padding:11px 16px;border-bottom:1px solid '+(isLast?'#e0e0e0':'#f0f0f0')+';text-align:center;font-size:13px;color:var(--muted);vertical-align:top">—</td>'
+        ) : '';
         let html = '<tr style="background:'+rowBg+'">'
           +'<td style="padding:11px 16px;border-bottom:1px solid '+(isLast?'#e0e0e0':'#f0f0f0')+';font-size:13px;vertical-align:top;line-height:1.4">'
             +'<div style="font-weight:600;color:#1a1a1a;display:flex;align-items:center;flex-wrap:wrap;gap:4px">'+optCheckbox+esc(par.name)+(lbl?'<span style="font-weight:400;color:var(--muted)"> — '+esc(lbl)+'</span>':'')+optBadge+'</div>'
@@ -6163,6 +6180,7 @@ function doPrint(){
           +'</td>'
           +'<td style="padding:11px 16px;border-bottom:1px solid '+(isLast?'#e0e0e0':'#f0f0f0')+';text-align:center;font-size:13px;color:var(--muted);vertical-align:top;white-space:nowrap">'+par.qty+'</td>'
           +'<td style="padding:11px 16px;border-bottom:1px solid '+(isLast?'#e0e0e0':'#f0f0f0')+';text-align:right;font-size:13px;color:var(--muted);vertical-align:top;white-space:nowrap;font-family:monospace">'+Number(up(par)).toFixed(2)+'</td>'
+          +discCell
           +'<td class="'+(isOpt?'opt-amt':'')+'" style="padding:11px 16px;border-bottom:1px solid '+(isLast?'#e0e0e0':'#f0f0f0')+';text-align:right;font-size:13px;font-weight:700;color:'+(isOpt?'#b06000':'#1a1a1a')+';vertical-align:top;white-space:nowrap;font-family:monospace">'+Number(pc.total).toFixed(2)+'</td>'
         +'</tr>';
         if (detail === 'full') {
@@ -6201,7 +6219,7 @@ function doPrint(){
     const sc2 = calcSection(sec);
     return ''
       // Room header — accent bar on left, dark bg
-      +'<tr><td colspan="4" style="padding:0"><div style="display:flex;align-items:stretch">'
+      +'<tr><td colspan="'+pdfColSpan+'" style="padding:0"><div style="display:flex;align-items:stretch">'
         +'<div style="width:4px;background:#007aff;flex-shrink:0;border-radius:0"></div>'
         +'<div style="background:#f0f2f8;padding:9px 14px;font-weight:800;font-size:13px;color:#1a1a1a;flex:1;letter-spacing:-.1px">'+esc(sec.name)+'</div>'
         +'<div style="background:#f0f2f8;padding:9px 16px;font-family:monospace;font-weight:700;font-size:13px;color:#007aff">'+Number(sc2.total).toFixed(2)+'</div>'
@@ -6209,10 +6227,10 @@ function doPrint(){
       + groupHtml
       // Section subtotal row
       +'<tr style="background:#f8f6f2">'
-        +'<td colspan="3" style="padding:8px 16px;text-align:right;font-size:11px;font-weight:700;color:#888;letter-spacing:.5px;text-transform:uppercase">Subtotal — '+esc(sec.name)+'</td>'
+        +'<td colspan="'+(pdfColSpan-1)+'" style="padding:8px 16px;text-align:right;font-size:11px;font-weight:700;color:#888;letter-spacing:.5px;text-transform:uppercase">Subtotal — '+esc(sec.name)+'</td>'
         +'<td style="padding:8px 16px;text-align:right;font-size:13px;font-weight:800;font-family:monospace;color:var(--text)">'+Number(sc2.total).toFixed(2)+'</td>'
       +'</tr>'
-      +'<tr><td colspan="4" style="height:12px;padding:0"></td></tr>';
+      +'<tr><td colspan="'+pdfColSpan+'" style="height:12px;padding:0"></td></tr>';
     }).join('');
   }
 
@@ -6313,6 +6331,7 @@ function doPrint(){
         +'<th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase">Description</th>'
         +'<th style="padding:10px 16px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:60px">Qty</th>'
         +'<th style="padding:10px 16px;text-align:right;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:100px">Unit</th>'
+        +(hasDisc?'<th style="padding:10px 16px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:90px">Discount</th>':'')
         +'<th style="padding:10px 16px;text-align:right;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:100px">Amount</th>'
       +'</tr>'
     +'</thead>'
