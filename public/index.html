@@ -1,4 +1,4 @@
-<!-- ProQuote build: 7c2e1d9 — Line item discounts with auto-hide column -->
+<!-- ProQuote build: a3f8b2c — Mobile layout toggle with nav-to-bottom mode -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -495,6 +495,16 @@ html.dark .sidebar.sb-floating{box-shadow:0 12px 48px rgba(0,0,0,.5)!important;}
 html.dark .nav-rail{background:#18180f;border-right:none}
 .nav-version{margin-top:auto;padding-bottom:8px;font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(60,50,30,.25);text-align:center;user-select:none}
 html.dark .nav-version{color:rgba(255,255,255,.18)}
+/* ── Mobile layout mode ────────────────────────────── */
+html.mobile .nav-rail{top:auto!important;bottom:0;left:0;right:0;width:100%!important;height:56px;flex-direction:row;justify-content:space-around;border-right:none;border-top:1px solid var(--border);padding:0 2px;gap:0}
+html.mobile .nav-rail-top-spacer,html.mobile .nav-rail-divider,html.mobile .nav-version{display:none!important}
+html.mobile .nav-rail-btn{flex:1;height:56px;border-radius:0;min-width:0}
+html.mobile .nav-rail-btn .rail-label{font-size:8px;letter-spacing:.2px}
+html.mobile .topbar{left:0!important}
+html.mobile .main{margin-left:0!important;margin-right:0!important;padding-bottom:140px!important}
+html.mobile .totals-bar{left:0!important;bottom:56px}
+html.mobile .sidebar,html.mobile .sidebar-toggle{display:none!important}
+html.mobile #rail-flyout{display:none!important}
 .nav-rail-top-spacer{height:52px;flex-shrink:0}
 .nav-rail-btn{
   width:42px;height:42px;border-radius:9px;border:none;
@@ -1278,6 +1288,11 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   <!-- ── Pinned bottom: Dark mode + Save ── -->
   <div style="flex:1"></div>
   <div class="nav-rail-divider"></div>
+  <button class="nav-rail-btn" id="mobile-mode-btn" onclick="toggleMobileMode()" title="Toggle mobile layout">
+    <svg id="mm-icon-mobile" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.5" stroke-width="2.5" stroke-linecap="round"/></svg>
+    <svg id="mm-icon-web" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" style="display:none"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    <span class="rail-label" id="mm-label">Mobile</span>
+  </button>
   <button class="nav-rail-btn" id="dm-toggle" onclick="toggleDarkMode()" title="Toggle light/dark mode">
     <svg id="dm-icon-moon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     <svg id="dm-icon-sun" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -10648,6 +10663,19 @@ function toggleDarkMode() {
   _applyDarkModeIcons(isDark);
   try { localStorage.setItem('proquote-theme', isDark ? 'dark' : 'light'); } catch(e){}
 }
+function toggleMobileMode() {
+  const isMobile = document.documentElement.classList.toggle('mobile');
+  _applyMobileModeUI(isMobile);
+  try { localStorage.setItem('proquote-layout', isMobile ? 'mobile' : 'web'); } catch(e){}
+}
+function _applyMobileModeUI(isMobile) {
+  const iconMobile = document.getElementById('mm-icon-mobile');
+  const iconWeb    = document.getElementById('mm-icon-web');
+  const label      = document.getElementById('mm-label');
+  if (iconMobile) iconMobile.style.display = isMobile ? 'none' : '';
+  if (iconWeb)    iconWeb.style.display    = isMobile ? '' : 'none';
+  if (label)      label.textContent        = isMobile ? 'Web' : 'Mobile';
+}
 function _applyDarkModeIcons(isDark) {
   const sun = document.getElementById('dm-icon-sun');
   const moon = document.getElementById('dm-icon-moon');
@@ -11050,6 +11078,12 @@ function init(){
     const isDark = localStorage.getItem('proquote-theme') === 'dark';
     if (isDark) document.documentElement.classList.add('dark');
     _applyDarkModeIcons(isDark);
+  } catch(e){}
+  // Restore saved layout mode
+  try {
+    const isMobile = localStorage.getItem('proquote-layout') === 'mobile';
+    if (isMobile) document.documentElement.classList.add('mobile');
+    _applyMobileModeUI(isMobile);
   } catch(e){}
   // Attach nav-rail hover flyouts
   if (window._attachRailFlyouts) window._attachRailFlyouts();
