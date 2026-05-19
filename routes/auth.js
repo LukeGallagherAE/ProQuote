@@ -48,33 +48,16 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GET /api/auth/register-available — tells frontend if registration is open
-router.get('/register-available', async (req, res) => {
-  const inviteCode = process.env.INVITE_CODE || '';
-  res.json({ available: inviteCode.length > 0 });
-});
-
-// POST /api/auth/register — first-run (no users) OR invite-code protected
+// POST /api/auth/register — open registration
 router.post('/register', async (req, res) => {
-  const { username, password, biz, inviteCode } = req.body || {};
+  const { username, password, biz } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
+  if (password.length < 4) {
+    return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  }
   try {
-    const { rows: existing } = await db.query('SELECT COUNT(*)::int AS count FROM users');
-    const isFirstRun = existing[0].count === 0;
-
-    if (!isFirstRun) {
-      // Require invite code for subsequent registrations
-      const serverCode = process.env.INVITE_CODE || '';
-      if (!serverCode) {
-        return res.status(403).json({ error: 'Registration is closed' });
-      }
-      if (!inviteCode || inviteCode.trim() !== serverCode.trim()) {
-        return res.status(403).json({ error: 'Invalid invite code' });
-      }
-    }
-
     // Check username not already taken
     const { rows: taken } = await db.query('SELECT id FROM users WHERE username = $1', [username]);
     if (taken.length) {

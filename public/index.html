@@ -1,4 +1,4 @@
-<!-- ProQuote build: d9e4c71 — Invite-code create account on login screen -->
+<!-- ProQuote build: f1a7d3e — Open sign-up tab on login screen -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1095,13 +1095,16 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 
       </div>
 
+      <!-- ── Tab switcher ── -->
+      <div id="login-tabs" class="login-card" style="display:none;padding-bottom:0">
+        <div style="display:flex;background:var(--surface2);border-radius:10px;padding:3px;margin-bottom:28px">
+          <button id="tab-signin-btn" onclick="showSignInForm()" style="flex:1;padding:8px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:#1a4fa0;color:#fff;transition:all .15s">Sign in</button>
+          <button id="tab-register-btn" onclick="showRegisterForm()" style="flex:1;padding:8px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;background:none;color:var(--muted);transition:all .15s">Create account</button>
+        </div>
+      </div>
+
       <!-- ── Login state (returning user) ── -->
       <div id="login-signin" class="login-card" style="display:none">
-        <div class="login-avatar" id="login-avatar">PQ</div>
-        <div style="text-align:center;margin-bottom:28px">
-          <div class="login-card-title" id="login-welcome" style="text-align:center">Welcome back</div>
-          <div class="login-card-sub" style="text-align:center;margin-bottom:0" id="login-biz-name">ProQuote</div>
-        </div>
         <div class="login-field">
           <label>Username</label>
           <input id="signin-username" placeholder="Username" autocomplete="username">
@@ -1117,23 +1120,13 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         </label>
         <button id="signin-submit-btn" class="login-btn" onclick="submitPassword()">Sign in →</button>
         <hr class="login-divider">
-        <div style="text-align:center;display:flex;justify-content:center;gap:20px">
+        <div style="text-align:center">
           <button class="login-link" onclick="showResetPin()">Forgot password?</button>
-          <button class="login-link" id="show-register-btn" onclick="showRegisterForm()" style="display:none">Create account</button>
         </div>
       </div>
 
-      <!-- ── Create account (invite-code protected) ── -->
+      <!-- ── Create account ── -->
       <div id="login-register" class="login-card" style="display:none">
-        <div class="login-avatar" style="background:linear-gradient(135deg,#1a4fa0,#5856d6)">+</div>
-        <div style="text-align:center;margin-bottom:28px">
-          <div class="login-card-title" style="text-align:center">Create account</div>
-          <div class="login-card-sub" style="text-align:center;margin-bottom:0">Enter your invite code to get started</div>
-        </div>
-        <div class="login-field">
-          <label>Invite code</label>
-          <input id="reg-code" placeholder="••••••••" autocomplete="off">
-        </div>
         <div class="login-field">
           <label>Username</label>
           <input id="reg-username" placeholder="e.g. jane" autocomplete="username">
@@ -1148,10 +1141,6 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         </div>
         <div id="reg-error" style="color:#ff3b30;font-size:12px;min-height:16px;margin:4px 0 8px"></div>
         <button id="reg-submit-btn" class="login-btn" onclick="submitRegister()">Create account →</button>
-        <hr class="login-divider">
-        <div style="text-align:center">
-          <button class="login-link" onclick="showSignInForm()">← Back to sign in</button>
-        </div>
       </div>
 
     </div>
@@ -11725,22 +11714,14 @@ async function showLandingLogin() {
     document.getElementById('login-setup').style.display = '';
     document.getElementById('login-signin').style.display = 'none';
   } else {
-    // Account exists — show login form, check if registration is available
+    // Account exists — show tabs + sign in form
     document.getElementById('login-setup').style.display = 'none';
+    document.getElementById('login-tabs').style.display = '';
     document.getElementById('login-signin').style.display = '';
     document.getElementById('login-register').style.display = 'none';
     const pf = document.getElementById('signin-password'); if (pf) pf.value = '';
     document.getElementById('pin-error').textContent = '';
-    setTimeout(() => (document.getElementById('signin-password') || document.getElementById('signin-username'))?.focus(), 80);
-    // Show "Create account" link only if invite code is configured on the server
-    try {
-      const ra = await fetch('/api/auth/register-available');
-      if (ra.ok) {
-        const { available } = await ra.json();
-        const btn = document.getElementById('show-register-btn');
-        if (btn) btn.style.display = available ? '' : 'none';
-      }
-    } catch(e) {}
+    setTimeout(() => (document.getElementById('signin-username'))?.focus(), 80);
   }
 }
 
@@ -11748,24 +11729,28 @@ function showRegisterForm() {
   document.getElementById('login-signin').style.display = 'none';
   document.getElementById('login-register').style.display = '';
   document.getElementById('reg-error').textContent = '';
-  setTimeout(() => document.getElementById('reg-code')?.focus(), 80);
+  const tb = document.getElementById('tab-signin-btn'); const rb = document.getElementById('tab-register-btn');
+  if (tb) { tb.style.background = 'none'; tb.style.color = 'var(--muted)'; }
+  if (rb) { rb.style.background = '#1a4fa0'; rb.style.color = '#fff'; }
+  setTimeout(() => document.getElementById('reg-username')?.focus(), 80);
 }
 
 function showSignInForm() {
   document.getElementById('login-register').style.display = 'none';
   document.getElementById('login-signin').style.display = '';
+  const tb = document.getElementById('tab-signin-btn'); const rb = document.getElementById('tab-register-btn');
+  if (tb) { tb.style.background = '#1a4fa0'; tb.style.color = '#fff'; }
+  if (rb) { rb.style.background = 'none'; rb.style.color = 'var(--muted)'; }
   setTimeout(() => document.getElementById('signin-username')?.focus(), 80);
 }
 
 async function submitRegister() {
-  const code    = document.getElementById('reg-code')?.value.trim() || '';
-  const uname   = document.getElementById('reg-username')?.value.trim() || '';
-  const pass    = document.getElementById('reg-pass')?.value || '';
-  const pass2   = document.getElementById('reg-pass2')?.value || '';
-  const errEl   = document.getElementById('reg-error');
-  const btn     = document.getElementById('reg-submit-btn');
+  const uname = document.getElementById('reg-username')?.value.trim() || '';
+  const pass  = document.getElementById('reg-pass')?.value || '';
+  const pass2 = document.getElementById('reg-pass2')?.value || '';
+  const errEl = document.getElementById('reg-error');
+  const btn   = document.getElementById('reg-submit-btn');
   errEl.textContent = '';
-  if (!code)  { errEl.textContent = 'Invite code is required.'; document.getElementById('reg-code').focus(); return; }
   if (!uname) { errEl.textContent = 'Username is required.'; document.getElementById('reg-username').focus(); return; }
   if (pass.length < 4) { errEl.textContent = 'Password must be at least 4 characters.'; document.getElementById('reg-pass').focus(); return; }
   if (pass !== pass2) { errEl.textContent = 'Passwords do not match.'; document.getElementById('reg-pass2').focus(); return; }
@@ -11774,11 +11759,10 @@ async function submitRegister() {
     const r = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: uname, password: pass, inviteCode: code })
+      body: JSON.stringify({ username: uname, password: pass })
     });
     const data = await r.json();
     if (!r.ok) { errEl.textContent = data.error || 'Registration failed.'; btn.disabled = false; btn.textContent = 'Create account →'; return; }
-    // Registered — log straight in
     localStorage.setItem('pq_jwt', data.token);
     location.reload();
   } catch(e) {
