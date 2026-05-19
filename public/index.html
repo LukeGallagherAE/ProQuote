@@ -1,4 +1,4 @@
-<!-- ProQuote build: f1a7d3e — Open sign-up tab on login screen -->
+<!-- ProQuote build: b8c2f91 — Onboarding walkthroughs and help panel -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -547,6 +547,152 @@ html.dark .nav-rail-divider{background:rgba(255,255,255,.09)}
 .nav-rail-add:hover{border-color:rgba(60,50,30,.6);color:#18180f}
 html.dark .nav-rail-add{border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.35)}
 html.dark .nav-rail-add:hover{border-color:rgba(255,255,255,.6);color:#fff}
+
+/* ── Walkthrough engine ─────────────────────────────── */
+#wt-overlay{
+  position:fixed;inset:0;z-index:9000;pointer-events:none;
+  transition:opacity .25s;
+}
+#wt-overlay.wt-active{pointer-events:auto}
+#wt-backdrop{
+  position:absolute;inset:0;
+  background:rgba(0,0,0,.55);
+  transition:opacity .25s;
+}
+#wt-spotlight{
+  position:absolute;
+  border-radius:10px;
+  box-shadow:0 0 0 9999px rgba(0,0,0,.55);
+  transition:top .35s cubic-bezier(.4,0,.2,1),left .35s cubic-bezier(.4,0,.2,1),
+             width .35s cubic-bezier(.4,0,.2,1),height .35s cubic-bezier(.4,0,.2,1);
+  pointer-events:none;
+}
+#wt-card{
+  position:fixed;
+  z-index:9001;
+  background:var(--surface,#fff);
+  border:1px solid var(--border,#e0dbd0);
+  border-radius:14px;
+  box-shadow:0 12px 48px rgba(0,0,0,.22);
+  padding:22px 24px 18px;
+  width:320px;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  transition:top .35s cubic-bezier(.4,0,.2,1),left .35s cubic-bezier(.4,0,.2,1),opacity .2s;
+  pointer-events:auto;
+}
+html.dark #wt-card{background:#1e1e16;border-color:rgba(255,255,255,.1);}
+#wt-card .wt-counter{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted,#888);margin-bottom:8px;}
+#wt-card .wt-title{font-size:15px;font-weight:700;color:var(--text,#18180f);margin-bottom:8px;line-height:1.3;}
+html.dark #wt-card .wt-title{color:#fff;}
+#wt-card .wt-body{font-size:13px;color:var(--muted,#666);line-height:1.6;margin-bottom:18px;}
+html.dark #wt-card .wt-body{color:rgba(255,255,255,.6);}
+#wt-card .wt-body strong{color:var(--text,#18180f);font-weight:600;}
+html.dark #wt-card .wt-body strong{color:#fff;}
+#wt-card .wt-actions{display:flex;align-items:center;gap:8px;}
+#wt-card .wt-btn-skip{background:none;border:none;font-size:12px;color:var(--muted,#888);cursor:pointer;padding:0;font-family:inherit;margin-right:auto;}
+#wt-card .wt-btn-skip:hover{color:var(--text,#18180f);}
+html.dark #wt-card .wt-btn-skip:hover{color:#fff;}
+#wt-card .wt-btn-back{background:none;border:1px solid var(--border,#e0dbd0);font-size:12px;font-weight:600;color:var(--text,#18180f);cursor:pointer;padding:6px 14px;border-radius:7px;font-family:inherit;}
+#wt-card .wt-btn-back:hover{background:var(--surface2,#f5f3ee);}
+html.dark #wt-card .wt-btn-back{color:#fff;border-color:rgba(255,255,255,.15);}
+html.dark #wt-card .wt-btn-back:hover{background:rgba(255,255,255,.08);}
+#wt-card .wt-btn-next{background:#1a4fa0;border:none;color:#fff;font-size:12px;font-weight:700;cursor:pointer;padding:7px 16px;border-radius:7px;font-family:inherit;transition:background .12s;}
+#wt-card .wt-btn-next:hover{background:#163f85;}
+
+/* ── Help panel ─────────────────────────────────────── */
+#help-panel-backdrop{
+  position:fixed;inset:0;z-index:7999;
+  background:rgba(0,0,0,0);
+  pointer-events:none;
+  transition:background .25s;
+  backdrop-filter:blur(0px);
+  -webkit-backdrop-filter:blur(0px);
+}
+#help-panel-backdrop.hp-open{
+  pointer-events:auto;
+  background:rgba(0,0,0,.25);
+  backdrop-filter:blur(3px);
+  -webkit-backdrop-filter:blur(3px);
+}
+#help-panel{
+  position:fixed;top:0;right:0;bottom:0;
+  width:340px;z-index:8000;
+  background:var(--surface,#fff);
+  border-left:1px solid var(--border,#e0dbd0);
+  box-shadow:-8px 0 32px rgba(0,0,0,.12);
+  display:flex;flex-direction:column;
+  transform:translateX(100%);
+  transition:transform .3s cubic-bezier(.4,0,.2,1);
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+}
+html.dark #help-panel{background:#1a1a12;border-color:rgba(255,255,255,.08);}
+#help-panel.hp-open{transform:translateX(0);}
+#help-panel .hp-header{
+  padding:18px 20px 14px;
+  border-bottom:1px solid var(--border,#e0dbd0);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+html.dark #help-panel .hp-header{border-color:rgba(255,255,255,.08);}
+#help-panel .hp-title{font-size:14px;font-weight:700;color:var(--text,#18180f);}
+html.dark #help-panel .hp-title{color:#fff;}
+#help-panel .hp-close{background:none;border:none;font-size:18px;color:var(--muted,#888);cursor:pointer;padding:0;line-height:1;font-family:inherit;}
+#help-panel .hp-close:hover{color:var(--text,#18180f);}
+html.dark #help-panel .hp-close:hover{color:#fff;}
+#help-panel .hp-body{flex:1;overflow-y:auto;padding:16px 16px 0;}
+#help-panel .hp-section-title{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted,#888);margin:12px 4px 8px;}
+#help-panel .hp-tour-card{
+  background:var(--surface2,#f5f3ee);
+  border-radius:10px;
+  padding:13px 14px 11px;
+  margin-bottom:8px;
+  display:flex;flex-direction:column;gap:5px;
+}
+html.dark #help-panel .hp-tour-card{background:#232318;}
+#help-panel .hp-tour-card-top{display:flex;align-items:center;justify-content:space-between;}
+#help-panel .hp-tour-name{font-size:13px;font-weight:700;color:var(--text,#18180f);}
+html.dark #help-panel .hp-tour-name{color:#fff;}
+#help-panel .hp-tour-desc{font-size:11.5px;color:var(--muted,#888);line-height:1.5;}
+#help-panel .hp-tour-start{background:#1a4fa0;border:none;color:#fff;font-size:11px;font-weight:700;cursor:pointer;padding:5px 12px;border-radius:6px;font-family:inherit;white-space:nowrap;transition:background .12s;}
+#help-panel .hp-tour-start:hover{background:#163f85;}
+#help-panel .hp-tip-card{
+  background:var(--surface2,#f5f3ee);
+  border-radius:9px;
+  padding:11px 13px;
+  margin-bottom:7px;
+  font-size:12px;
+  color:var(--text,#18180f);
+  line-height:1.55;
+}
+html.dark #help-panel .hp-tip-card{background:#232318;color:rgba(255,255,255,.8);}
+#help-panel .hp-footer{
+  padding:12px 16px;
+  border-top:1px solid var(--border,#e0dbd0);
+  font-size:10px;
+  color:var(--muted,#888);
+  text-align:center;
+  flex-shrink:0;
+}
+html.dark #help-panel .hp-footer{border-color:rgba(255,255,255,.08);}
+
+/* ── Welcome banner ─────────────────────────────────── */
+#welcome-banner{
+  display:flex;align-items:center;gap:10px;
+  background:#1a4fa0;color:#fff;
+  padding:10px 16px 10px 20px;
+  border-radius:10px;
+  margin:10px 16px 0;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  font-size:13px;
+  flex-shrink:0;
+  position:relative;
+  z-index:200;
+}
+#welcome-banner .wb-text{flex:1;line-height:1.45;}
+#welcome-banner .wb-start{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:12px;font-weight:700;border-radius:7px;padding:5px 13px;cursor:pointer;white-space:nowrap;font-family:inherit;transition:background .12s;}
+#welcome-banner .wb-start:hover{background:rgba(255,255,255,.28);}
+#welcome-banner .wb-dismiss{background:none;border:none;color:rgba(255,255,255,.7);font-size:18px;cursor:pointer;padding:0 0 0 8px;line-height:1;font-family:inherit;}
+#welcome-banner .wb-dismiss:hover{color:#fff;}
 .nav-rail-custom{position:relative}
 .nav-rail-custom .rail-close{
   position:absolute;top:-4px;right:-4px;width:14px;height:14px;
@@ -1309,6 +1455,13 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   <!-- ── Pinned bottom: Dark mode + Save ── -->
   <div style="flex:1"></div>
   <div class="nav-rail-divider"></div>
+  <button class="nav-rail-btn" id="help-btn" onclick="openHelpPanel()" title="Help &amp; Walkthroughs">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+      <path d="M22 10l-10-7L2 10l10 7 10-7z"/>
+      <path d="M6 12v5c0 1.1 2.686 2 6 2s6-.9 6-2v-5"/>
+    </svg>
+    <span class="rail-label">Help</span>
+  </button>
   <button class="nav-rail-btn" id="mobile-mode-btn" onclick="toggleMobileMode()" title="Toggle mobile layout">
     <svg id="mm-icon-mobile" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.5" stroke-width="2.5" stroke-linecap="round"/></svg>
     <svg id="mm-icon-web" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" style="display:none"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
@@ -10704,6 +10857,180 @@ function _applyDarkModeIcons(isDark) {
   if (moon) moon.style.display = isDark ? 'none' : '';
 }
 
+// ── Walkthrough engine ────────────────────────────────────────────────────────
+const _WT_TOURS = {
+  'first-quote': {
+    steps: [
+      { title: 'Welcome to ProQuote!', body: "Let's walk you through creating your first quote. It only takes 2 minutes.", target: null },
+      { title: 'Start a new quote', body: 'Tap the + button to start a new quote. You can create from scratch or use a template.', target: '.tab-new-quote' },
+      { title: 'Your quotes list', body: 'Your quotes list lives here — all your quotes, searchable and filterable by status.', target: '#rail-quotes-all' },
+      { title: 'Business profile', body: 'Set up your business profile here — logo, ABN, licence number, T&amp;Cs. This appears on every quote.', target: '#rail-profile' },
+      { title: 'Price lists', body: 'Build your price lists here — materials and labour rates you use all the time.', target: '#rail-pricelists' },
+      { title: "You're ready! 🎉", body: "That's the overview! When you're ready, hit + to create your first real quote. You've got this.", target: null },
+    ]
+  },
+  'profile-setup': {
+    steps: [
+      { title: 'Setting up your profile', body: "Let's get your business profile set up — this fills your quote headers automatically.", target: null },
+      { title: 'Business Profile', body: 'Click Business Profile in the nav.', target: '#rail-profile' },
+      { title: 'Fill in your details', body: 'Fill in your business name, ABN, licence number, phone and email. Upload your logo and T&amp;C PDF. These appear on every quote you send.', target: null },
+      { title: 'All done!', body: "Done! Your profile info will automatically populate every new quote.", target: null },
+    ]
+  },
+  'markup-explainer': {
+    steps: [
+      { title: 'Understanding markup', body: 'ProQuote uses a cost-plus markup model. Here\'s how it works.', target: null },
+      { title: 'Cost price &amp; markup', body: 'Each line item has a <strong>cost price</strong> (what you pay) and a <strong>markup %</strong> that calculates your <strong>sell price</strong> (what you charge the client).', target: null },
+      { title: 'Default rates', body: 'You can set default markup rates in your Business Profile — separate rates for materials and labour.', target: '#rail-profile' },
+      { title: 'Per-section override', body: 'When building a quote, you can override markup per section. The totals bar always shows your margin in real time.', target: null },
+      { title: 'Client privacy ✅', body: "Tip: The PDF sent to clients only shows sell prices — your cost and markup stays private.", target: null },
+    ]
+  }
+};
+
+let _wtTourId = null;
+let _wtStep = 0;
+let _wtSteps = [];
+let _wtKeyHandler = null;
+
+function startTour(tourId) {
+  const tour = _WT_TOURS[tourId];
+  if (!tour) return;
+  // Mark as seen
+  try { localStorage.setItem('proquote-tour-done-' + tourId, '1'); } catch(e){}
+  _wtTourId = tourId;
+  _wtSteps = tour.steps;
+  _wtStep = 0;
+  _wtShowStep();
+  // Keyboard handler
+  if (_wtKeyHandler) document.removeEventListener('keydown', _wtKeyHandler);
+  _wtKeyHandler = function(e) {
+    if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); wtNext(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); wtBack(); }
+    else if (e.key === 'Escape') { e.preventDefault(); wtSkip(); }
+  };
+  document.addEventListener('keydown', _wtKeyHandler);
+}
+
+function _wtShowStep() {
+  const step = _wtSteps[_wtStep];
+  if (!step) return;
+  const overlay = document.getElementById('wt-overlay');
+  const spotlight = document.getElementById('wt-spotlight');
+  const card = document.getElementById('wt-card');
+  const counter = document.getElementById('wt-counter');
+  const titleEl = document.getElementById('wt-title');
+  const bodyEl = document.getElementById('wt-body');
+  const backBtn = document.getElementById('wt-back');
+  const nextBtn = document.getElementById('wt-next');
+  const isLast = _wtStep === _wtSteps.length - 1;
+
+  overlay.classList.add('wt-active');
+  card.style.display = 'block';
+  counter.textContent = 'Step ' + (_wtStep + 1) + ' of ' + _wtSteps.length;
+  titleEl.innerHTML = step.title;
+  bodyEl.innerHTML = step.body;
+  backBtn.style.display = _wtStep === 0 ? 'none' : '';
+  nextBtn.textContent = isLast ? 'Finish ✓' : 'Next →';
+
+  if (step.target) {
+    const el = document.querySelector(step.target);
+    if (el) {
+      spotlight.style.display = 'block';
+      document.getElementById('wt-backdrop').style.background = 'transparent';
+      const rect = el.getBoundingClientRect();
+      const pad = 8;
+      spotlight.style.top = (rect.top - pad) + 'px';
+      spotlight.style.left = (rect.left - pad) + 'px';
+      spotlight.style.width = (rect.width + pad * 2) + 'px';
+      spotlight.style.height = (rect.height + pad * 2) + 'px';
+      // Position card near spotlight
+      const cardW = 320, cardH = 200;
+      let cx = rect.right + 16;
+      let cy = rect.top - pad;
+      if (cx + cardW > window.innerWidth - 12) cx = rect.left - cardW - 16;
+      if (cx < 12) cx = Math.max(12, (window.innerWidth - cardW) / 2);
+      if (cy + cardH > window.innerHeight - 16) cy = Math.max(12, rect.bottom + 12);
+      card.style.left = cx + 'px';
+      card.style.top = cy + 'px';
+      card.style.transform = 'none';
+    } else {
+      _wtCenterCard(spotlight);
+    }
+  } else {
+    _wtCenterCard(spotlight);
+  }
+}
+
+function _wtCenterCard(spotlight) {
+  spotlight.style.display = 'none';
+  document.getElementById('wt-backdrop').style.background = '';
+  const card = document.getElementById('wt-card');
+  card.style.left = '50%';
+  card.style.top = '50%';
+  card.style.transform = 'translate(-50%, -50%)';
+}
+
+function wtNext() {
+  if (_wtStep < _wtSteps.length - 1) {
+    _wtStep++;
+    _wtShowStep();
+  } else {
+    wtSkip();
+  }
+}
+
+function wtBack() {
+  if (_wtStep > 0) {
+    _wtStep--;
+    _wtShowStep();
+  }
+}
+
+function wtSkip() {
+  const overlay = document.getElementById('wt-overlay');
+  const spotlight = document.getElementById('wt-spotlight');
+  const card = document.getElementById('wt-card');
+  overlay.classList.remove('wt-active');
+  spotlight.style.display = 'none';
+  card.style.display = 'none';
+  _wtTourId = null;
+  _wtSteps = [];
+  if (_wtKeyHandler) { document.removeEventListener('keydown', _wtKeyHandler); _wtKeyHandler = null; }
+}
+
+// ── Help panel ────────────────────────────────────────────────────────────────
+function openHelpPanel() {
+  document.getElementById('help-panel').classList.add('hp-open');
+  document.getElementById('help-panel-backdrop').classList.add('hp-open');
+}
+function closeHelpPanel() {
+  document.getElementById('help-panel').classList.remove('hp-open');
+  document.getElementById('help-panel-backdrop').classList.remove('hp-open');
+}
+
+// ── Welcome banner ────────────────────────────────────────────────────────────
+function _maybeShowWelcomeBanner() {
+  try {
+    if (localStorage.getItem('proquote-welcome-dismissed')) return;
+    const profile = localStorage.getItem('proquote_profile');
+    const isEmpty = !profile || profile === '{}' || profile === 'null';
+    if (!isEmpty) return; // not a first login
+    const banner = document.getElementById('welcome-banner');
+    if (banner) {
+      // Insert at top of first visible tab-page or main area
+      const main = document.querySelector('.main') || document.body;
+      main.insertBefore(banner, main.firstChild);
+      banner.style.display = 'flex';
+    }
+  } catch(e){}
+}
+
+function dismissWelcomeBanner() {
+  try { localStorage.setItem('proquote-welcome-dismissed', '1'); } catch(e){}
+  const banner = document.getElementById('welcome-banner');
+  if (banner) banner.style.display = 'none';
+}
 
 // ── Job Tracker ───────────────────────────────────────────────────────────────
 const TRACKER_KEY = 'proquote_tracker';
@@ -11133,6 +11460,7 @@ function init(){
         renderCustomTabButtons();
         _persistSession(); // keep session alive
         wsShowScreen();
+        setTimeout(_maybeShowWelcomeBanner, 400);
         return; // skip normal quote-init flow
       }
     } catch(e) {}
@@ -11149,6 +11477,8 @@ function init(){
   });
   // Show workspace screen
   wsShowScreen();
+  // Show welcome banner for first-time users
+  setTimeout(_maybeShowWelcomeBanner, 400);
 }
 
 // ── Workspace save / load ─────────────────────────────────────────────────────
@@ -11930,6 +12260,70 @@ window._initStorage().then(() => {
   <div style="max-width:820px;margin:0 auto;padding:28px 24px 60px;width:100%">
     <div id="detail-panel-inner"></div>
   </div>
+</div>
+
+<!-- ── Walkthrough overlay ── -->
+<div id="wt-overlay">
+  <div id="wt-backdrop"></div>
+  <div id="wt-spotlight" style="display:none"></div>
+</div>
+<div id="wt-card" style="display:none">
+  <div class="wt-counter" id="wt-counter"></div>
+  <div class="wt-title" id="wt-title"></div>
+  <div class="wt-body" id="wt-body"></div>
+  <div class="wt-actions">
+    <button class="wt-btn-skip" onclick="wtSkip()">Skip tour</button>
+    <button class="wt-btn-back" id="wt-back" onclick="wtBack()">Back</button>
+    <button class="wt-btn-next" id="wt-next" onclick="wtNext()">Next →</button>
+  </div>
+</div>
+
+<!-- ── Help panel ── -->
+<div id="help-panel-backdrop" onclick="closeHelpPanel()"></div>
+<div id="help-panel">
+  <div class="hp-header">
+    <span class="hp-title">Help &amp; Walkthroughs</span>
+    <button class="hp-close" onclick="closeHelpPanel()">×</button>
+  </div>
+  <div class="hp-body">
+    <div class="hp-section-title">Walkthroughs</div>
+    <div class="hp-tour-card">
+      <div class="hp-tour-card-top">
+        <span class="hp-tour-name">Create your first quote</span>
+        <button class="hp-tour-start" onclick="closeHelpPanel();startTour('first-quote')">Start →</button>
+      </div>
+      <div class="hp-tour-desc">A quick overview of the key areas to get your first quote out the door.</div>
+    </div>
+    <div class="hp-tour-card">
+      <div class="hp-tour-card-top">
+        <span class="hp-tour-name">Setting up your profile</span>
+        <button class="hp-tour-start" onclick="closeHelpPanel();startTour('profile-setup')">Start →</button>
+      </div>
+      <div class="hp-tour-desc">Add your business name, logo, ABN and T&amp;Cs so they appear on every quote.</div>
+    </div>
+    <div class="hp-tour-card">
+      <div class="hp-tour-card-top">
+        <span class="hp-tour-name">Understanding markup</span>
+        <button class="hp-tour-start" onclick="closeHelpPanel();startTour('markup-explainer')">Start →</button>
+      </div>
+      <div class="hp-tour-desc">Learn how cost-plus markup works and how to set your rates and margins.</div>
+    </div>
+
+    <div class="hp-section-title">Quick tips</div>
+    <div class="hp-tip-card">Use the discount field on any line group to apply a % off — the PDF column auto-hides if nothing is discounted.</div>
+    <div class="hp-tip-card">Drag the sidebar divider to resize the quote editor and PDF preview side by side.</div>
+    <div class="hp-tip-card">The totals bar shows your live margin. Green = healthy, aim for 30%+.</div>
+    <div class="hp-tip-card">Send quotes directly from ProQuote — clients get a PDF with your branding and T&amp;Cs merged in.</div>
+    <div class="hp-tip-card">Switch to Mobile mode (phone icon in nav) for a cleaner layout on tablets and phones.</div>
+  </div>
+  <div class="hp-footer">ProQuote v2.1</div>
+</div>
+
+<!-- ── Welcome banner (injected by JS if first login) ── -->
+<div id="welcome-banner" style="display:none">
+  <div class="wb-text">👋 Welcome to ProQuote! Take a 2-minute tour to get started.</div>
+  <button class="wb-start" onclick="dismissWelcomeBanner();startTour('first-quote')">Start tour →</button>
+  <button class="wb-dismiss" onclick="dismissWelcomeBanner()" title="Dismiss">×</button>
 </div>
 </body>
 </html>
