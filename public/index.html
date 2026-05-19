@@ -1,4 +1,4 @@
-<!-- ProQuote build: a3f8b2c — Mobile layout toggle with nav-to-bottom mode -->
+<!-- ProQuote build: d9e4c71 — Invite-code create account on login screen -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1117,8 +1117,40 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         </label>
         <button id="signin-submit-btn" class="login-btn" onclick="submitPassword()">Sign in →</button>
         <hr class="login-divider">
-        <div style="text-align:center">
+        <div style="text-align:center;display:flex;justify-content:center;gap:20px">
           <button class="login-link" onclick="showResetPin()">Forgot password?</button>
+          <button class="login-link" id="show-register-btn" onclick="showRegisterForm()" style="display:none">Create account</button>
+        </div>
+      </div>
+
+      <!-- ── Create account (invite-code protected) ── -->
+      <div id="login-register" class="login-card" style="display:none">
+        <div class="login-avatar" style="background:linear-gradient(135deg,#1a4fa0,#5856d6)">+</div>
+        <div style="text-align:center;margin-bottom:28px">
+          <div class="login-card-title" style="text-align:center">Create account</div>
+          <div class="login-card-sub" style="text-align:center;margin-bottom:0">Enter your invite code to get started</div>
+        </div>
+        <div class="login-field">
+          <label>Invite code</label>
+          <input id="reg-code" placeholder="••••••••" autocomplete="off">
+        </div>
+        <div class="login-field">
+          <label>Username</label>
+          <input id="reg-username" placeholder="e.g. jane" autocomplete="username">
+        </div>
+        <div class="login-field">
+          <label>Password</label>
+          <input id="reg-pass" type="password" placeholder="At least 4 characters" autocomplete="new-password">
+        </div>
+        <div class="login-field">
+          <label>Confirm password</label>
+          <input id="reg-pass2" type="password" placeholder="Repeat password" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitRegister()">
+        </div>
+        <div id="reg-error" style="color:#ff3b30;font-size:12px;min-height:16px;margin:4px 0 8px"></div>
+        <button id="reg-submit-btn" class="login-btn" onclick="submitRegister()">Create account →</button>
+        <hr class="login-divider">
+        <div style="text-align:center">
+          <button class="login-link" onclick="showSignInForm()">← Back to sign in</button>
         </div>
       </div>
 
@@ -11693,12 +11725,65 @@ async function showLandingLogin() {
     document.getElementById('login-setup').style.display = '';
     document.getElementById('login-signin').style.display = 'none';
   } else {
-    // Account exists — show login form
+    // Account exists — show login form, check if registration is available
     document.getElementById('login-setup').style.display = 'none';
     document.getElementById('login-signin').style.display = '';
+    document.getElementById('login-register').style.display = 'none';
     const pf = document.getElementById('signin-password'); if (pf) pf.value = '';
     document.getElementById('pin-error').textContent = '';
     setTimeout(() => (document.getElementById('signin-password') || document.getElementById('signin-username'))?.focus(), 80);
+    // Show "Create account" link only if invite code is configured on the server
+    try {
+      const ra = await fetch('/api/auth/register-available');
+      if (ra.ok) {
+        const { available } = await ra.json();
+        const btn = document.getElementById('show-register-btn');
+        if (btn) btn.style.display = available ? '' : 'none';
+      }
+    } catch(e) {}
+  }
+}
+
+function showRegisterForm() {
+  document.getElementById('login-signin').style.display = 'none';
+  document.getElementById('login-register').style.display = '';
+  document.getElementById('reg-error').textContent = '';
+  setTimeout(() => document.getElementById('reg-code')?.focus(), 80);
+}
+
+function showSignInForm() {
+  document.getElementById('login-register').style.display = 'none';
+  document.getElementById('login-signin').style.display = '';
+  setTimeout(() => document.getElementById('signin-username')?.focus(), 80);
+}
+
+async function submitRegister() {
+  const code    = document.getElementById('reg-code')?.value.trim() || '';
+  const uname   = document.getElementById('reg-username')?.value.trim() || '';
+  const pass    = document.getElementById('reg-pass')?.value || '';
+  const pass2   = document.getElementById('reg-pass2')?.value || '';
+  const errEl   = document.getElementById('reg-error');
+  const btn     = document.getElementById('reg-submit-btn');
+  errEl.textContent = '';
+  if (!code)  { errEl.textContent = 'Invite code is required.'; document.getElementById('reg-code').focus(); return; }
+  if (!uname) { errEl.textContent = 'Username is required.'; document.getElementById('reg-username').focus(); return; }
+  if (pass.length < 4) { errEl.textContent = 'Password must be at least 4 characters.'; document.getElementById('reg-pass').focus(); return; }
+  if (pass !== pass2) { errEl.textContent = 'Passwords do not match.'; document.getElementById('reg-pass2').focus(); return; }
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    const r = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: uname, password: pass, inviteCode: code })
+    });
+    const data = await r.json();
+    if (!r.ok) { errEl.textContent = data.error || 'Registration failed.'; btn.disabled = false; btn.textContent = 'Create account →'; return; }
+    // Registered — log straight in
+    localStorage.setItem('pq_jwt', data.token);
+    location.reload();
+  } catch(e) {
+    errEl.textContent = 'Network error — please try again.';
+    btn.disabled = false; btn.textContent = 'Create account →';
   }
 }
 
