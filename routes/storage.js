@@ -38,8 +38,8 @@ router.put('/', async (req, res) => {
       await db.query(
         `INSERT INTO settings (key, value, user_id, updated_at)
          VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (key) DO UPDATE
-           SET value = EXCLUDED.value, user_id = EXCLUDED.user_id, updated_at = NOW()`,
+         ON CONFLICT (key, user_id) DO UPDATE
+           SET value = EXCLUDED.value, updated_at = NOW()`,
         [keys[i], vals[i], userId]
       );
     }

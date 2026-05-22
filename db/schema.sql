@@ -2,11 +2,14 @@
 -- Run once: psql -d proquote -f db/schema.sql
 
 -- All workspace key-value storage (mirrors localStorage keys).
--- One row per key. Value is stored as JSONB (raw strings wrapped in quotes, objects/arrays as-is).
+-- One row per (key, user_id) pair so each user has an isolated namespace.
 CREATE TABLE IF NOT EXISTS settings (
-  key         TEXT PRIMARY KEY,
+  id          BIGSERIAL PRIMARY KEY,
+  key         TEXT NOT NULL,
   value       TEXT,               -- stored as raw string, same as localStorage
-  updated_at  TIMESTAMPTZ DEFAULT NOW()
+  user_id     INTEGER REFERENCES users(id),
+  updated_at  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (key, user_id)
 );
 
 -- Quotes — each row is one quote tab.
@@ -28,8 +31,7 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
-ALTER TABLE quotes   ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
 
 CREATE INDEX IF NOT EXISTS idx_settings_user ON settings(user_id);
 CREATE INDEX IF NOT EXISTS idx_quotes_user   ON quotes(user_id);

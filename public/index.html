@@ -2568,8 +2568,9 @@ function saveActiveQuoteState() {
 function _persistSession() {
   try {
     localStorage.setItem('proquote_session_quotes', JSON.stringify(_quotes));
-    const _aq = _quotes.find(q => q.id === _activeQuoteId);
-    if (_aq && window._saveQuoteToServer) window._saveQuoteToServer(_aq);
+    if (window._saveQuoteToServer) {
+      _quotes.forEach(q => window._saveQuoteToServer(q));
+    }
   } catch(e) {}
 }
 
