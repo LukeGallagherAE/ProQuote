@@ -923,6 +923,27 @@ html.dark .wiz-inner{background:var(--surface)!important;color:var(--text)!impor
 html.dark .wiz-inner input,html.dark .wiz-inner textarea,html.dark .wiz-inner select{background:var(--surface2)!important;color:var(--text)!important;border-color:var(--border)!important}
 html.dark .wiz-inner label{color:var(--muted)!important}
 html.dark .clientModal-inner,html.dark .jobModal-inner{background:var(--surface)!important}
+
+/* ── Revisions panel ── */
+.rev-page{padding:0 0 80px;max-width:100%}
+.rev-page-header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:2px solid var(--border);background:var(--surface);gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:50}
+.rev-page-title{font-size:17px;font-weight:700;color:var(--text)}
+.rev-page-subtitle{font-size:12px;color:var(--muted);margin-top:2px}
+.rev-list{padding:16px 24px;display:flex;flex-direction:column;gap:10px}
+.rev-card{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.rev-card:hover{border-color:var(--accent);box-shadow:0 2px 8px rgba(0,122,255,.1)}
+.rev-card.rev-card-active{border-color:var(--accent);background:var(--blue-bg,#e8f0ff)}
+.rev-card-header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rev-card-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--surface2);color:var(--muted)}
+.rev-card-ref{font-size:13px;font-weight:700;color:var(--text)}
+.rev-card-date{font-size:11px;color:var(--muted);margin-left:auto}
+.rev-card-total{font-size:13px;font-weight:700;color:var(--accent);margin-top:4px}
+.rev-card-notes{font-size:12px;color:var(--muted);margin-top:6px;font-style:italic;white-space:pre-wrap}
+.rev-notes-banner{background:var(--blue-bg,#e8f0ff);border:1.5px solid var(--blue-border,#b3d0ff);border-radius:8px;padding:10px 12px;margin-bottom:12px}
+.rev-notes-label{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px}
+.rev-notes-textarea{width:100%;box-sizing:border-box;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;background:var(--bg);color:var(--text);resize:vertical;min-height:60px;font-family:inherit}
+html.dark .rev-notes-banner{background:rgba(0,122,255,.1);border-color:rgba(0,122,255,.3)}
+html.dark .rev-card-active{background:rgba(0,122,255,.1)}
 </style>
 </head>
 <body>
@@ -1407,6 +1428,10 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       Tracker
     </button>
+    <button id="qsub-revisions" class="qsub-btn" onclick="switchTab('revisions')">
+      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      Revisions
+    </button>
   </div>
   <div style="flex:1"></div>
   <!-- quote label + badge + publish — right -->
@@ -1508,6 +1533,11 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     <!-- left-edge width resize handle -->
     <div class="sb-resize-w" id="sb-resize-w"></div>
     <div id="sb-sidebar-content" style="display:flex;flex-direction:column;gap:16px;padding-bottom:16px">
+    <!-- Revision notes banner — shown only when viewing a revision -->
+    <div id="rev-notes-banner" class="rev-notes-banner" style="display:none">
+      <div class="rev-notes-label">↪ Revision — Changes from original</div>
+      <textarea id="revisionNotes" class="rev-notes-textarea" placeholder="Describe what changed in this revision…" oninput="clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800)"></textarea>
+    </div>
     <div>
       <div class="sh" style="margin-bottom:10px">Job details</div>
       <div style="display:flex;flex-direction:column;gap:8px">
@@ -1907,6 +1937,20 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     <div class="tracker-body">
       <div id="tracker-content"></div>
     </div>
+  </div>
+</div>
+
+<!-- ── REVISIONS TAB ── -->
+<div id="page-revisions" class="tab-page" style="display:none">
+  <div class="rev-page">
+    <div class="rev-page-header">
+      <div>
+        <div class="rev-page-title">Revisions</div>
+        <div class="rev-page-subtitle" id="rev-page-subtitle">All versions of this quote</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="createRevisionFromCurrentQuote()">↪ New Revision</button>
+    </div>
+    <div class="rev-list" id="rev-list"></div>
   </div>
 </div>
 
@@ -2475,7 +2519,7 @@ function _newQuoteState(overrides) {
       jobName:'', jobNumber:'', siteAddr:'',
       quoteRef:'Q-' + new Date().getFullYear() + '-001',
       quoteDate: new Date().toISOString().slice(0,10),
-      labourRate: profileRate('pLabourSell', 100), labourCostRate: profileRate('pLabourCost', 75), defaultMarkup: profileRate('pMarkup', 100), depositAmount: profileRate('pDeposit', 20), quoteNotes:''
+      labourRate: profileRate('pLabourSell', 100), labourCostRate: profileRate('pLabourCost', 75), defaultMarkup: profileRate('pMarkup', 100), depositAmount: profileRate('pDeposit', 20), quoteNotes:'', revisionNotes:''
     },
     ...overrides
   };
@@ -2483,7 +2527,7 @@ function _newQuoteState(overrides) {
 
 function _captureFields() {
   const ids = ['clientName','clientPhone','clientEmail','jobName','jobNumber',
-    'siteAddr','quoteRef','quoteDate','labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes'];
+    'siteAddr','quoteRef','quoteDate','labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes','revisionNotes'];
   const fields = {};
   ids.forEach(id => { const el = document.getElementById(id); if(el) fields[id] = el.value||''; });
   return fields;
@@ -2534,6 +2578,9 @@ function loadQuoteState(id) {
   _activeQuoteId = id;
   S.sections = JSON.parse(JSON.stringify(q.sections));
   _restoreFields(q.fields);
+  // Show revision notes banner only for revision quotes
+  const banner = document.getElementById('rev-notes-banner');
+  if (banner) banner.style.display = q._parentRef ? '' : 'none';
   fullRender();
   updateQuoteTabLabel();
   setTimeout(updatePublishBadge, 60);
@@ -3689,7 +3736,7 @@ function applyMarkupAll(){
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function fullRender(){renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();renderVariations();setTimeout(()=>{updatePublishBadge();},50);clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);}
+function fullRender(){renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();renderVariations();setTimeout(()=>{updatePublishBadge();},50);clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);}
 
 let _pubCheckTimer=null;
 function _schedulePublishCheck(){
@@ -4617,10 +4664,89 @@ function createRevisionFromQuote(qid) {
 
   _quotes.push(nq);
   loadQuoteState(nq.id);
-  if (_activeTab !== 'quote') switchTab('quote');
+  switchTab('revisions');
   renderQuoteTabs();
   saveActiveQuoteState();
-  showToast('↪ Revision (' + nextN + ') created — ' + newRef, 3500);
+  showToast('↪ Revision (' + nextN + ') created — switch to Quote tab to edit', 3500);
+}
+
+function createRevisionFromCurrentQuote() {
+  saveActiveQuoteState();
+  createRevisionFromQuote(_activeQuoteId);
+}
+
+function _getRevisionFamily(q) {
+  if (!q) return [];
+  const baseRef = (q._parentRef || q.fields?.quoteRef || '').replace(/\s+Revision\s*\(\d+\)\s*$/i, '').trim();
+  if (!baseRef) return [q];
+  const pat = new RegExp('^' + baseRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\s+Revision\\s*\\(\\d+\\))?$', 'i');
+  return _quotes.filter(x => pat.test(x.fields?.quoteRef || ''));
+}
+
+function _calcQuoteTotal(q) {
+  let total = 0;
+  (q.sections || []).forEach(sec => {
+    (sec.parents || []).forEach(p => {
+      (p.subs || []).forEach(sub => {
+        const qty = Number(sub.qty) || 1;
+        const price = Number(sub.customPrice) || Number(sub.price) || 0;
+        const markup = Number(sub.markup ?? (Number(q.fields?.defaultMarkup) || 100)) / 100;
+        const labour = (Number(sub.labourMins) || 0) / 60 * (Number(q.fields?.labourRate) || 100);
+        const disc = Number(sub.discount) || 0;
+        const mat = price * (1 + markup);
+        const lineTotal = (mat + labour) * qty * (1 - disc / 100);
+        if (!sub.optional) total += lineTotal;
+      });
+    });
+  });
+  return total;
+}
+
+function renderRevisions() {
+  const aq = _quotes.find(q => q.id === _activeQuoteId);
+  if (!aq) return;
+  const family = _getRevisionFamily(aq);
+  const baseRef = (aq._parentRef || aq.fields?.quoteRef || '').replace(/\s+Revision\s*\(\d+\)\s*$/i, '').trim();
+
+  const subtitle = document.getElementById('rev-page-subtitle');
+  if (subtitle) subtitle.textContent = family.length + ' version' + (family.length !== 1 ? 's' : '') + ' of ' + baseRef;
+
+  const list = document.getElementById('rev-list');
+  if (!list) return;
+
+  if (family.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px 0">No revisions yet</div>';
+    return;
+  }
+
+  list.innerHTML = family.map((q, i) => {
+    const isOriginal = !q._parentRef;
+    const isActive = q.id === _activeQuoteId;
+    const badge = isOriginal ? 'Original' : 'Rev ' + (i);
+    const total = _calcQuoteTotal(q);
+    const notes = q.fields?.revisionNotes || '';
+    const date = q.fields?.quoteDate || '';
+    const rawStatus = q._approvedAt ? 'Approved' : q._emailSentAt ? 'Email Sent' : q._publishedAt ? 'Published' : 'Draft';
+    return `<div class="rev-card${isActive ? ' rev-card-active' : ''}" onclick="loadRevisionCard('${q.id}')">
+      <div class="rev-card-header">
+        <span class="rev-card-badge">${badge}</span>
+        <span class="rev-card-ref">${escHtml(q.fields?.quoteRef || '')}</span>
+        <span class="rev-card-date">${date}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+        <span class="rev-card-total">${fmt(total)} excl. GST</span>
+        <span style="font-size:11px;color:var(--muted)">${escHtml(rawStatus)}</span>
+      </div>
+      ${notes ? `<div class="rev-card-notes">${escHtml(notes)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function loadRevisionCard(id) {
+  saveActiveQuoteState();
+  loadQuoteState(id);
+  renderRevisions();
+  renderQuoteTabs();
 }
 
 function closeWizard() {
@@ -7752,7 +7878,7 @@ function goBack() {
 function switchTab(tab) {
   // Track previous tab for back-button (only list/global pages count as "back" destinations)
   const listTabs = ['dashboard','quotes-all','clients','projects'];
-  const isQuoteTool = tab === 'quote' || tab === 'bom' || tab === 'tracker';
+  const isQuoteTool = tab === 'quote' || tab === 'bom' || tab === 'tracker' || tab === 'revisions';
   if (isQuoteTool && listTabs.includes(_activeTab)) {
     _prevTab = _activeTab;
   } else if (!isQuoteTool) {
@@ -7789,10 +7915,11 @@ function switchTab(tab) {
   }
 
   // Sync sub-tab pills
-  ['quote','bom','tracker'].forEach(t => {
+  ['quote','bom','tracker','revisions'].forEach(t => {
     const b = document.getElementById('qsub-' + t);
     if (b) b.classList.toggle('active', t === tab);
   });
+  if (tab === 'revisions') renderRevisions();
 
   // Update breadcrumb
   const qsubLabel = document.getElementById('qsub-label');
