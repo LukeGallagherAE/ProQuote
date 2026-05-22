@@ -3871,6 +3871,12 @@ function openQuoteTabDropdown(e, qid) {
   drop.className = 'quote-tab-dropdown';
   drop.style.cssText += `;position:fixed;top:${rect.bottom + 4}px;left:${rect.left}px`;
 
+  // New Revision option
+  const revItem = document.createElement('div');
+  revItem.className = 'qtd-item';
+  revItem.innerHTML = '<span class="qtd-icon">↪</span><div><div class="qtd-label">New Revision</div><div class="qtd-sub">Copy as Revision (N) under same job</div></div>';
+  revItem.addEventListener('click', () => { drop.remove(); createRevisionFromQuote(qid); });
+
   // Duplicate quote option
   const dupItem = document.createElement('div');
   dupItem.className = 'qtd-item';
@@ -3926,7 +3932,7 @@ function openQuoteTabDropdown(e, qid) {
     closeDetailPanel?.();
   });
 
-  [dupItem, closeItem, deleteItem].forEach(item => drop.appendChild(item));
+  [revItem, dupItem, closeItem, deleteItem].forEach(item => drop.appendChild(item));
   document.body.appendChild(drop);
 
   setTimeout(() => document.addEventListener('click', function h() { drop.remove(); document.removeEventListener('click', h); }), 0);
@@ -4582,6 +4588,39 @@ function openWizardDuplicateActive() {
   wizShowStep(1);
   document.getElementById('quote-wizard').style.display = 'flex';
   setTimeout(() => document.getElementById('wiz-client-search').focus(), 100);
+}
+
+function createRevisionFromQuote(qid) {
+  saveActiveQuoteState();
+  const src = _quotes.find(q => q.id === qid);
+  if (!src) return;
+
+  // Strip any existing " Revision (N)" suffix to get the canonical base ref
+  const srcRef = src.fields?.quoteRef || '';
+  const baseRef = srcRef.replace(/\s+Revision\s*\(\d+\)\s*$/i, '').trim() || srcRef;
+  const revPattern = new RegExp(
+    '^' + baseRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\s+Revision\\s*\\(\\d+\\))?$',
+    'i'
+  );
+
+  // Count all in-memory quotes sharing this base ref — next revision = that count
+  const siblingCount = _quotes.filter(q => revPattern.test(q.fields?.quoteRef || '')).length;
+  const nextN = siblingCount; // original is 1, so first revision → Revision (1)
+
+  const newRef = baseRef + ' Revision (' + nextN + ')';
+
+  const nq = _newQuoteState({
+    fields: { ...src.fields, quoteRef: newRef, quoteDate: new Date().toISOString().slice(0, 10) },
+    sections: JSON.parse(JSON.stringify(src.sections || [])),
+    _parentRef: baseRef,
+  });
+
+  _quotes.push(nq);
+  loadQuoteState(nq.id);
+  if (_activeTab !== 'quote') switchTab('quote');
+  renderQuoteTabs();
+  saveActiveQuoteState();
+  showToast('↪ Revision (' + nextN + ') created — ' + newRef, 3500);
 }
 
 function closeWizard() {
@@ -8586,7 +8625,7 @@ function resubmitWithVariations() {
     const col = ['#1a7a4a','#c87000','#1a4fa0','#9040c0','#d94f00'][gi % 5];
     const gItems = g.items.filter(i => i.name && i.name !== 'New Item');
     if (!gItems.length) return '';
-    const gTotal = gItems.reduce((s,i) => s + calcParent(i).total, 0);
+    const gTotal = gItems.reduce((s,i) => s + ((i.subitems||[]).length ? calcParent(i).total : 0), 0);
     return `<div style="margin-bottom:18px;border-radius:8px;overflow:hidden;border:1px solid ${col}30">
       <div style="background:${col}12;padding:9px 14px;font-size:12px;font-weight:800;color:${col};border-bottom:2px solid ${col}30;display:flex;justify-content:space-between">
         <span>${esc(g.name)}</span>
@@ -8595,11 +8634,11 @@ function resubmitWithVariations() {
       <table style="width:100%;border-collapse:collapse">
         <tbody>
           ${gItems.map(i => {
-            const tot = calcParent(i).total;
+            const tot = (i.subitems||[]).length ? calcParent(i).total : 0;
             return `<tr style="border-bottom:1px solid ${col}18">
               <td style="padding:9px 14px;font-size:13px;vertical-align:top">
                 <div style="font-weight:600">${esc(i.name)}</div>
-                ${i.description?`<div style="font-size:11px;color:var(--muted);margin-top:2px;font-style:italic">${esc(i.description)}</div>`:''}
+                ${i.description?`<div style="font-size:11px;color:#888;margin-top:2px;font-style:italic">${esc(i.description)}</div>`:''}
               </td>
               <td style="padding:9px 14px;text-align:right;font-family:monospace;font-weight:700;white-space:nowrap;vertical-align:top">${tot?fmt(tot):'—'}</td>
             </tr>`;
@@ -8617,7 +8656,7 @@ function resubmitWithVariations() {
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;background:#f2f1ed;color:#1a1a1a;font-size:14px;line-height:1.5}
 .page{max-width:820px;margin:0 auto;padding:32px 24px 60px}
-.card{background:var(--surface);border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden;margin-bottom:20px}
+.card{background:#fff;border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden;margin-bottom:20px}
 .card-body{padding:24px 28px}
 @media print{body{background:#fff}.page{max-width:100%;padding:12px}@page{margin:10mm}}
 </style></head>
@@ -8637,17 +8676,17 @@ body{font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;background:#f2f
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
         <div>
           <div style="font-size:36px;font-weight:800;letter-spacing:-1.5px;color:#1a1a1a;margin-bottom:8px;line-height:1;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif">ProQuote</div>
-          <div style="font-size:12px;color:var(--muted)">ABN ${esc(abn)} · Lic ${esc(lic)}</div>
+          <div style="font-size:12px;color:#888">ABN ${esc(abn)} · Lic ${esc(lic)}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:22px;font-weight:800;color:var(--text)">Revised Quote</div>
+          <div style="font-size:22px;font-weight:800;color:#1a1a1a">Revised Quote</div>
           <div style="font-size:14px;font-weight:700;color:#007aff;margin-top:4px">${esc(ref)} <span style="background:#007aff;color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;vertical-align:middle">${revNum}</span></div>
           <div style="font-size:12px;color:#888;margin-top:4px">${now}</div>
         </div>
       </div>
-      ${(client||jobName)?`<div style="margin-top:16px;padding:12px 16px;background:var(--surface2);border-radius:8px">
+      ${(client||jobName)?`<div style="margin-top:16px;padding:12px 16px;background:#f5f5f2;border-radius:8px">
         ${client?`<div style="font-weight:700;font-size:13px">${esc(client)}</div>`:''}
-        ${jobName?`<div style="color:var(--muted);font-size:12px">${esc(jobName)}${jobNumber?' · '+esc(jobNumber):''}</div>`:''}
+        ${jobName?`<div style="color:#666;font-size:12px">${esc(jobName)}${jobNumber?' · '+esc(jobNumber):''}</div>`:''}
         ${addr?`<div style="color:#888;font-size:12px">${esc(addr)}</div>`:''}
       </div>`:''}
     </div>
@@ -8665,11 +8704,11 @@ body{font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;background:#f2f
     <div class="card-body">
       <div style="font-size:14px;font-weight:700;margin-bottom:12px">Revised Pricing Summary</div>
       <table style="width:100%;border-collapse:collapse">
-        <tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:9px 0;font-size:13px;color:var(--muted)">Original quote (excl. GST)</td>
+        <tr style="border-bottom:1px solid #e0e0da">
+          <td style="padding:9px 0;font-size:13px;color:#888">Original quote (excl. GST)</td>
           <td style="padding:9px 0;text-align:right;font-family:monospace;font-size:13px">${fmt(t.total)}</td>
         </tr>
-        ${approved.map(x => `<tr style="border-bottom:1px solid var(--border)">
+        ${approved.map(x => `<tr style="border-bottom:1px solid #e0e0da">
           <td style="padding:9px 0 9px 16px;font-size:13px;color:#1a7a4a">+ ${esc(x.groupName)} — ${esc(x.name)}</td>
           <td style="padding:9px 0;text-align:right;font-family:monospace;font-size:13px;color:#1a7a4a">+${fmt(x.computedTotal)}</td>
         </tr>`).join('')}
@@ -8677,8 +8716,8 @@ body{font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;background:#f2f
           <td style="padding:9px 0;font-size:13px;font-weight:700">Revised total (excl. GST)</td>
           <td style="padding:9px 0;text-align:right;font-family:monospace;font-size:14px;font-weight:800">${fmt(revisedTotal)}</td>
         </tr>
-        <tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:9px 0;font-size:13px;color:var(--muted)">GST (10%)</td>
+        <tr style="border-bottom:1px solid #e0e0da">
+          <td style="padding:9px 0;font-size:13px;color:#888">GST (10%)</td>
           <td style="padding:9px 0;text-align:right;font-family:monospace;font-size:13px">${fmt(revGst)}</td>
         </tr>
         <tr style="background:#007aff08">
