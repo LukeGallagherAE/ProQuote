@@ -941,7 +941,8 @@ html.dark .clientModal-inner,html.dark .jobModal-inner{background:var(--surface)
 .rev-card-notes{font-size:12px;color:var(--muted);margin-top:6px;font-style:italic;white-space:pre-wrap}
 .rev-notes-banner{background:var(--blue-bg,#e8f0ff);border:1.5px solid var(--blue-border,#b3d0ff);border-radius:8px;padding:10px 12px;margin-bottom:12px}
 .rev-notes-label{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px}
-.rev-notes-textarea{width:100%;box-sizing:border-box;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;background:var(--bg);color:var(--text);resize:vertical;min-height:60px;font-family:inherit}
+.rev-diff-item{font-size:11px;color:var(--text);padding:2px 0;line-height:1.5}
+.rev-card-diff{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 html.dark .rev-notes-banner{background:rgba(0,122,255,.1);border-color:rgba(0,122,255,.3)}
 html.dark .rev-card-active{background:rgba(0,122,255,.1)}
 </style>
@@ -1535,8 +1536,8 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     <div id="sb-sidebar-content" style="display:flex;flex-direction:column;gap:16px;padding-bottom:16px">
     <!-- Revision notes banner — shown only when viewing a revision -->
     <div id="rev-notes-banner" class="rev-notes-banner" style="display:none">
-      <div class="rev-notes-label">↪ Revision — Changes from original</div>
-      <textarea id="revisionNotes" class="rev-notes-textarea" placeholder="Describe what changed in this revision…" oninput="clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800)"></textarea>
+      <div class="rev-notes-label" id="rev-banner-label">↪ Rev B — Changes from Rev A</div>
+      <div id="rev-diff-list"></div>
     </div>
     <div>
       <div class="sh" style="margin-bottom:10px">Job details</div>
@@ -2519,7 +2520,7 @@ function _newQuoteState(overrides) {
       jobName:'', jobNumber:'', siteAddr:'',
       quoteRef:'Q-' + new Date().getFullYear() + '-001',
       quoteDate: new Date().toISOString().slice(0,10),
-      labourRate: profileRate('pLabourSell', 100), labourCostRate: profileRate('pLabourCost', 75), defaultMarkup: profileRate('pMarkup', 100), depositAmount: profileRate('pDeposit', 20), quoteNotes:'', revisionNotes:''
+      labourRate: profileRate('pLabourSell', 100), labourCostRate: profileRate('pLabourCost', 75), defaultMarkup: profileRate('pMarkup', 100), depositAmount: profileRate('pDeposit', 20), quoteNotes:''
     },
     ...overrides
   };
@@ -2527,7 +2528,7 @@ function _newQuoteState(overrides) {
 
 function _captureFields() {
   const ids = ['clientName','clientPhone','clientEmail','jobName','jobNumber',
-    'siteAddr','quoteRef','quoteDate','labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes','revisionNotes'];
+    'siteAddr','quoteRef','quoteDate','labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes'];
   const fields = {};
   ids.forEach(id => { const el = document.getElementById(id); if(el) fields[id] = el.value||''; });
   return fields;
@@ -2578,9 +2579,6 @@ function loadQuoteState(id) {
   _activeQuoteId = id;
   S.sections = JSON.parse(JSON.stringify(q.sections));
   _restoreFields(q.fields);
-  // Show revision notes banner only for revision quotes
-  const banner = document.getElementById('rev-notes-banner');
-  if (banner) banner.style.display = q._parentRef ? '' : 'none';
   fullRender();
   updateQuoteTabLabel();
   setTimeout(updatePublishBadge, 60);
@@ -3736,7 +3734,7 @@ function applyMarkupAll(){
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function fullRender(){renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();renderVariations();setTimeout(()=>{updatePublishBadge();},50);clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);}
+function fullRender(){renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();renderVariations();updateRevisionBanner();setTimeout(()=>{updatePublishBadge();},50);clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);}
 
 let _pubCheckTimer=null;
 function _schedulePublishCheck(){
@@ -4637,24 +4635,202 @@ function openWizardDuplicateActive() {
   setTimeout(() => document.getElementById('wiz-client-search').focus(), 100);
 }
 
+// ── Revision helpers ─────────────────────────────────────────────────────────
+
+function _revBaseName(ref) {
+  // Strip " Rev X" (single letter) or legacy " Revision (N)" suffix
+  return (ref || '').replace(/\s+Rev\s+[A-Z]\s*$/i, '').replace(/\s+Revision\s*\(\d+\)\s*$/i, '').trim();
+}
+
+function _revLetter(idx) {
+  // 0→A, 1→B, ... 25→Z, 26→AA, etc.
+  let s = '';
+  let n = idx;
+  do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+  return s;
+}
+
+function _getRevisionFamily(q) {
+  if (!q) return [];
+  const baseRef = _revBaseName(q._parentRef || q.fields?.quoteRef || '');
+  if (!baseRef) return [q];
+  const escaped = baseRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pat = new RegExp('^' + escaped + '(\\s+Rev\\s+[A-Z]+|\\s+Revision\\s*\\(\\d+\\))?$', 'i');
+  return _quotes
+    .filter(x => pat.test(x.fields?.quoteRef || ''))
+    .sort((a, b) => (a._createdAt || 0) - (b._createdAt || 0));
+}
+
+function _calcQuoteTotal(q) {
+  const labourRate = Number(q.fields?.labourRate) || 100;
+  let total = 0;
+  (q.sections || []).forEach(sec => {
+    (sec.parents || []).forEach(par => {
+      if (par.optional) return;
+      const ac = par.activeCats || {supply:true, wire:true, install:true};
+      let matSell = 0, labSell = 0;
+      (par.subitems || []).forEach(sub => {
+        if (!ac[sub.cat]) return;
+        const mk = (sub.markup || 0) / 100;
+        const unitPrice = sub.item ? sub.item.p : (parseFloat(sub.customPrice) || 0);
+        const matS = unitPrice * (sub.qty || 1) * (1 + mk);
+        let labS = 0;
+        if (sub.cat === 'wire')    labS = ((sub.wireMin||0) * (sub.qty||1) / 60) * labourRate;
+        if (sub.cat === 'install') labS = ((sub.instMin||0) * (sub.qty||1) / 60) * labourRate;
+        if (sub.cat === 'supply' && ac.install) labS = ((sub.instMin||0) * (sub.qty||1) / 60) * labourRate;
+        matSell += matS; labSell += labS;
+      });
+      const base = (matSell + labSell) * (par.qty || 1);
+      const disc = Math.min(Math.max(par.discount || 0, 0), 100) / 100;
+      total += base * (1 - disc);
+    });
+  });
+  return total;
+}
+
+function diffQuotes(prevQ, newQ) {
+  // Build parent lookup maps keyed by ID
+  const prevMap = {}, newMap = {};
+  (prevQ.sections || []).forEach(sec => {
+    (sec.parents || []).forEach(par => { prevMap[par.id] = {zone: sec.name || '', par}; });
+  });
+  (newQ.sections || []).forEach(sec => {
+    (sec.parents || []).forEach(par => { newMap[par.id] = {zone: sec.name || '', par}; });
+  });
+
+  const changes = [];
+
+  // Removed items
+  Object.entries(prevMap).forEach(([id, {zone, par}]) => {
+    if (!newMap[id]) changes.push((zone ? zone + ' · ' : '') + (par.name || 'Item') + ' — removed');
+  });
+
+  // Added items
+  Object.entries(newMap).forEach(([id, {zone, par}]) => {
+    if (!prevMap[id]) changes.push((zone ? zone + ' · ' : '') + (par.name || 'Item') + ' — added');
+  });
+
+  // Changed items
+  Object.entries(newMap).forEach(([id, {zone, par: np}]) => {
+    const prev = prevMap[id];
+    if (!prev) return;
+    const pp = prev.par;
+    const prefix = (zone ? zone + ' · ' : '') + (np.name || pp.name || 'Item');
+
+    // Parent qty
+    if ((np.qty || 1) !== (pp.qty || 1))
+      changes.push(prefix + ' — qty ' + (pp.qty || 1) + ' → ' + (np.qty || 1));
+
+    // activeCats toggles
+    const prevAC = pp.activeCats || {supply:true, wire:true, install:true};
+    const newAC  = np.activeCats || {supply:true, wire:true, install:true};
+    if (!prevAC.supply &&  newAC.supply) changes.push(prefix + ' — supply added');
+    if ( prevAC.supply && !newAC.supply) changes.push(prefix + ' — supply removed');
+    if (!prevAC.wire   &&  newAC.wire)   changes.push(prefix + ' — wiring added');
+    if ( prevAC.wire   && !newAC.wire)   changes.push(prefix + ' — wiring removed');
+    if (!prevAC.install &&  newAC.install) changes.push(prefix + ' — install added');
+    if ( prevAC.install && !newAC.install) changes.push(prefix + ' — install removed');
+
+    // Optional toggle
+    if (!!np.optional !== !!pp.optional)
+      changes.push(prefix + (np.optional ? ' — marked optional' : ' — no longer optional'));
+
+    // Subitems by ID
+    const prevSubs = {}, newSubs = {};
+    (pp.subitems || []).forEach(s => { prevSubs[s.id] = s; });
+    (np.subitems || []).forEach(s => { newSubs[s.id] = s; });
+
+    Object.entries(newSubs).forEach(([sid, ns]) => {
+      const ps = prevSubs[sid];
+      if (!ps) {
+        // new subitem added (uncommon — usually just the 3 defaults)
+        const lbl = ns.item ? ns.item.d1 : (ns.customName || ns.cat);
+        changes.push(prefix + ' — ' + ns.cat + ' item added: ' + lbl);
+        return;
+      }
+      // sub qty
+      if ((ns.qty || 1) !== (ps.qty || 1))
+        changes.push(prefix + ' — ' + ns.cat + ' qty ' + (ps.qty||1) + ' → ' + (ns.qty||1));
+      // wire time
+      if (ns.cat === 'wire' && (ns.wireMin || 0) !== (ps.wireMin || 0)) {
+        const ow = ps.wireMin || 0, nw = ns.wireMin || 0;
+        if (!ow && nw)       changes.push(prefix + ' — wiring time set to ' + nw + ' min');
+        else if (ow && !nw)  changes.push(prefix + ' — wiring time cleared');
+        else                 changes.push(prefix + ' — wiring ' + ow + ' → ' + nw + ' min');
+      }
+      // install time
+      if ((ns.cat === 'install' || ns.cat === 'supply') && (ns.instMin || 0) !== (ps.instMin || 0)) {
+        const oi = ps.instMin || 0, ni = ns.instMin || 0;
+        if (!oi && ni)       changes.push(prefix + ' — install time set to ' + ni + ' min');
+        else if (oi && !ni)  changes.push(prefix + ' — install time cleared');
+        else                 changes.push(prefix + ' — install ' + oi + ' → ' + ni + ' min');
+      }
+      // price
+      const np_ = ns.item ? (ns.item.p || 0) : (parseFloat(ns.customPrice) || 0);
+      const pp_ = ps.item ? (ps.item.p || 0) : (parseFloat(ps.customPrice) || 0);
+      if (Math.abs(np_ - pp_) > 0.005 && (np_ || pp_))
+        changes.push(prefix + ' — price $' + pp_.toFixed(2) + ' → $' + np_.toFixed(2));
+      // markup
+      if ((ns.markup || 0) !== (ps.markup || 0) && (ns.markup || ps.markup))
+        changes.push(prefix + ' — markup ' + (ps.markup||0) + '% → ' + (ns.markup||0) + '%');
+    });
+
+    // Subitems removed
+    Object.entries(prevSubs).forEach(([sid, ps]) => {
+      if (!newSubs[sid]) {
+        const lbl = ps.item ? ps.item.d1 : (ps.customName || ps.cat);
+        changes.push(prefix + ' — ' + ps.cat + ' item removed: ' + lbl);
+      }
+    });
+  });
+
+  return changes;
+}
+
+function updateRevisionBanner() {
+  const banner  = document.getElementById('rev-notes-banner');
+  const diffEl  = document.getElementById('rev-diff-list');
+  const labelEl = document.getElementById('rev-banner-label');
+  if (!banner || !diffEl) return;
+
+  const aq = _quotes.find(q => q.id === _activeQuoteId);
+  if (!aq || !aq._parentRef) { banner.style.display = 'none'; return; }
+
+  banner.style.display = '';
+  const family = _getRevisionFamily(aq);
+  const myIdx  = family.findIndex(q => q.id === _activeQuoteId);
+  if (myIdx <= 0) { diffEl.innerHTML = ''; return; }
+
+  const prevQ  = family[myIdx - 1];
+  const myLet  = _revLetter(myIdx);
+  const preLet = _revLetter(myIdx - 1);
+  if (labelEl) labelEl.textContent = '↪ Rev ' + myLet + ' — Changes from Rev ' + preLet;
+
+  // Use live in-memory sections for the current quote
+  const liveNew = { sections: S.sections };
+  const changes = diffQuotes(prevQ, liveNew);
+
+  if (changes.length === 0) {
+    diffEl.innerHTML = '<div style="font-size:12px;color:var(--muted);font-style:italic">No changes from Rev ' + preLet + ' yet</div>';
+  } else {
+    diffEl.innerHTML = changes.map(c =>
+      '<div class="rev-diff-item">· ' + escHtml(c) + '</div>'
+    ).join('');
+  }
+}
+
 function createRevisionFromQuote(qid) {
   saveActiveQuoteState();
   const src = _quotes.find(q => q.id === qid);
   if (!src) return;
 
-  // Strip any existing " Revision (N)" suffix to get the canonical base ref
-  const srcRef = src.fields?.quoteRef || '';
-  const baseRef = srcRef.replace(/\s+Revision\s*\(\d+\)\s*$/i, '').trim() || srcRef;
-  const revPattern = new RegExp(
-    '^' + baseRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\s+Revision\\s*\\(\\d+\\))?$',
-    'i'
-  );
-
-  // Count all in-memory quotes sharing this base ref — next revision = that count
-  const siblingCount = _quotes.filter(q => revPattern.test(q.fields?.quoteRef || '')).length;
-  const nextN = siblingCount; // original is 1, so first revision → Revision (1)
-
-  const newRef = baseRef + ' Revision (' + nextN + ')';
+  const baseRef = _revBaseName(src.fields?.quoteRef || '') || (src.fields?.quoteRef || '');
+  const escaped = baseRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pat = new RegExp('^' + escaped + '(\\s+Rev\\s+[A-Z]+|\\s+Revision\\s*\\(\\d+\\))?$', 'i');
+  const siblingCount = _quotes.filter(q => pat.test(q.fields?.quoteRef || '')).length;
+  // siblingCount includes the original, so the next letter index = siblingCount (A=0 is original)
+  const newLetter = _revLetter(siblingCount);
+  const newRef = baseRef + ' Rev ' + newLetter;
 
   const nq = _newQuoteState({
     fields: { ...src.fields, quoteRef: newRef, quoteDate: new Date().toISOString().slice(0, 10) },
@@ -4667,7 +4843,7 @@ function createRevisionFromQuote(qid) {
   switchTab('revisions');
   renderQuoteTabs();
   saveActiveQuoteState();
-  showToast('↪ Revision (' + nextN + ') created — switch to Quote tab to edit', 3500);
+  showToast('↪ Rev ' + newLetter + ' created — tap Quote to edit', 3000);
 }
 
 function createRevisionFromCurrentQuote() {
@@ -4675,38 +4851,13 @@ function createRevisionFromCurrentQuote() {
   createRevisionFromQuote(_activeQuoteId);
 }
 
-function _getRevisionFamily(q) {
-  if (!q) return [];
-  const baseRef = (q._parentRef || q.fields?.quoteRef || '').replace(/\s+Revision\s*\(\d+\)\s*$/i, '').trim();
-  if (!baseRef) return [q];
-  const pat = new RegExp('^' + baseRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\s+Revision\\s*\\(\\d+\\))?$', 'i');
-  return _quotes.filter(x => pat.test(x.fields?.quoteRef || ''));
-}
-
-function _calcQuoteTotal(q) {
-  let total = 0;
-  (q.sections || []).forEach(sec => {
-    (sec.parents || []).forEach(p => {
-      (p.subs || []).forEach(sub => {
-        const qty = Number(sub.qty) || 1;
-        const price = Number(sub.customPrice) || Number(sub.price) || 0;
-        const markup = Number(sub.markup ?? (Number(q.fields?.defaultMarkup) || 100)) / 100;
-        const labour = (Number(sub.labourMins) || 0) / 60 * (Number(q.fields?.labourRate) || 100);
-        const disc = Number(sub.discount) || 0;
-        const mat = price * (1 + markup);
-        const lineTotal = (mat + labour) * qty * (1 - disc / 100);
-        if (!sub.optional) total += lineTotal;
-      });
-    });
-  });
-  return total;
-}
-
 function renderRevisions() {
+  saveActiveQuoteState();
   const aq = _quotes.find(q => q.id === _activeQuoteId);
   if (!aq) return;
-  const family = _getRevisionFamily(aq);
-  const baseRef = (aq._parentRef || aq.fields?.quoteRef || '').replace(/\s+Revision\s*\(\d+\)\s*$/i, '').trim();
+
+  const family  = _getRevisionFamily(aq);
+  const baseRef = _revBaseName(aq._parentRef || aq.fields?.quoteRef || '');
 
   const subtitle = document.getElementById('rev-page-subtitle');
   if (subtitle) subtitle.textContent = family.length + ' version' + (family.length !== 1 ? 's' : '') + ' of ' + baseRef;
@@ -4714,30 +4865,37 @@ function renderRevisions() {
   const list = document.getElementById('rev-list');
   if (!list) return;
 
-  if (family.length === 0) {
-    list.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px 0">No revisions yet</div>';
-    return;
-  }
-
   list.innerHTML = family.map((q, i) => {
-    const isOriginal = !q._parentRef;
     const isActive = q.id === _activeQuoteId;
-    const badge = isOriginal ? 'Original' : 'Rev ' + (i);
-    const total = _calcQuoteTotal(q);
-    const notes = q.fields?.revisionNotes || '';
-    const date = q.fields?.quoteDate || '';
-    const rawStatus = q._approvedAt ? 'Approved' : q._emailSentAt ? 'Email Sent' : q._publishedAt ? 'Published' : 'Draft';
+    const letter   = _revLetter(i);
+    const total    = _calcQuoteTotal(q);
+    const date     = q.fields?.quoteDate || '';
+    const status   = q._approvedAt ? 'Approved' : q._emailSentAt ? 'Email Sent' : q._publishedAt ? 'Published' : 'Draft';
+
+    // Compute diff vs previous version
+    let diffHtml = '';
+    if (i > 0) {
+      const changes = diffQuotes(family[i - 1], q);
+      if (changes.length === 0) {
+        diffHtml = '<div class="rev-card-notes" style="font-style:italic">No changes recorded yet</div>';
+      } else {
+        diffHtml = '<div class="rev-card-diff">' +
+          changes.map(c => '<div class="rev-diff-item">· ' + escHtml(c) + '</div>').join('') +
+          '</div>';
+      }
+    }
+
     return `<div class="rev-card${isActive ? ' rev-card-active' : ''}" onclick="loadRevisionCard('${q.id}')">
       <div class="rev-card-header">
-        <span class="rev-card-badge">${badge}</span>
+        <span class="rev-card-badge">Rev ${letter}</span>
         <span class="rev-card-ref">${escHtml(q.fields?.quoteRef || '')}</span>
         <span class="rev-card-date">${date}</span>
       </div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
         <span class="rev-card-total">${fmt(total)} excl. GST</span>
-        <span style="font-size:11px;color:var(--muted)">${escHtml(rawStatus)}</span>
+        <span style="font-size:11px;color:var(--muted)">${escHtml(status)}</span>
       </div>
-      ${notes ? `<div class="rev-card-notes">${escHtml(notes)}</div>` : ''}
+      ${diffHtml}
     </div>`;
   }).join('');
 }
