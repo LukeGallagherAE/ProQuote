@@ -1392,10 +1392,6 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   <button id="qsub-back" onclick="goBack()">← <span id="qsub-back-label">Back</span></button>
   <!-- sub-tab pills — left -->
   <div style="display:flex;gap:2px;align-items:center;">
-    <button id="qsub-quote"   class="qsub-btn active" onclick="switchTab('quote')">
-      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      Quote
-    </button>
     <button id="qsub-bom"     class="qsub-btn" onclick="switchTab('bom')">
       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
       Materials
@@ -1409,13 +1405,14 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       Revisions
     </button>
   </div>
+  <button id="qsub-collapse-all" class="btn btn-ghost btn-sm" onclick="collapseExpandAll()" style="display:none;font-size:11px;margin-left:6px" title="Collapse / expand all sections">⊟ Collapse all</button>
   <div style="flex:1"></div>
-  <!-- quote label + badge + publish — right -->
-  <button id="qsub-collapse-all" class="btn btn-ghost btn-sm" onclick="collapseExpandAll()" style="display:none;font-size:11px;margin-right:4px" title="Collapse / expand all sections">⊟ Collapse all</button>
-  <span id="qsub-label" style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;font-family:inherit;margin-right:10px;"></span>
+  <!-- quote label + status badge + publish — right -->
+  <span id="qsub-label" style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;font-family:inherit;margin-right:8px;"></span>
   <span id="publish-badge" style="display:none;font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap;letter-spacing:.3px;cursor:default;margin-right:6px;"></span>
   <button class="btn btn-secondary btn-sm" id="pdf-btn" onclick="openModal()">📤 Publish</button>
-  <button onclick="openWizard()" title="New Quote" style="display:flex;align-items:center;gap:5px;padding:4px 11px;background:#007aff;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;margin-left:6px;font-family:inherit">
+  <div style="width:1px;height:18px;background:var(--border);margin:0 8px;flex-shrink:0"></div>
+  <button onclick="openWizard()" title="New Quote" style="display:flex;align-items:center;gap:5px;padding:4px 11px;background:#007aff;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
     <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     New
   </button>
@@ -4977,27 +4974,7 @@ function renderSections(){
     return;
   }
   if(zwBtn) zwBtn.style.display='none';
-  // Job name title above sections
-  const jobName = document.getElementById('jobName')?.value?.trim() || '';
-  const clientName = document.getElementById('clientName')?.value?.trim() || '';
-  const siteAddr = document.getElementById('siteAddr')?.value?.trim() || '';
-  const quoteRef = document.getElementById('quoteRef')?.value?.trim() || '';
-  const quoteDate = document.getElementById('quoteDate')?.value || '';
-  const dateStr = quoteDate ? new Date(quoteDate).toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}) : '';
-  let titleHtml = '';
-  if (jobName || clientName) {
-    titleHtml = '<div style="margin-bottom:16px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);border-left:4px solid var(--accent)">' +
-      '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
-        (jobName ? '<div style="font-size:18px;font-weight:800;color:var(--text)">'+esc(jobName)+'</div>' : '') +
-        (quoteRef ? '<div style="font-size:12px;font-family:\'IBM Plex Mono\',monospace;color:var(--muted);font-weight:600">'+esc(quoteRef)+(dateStr?' · '+esc(dateStr):'')+'</div>' : '') +
-      '</div>' +
-      ((clientName||siteAddr) ? '<div style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap">' +
-        (clientName ? '<span style="font-size:12px;color:var(--muted)">👤 '+esc(clientName)+'</span>' : '') +
-        (siteAddr ? '<span style="font-size:12px;color:var(--muted)">📍 '+esc(siteAddr)+'</span>' : '') +
-      '</div>' : '') +
-    '</div>';
-  }
-  wrap.innerHTML = titleHtml + S.sections.map(renderSection).join('');
+  wrap.innerHTML = S.sections.map(renderSection).join('');
 }
 
 function renderSection(sec,si){
