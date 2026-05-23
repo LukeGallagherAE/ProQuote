@@ -12657,7 +12657,8 @@ window._initStorage().then(() => {
 fetch('/api/build-info').then(r => r.json()).then(d => {
   if (!d.built) return;
   const dt = new Date(d.built);
-  const label = dt.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  const label = dt.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+              + ' ' + dt.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
   const el  = document.getElementById('nav-build-stamp');
   const el2 = document.getElementById('hp-build-stamp');
   if (el)  el.textContent  = 'Built ' + label;
