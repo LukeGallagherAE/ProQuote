@@ -8137,6 +8137,10 @@ function switchTab(tab) {
   const subBar = document.getElementById('quote-sub-bar');
   if (subBar) subBar.style.display = isQuoteTool ? 'flex' : 'none';
 
+  // Totals bar — only on quote-scoped views
+  const totalsBar = document.querySelector('.totals-bar');
+  if (totalsBar) totalsBar.style.display = isQuoteTool ? 'flex' : 'none';
+
   // Back button — show when we came from a list/global page
   const backBtn = document.getElementById('qsub-back');
   const backLabel = document.getElementById('qsub-back-label');
