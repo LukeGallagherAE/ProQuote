@@ -222,7 +222,8 @@ html.dark .parent-item:focus-within{background:var(--blue-bg)}
 .swi-btn.off{background:#f0f0ee;color:#bbb;border-color:#ddd}
 .swi-btn.off:hover{background:#e8e8e6;color:#999}
 
-.ptotal{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptotal{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.ptotal-lbl{font-size:8px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;font-family:'IBM Plex Sans',sans-serif;font-weight:700;line-height:1}
 .ptotal.mat{color:var(--text)}.ptotal.lab{color:var(--blue)}.ptotal.tot{color:var(--accent);font-size:13px}
 
 .cat-tag{display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;border:1px solid var(--blue-border);background:var(--blue-bg);color:var(--blue);cursor:pointer;transition:all .12s;user-select:none;white-space:nowrap}
@@ -3660,13 +3661,31 @@ function renderQuoteTabs() {
   });
 }
 
+function deleteRevision(qid) {
+  const q = _quotes.find(x => x.id === qid);
+  if (!q) return;
+  const family = _getRevisionFamily(q);
+  if (family.length <= 1) { showToast('Cannot delete the only version', 2000); return; }
+  const idx = family.findIndex(x => x.id === qid);
+  if (!confirm('Delete Rev ' + _revLetter(idx) + '? This cannot be undone.')) return;
+  saveActiveQuoteState();
+  _quotes = _quotes.filter(x => x.id !== qid);
+  if (_activeQuoteId === qid) {
+    const remaining = family.filter(x => x.id !== qid);
+    loadQuoteState(remaining[0].id);
+  }
+  _persistSession();
+  renderQuoteTabs();
+  updateRevLabel();
+  fullRender();
+}
+
 function updateRevLabel() {
   const lbl = document.getElementById('qsub-rev-label');
   if (!lbl) return;
   const aq = _quotes.find(q => q.id === _activeQuoteId);
-  if (!aq) { lbl.textContent = 'Revisions'; return; }
+  if (!aq) { lbl.textContent = 'Rev A'; return; }
   const family = _getRevisionFamily(aq);
-  if (family.length <= 1) { lbl.textContent = 'Revisions'; return; }
   const idx = family.findIndex(q => q.id === _activeQuoteId);
   lbl.textContent = 'Rev ' + (idx >= 0 ? _revLetter(idx) : 'A');
 }
@@ -3683,21 +3702,20 @@ function openRevDropdown(e) {
   const dd = document.createElement('div');
   dd.id = 'qsub-rev-dd';
   dd.style.cssText = 'position:fixed;top:'+(rect.bottom+5)+'px;left:'+rect.left+'px;min-width:260px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);z-index:900;overflow:hidden';
+  const canDelete = family.length > 1;
   const rowHtml = family.map((q, i) => {
     const isCurrent = q.id === _activeQuoteId;
     const letter = _revLetter(i);
     const total = _calcQuoteTotal(q);
     const status = q._approvedAt ? 'Approved' : q._emailSentAt ? 'Sent' : q._publishedAt ? 'Published' : 'Draft';
     const statusColor = q._approvedAt ? '#30d158' : q._publishedAt ? '#007aff' : 'var(--muted)';
-    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;'+(isCurrent?'background:var(--blue-bg)':'')+'" '
-      + 'onmouseover="if(!'+isCurrent+')this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\''+(isCurrent?'var(--blue-bg)':'')+'\';" '
-      + (isCurrent ? '' : 'onclick="loadRevisionCard(\''+q.id+'\');document.getElementById(\'qsub-rev-dd\')?.remove()"')
-      + '>'
-      + '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;'+(isCurrent?'background:var(--accent);color:#fff':'background:var(--surface2);color:var(--muted)')+'">Rev '+letter+'</span>'
-      + '<span style="font-size:12px;font-weight:'+(isCurrent?'700':'500')+';color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(q.fields?.quoteRef||'—')+'</span>'
-      + '<span style="font-size:11px;font-weight:600;color:'+statusColor+';white-space:nowrap">'+fmt(total)+'</span>'
-      + '<span style="font-size:10px;color:'+statusColor+';white-space:nowrap">'+escHtml(status)+'</span>'
-      + (isCurrent ? '<span style="font-size:10px;color:var(--muted)">current</span>' : '')
+    return '<div style="display:flex;align-items:center;gap:7px;padding:7px 8px 7px 10px;'+(isCurrent?'background:var(--blue-bg)':'')+';" '
+      + 'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\''+(isCurrent?'var(--blue-bg)':'')+'\';">'
+      + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;flex-shrink:0;cursor:'+(isCurrent?'default':'pointer')+';'+(isCurrent?'background:var(--accent);color:#fff':'background:var(--surface2);color:var(--muted)')+'" '+(isCurrent?'':' onclick="loadRevisionCard(\''+q.id+'\');document.getElementById(\'qsub-rev-dd\')?.remove()"')+'>Rev '+letter+'</span>'
+      + '<span style="font-size:12px;font-weight:'+(isCurrent?'700':'500')+';color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:'+(isCurrent?'default':'pointer')+'" '+(isCurrent?'':' onclick="loadRevisionCard(\''+q.id+'\');document.getElementById(\'qsub-rev-dd\')?.remove()"')+'>'+escHtml(q.fields?.quoteRef||'—')+'</span>'
+      + '<span style="font-size:11px;font-weight:600;color:'+statusColor+';white-space:nowrap;flex-shrink:0">'+fmt(total)+'</span>'
+      + '<span style="font-size:10px;color:'+statusColor+';white-space:nowrap;flex-shrink:0">'+escHtml(status)+'</span>'
+      + (canDelete ? '<button onclick="event.stopPropagation();document.getElementById(\'qsub-rev-dd\')?.remove();deleteRevision(\''+q.id+'\')" title="Delete this revision" style="flex-shrink:0;width:18px;height:18px;border-radius:4px;border:none;background:transparent;color:var(--muted);font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-family:inherit" onmouseover="this.style.background=\'rgba(220,50,50,.1)\';this.style.color=\'#e03\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--muted)\'">×</button>' : '')
       + '</div>';
   }).join('');
   dd.innerHTML = '<div style="padding:4px 0">'+(rowHtml||'')+'</div>'
@@ -5177,12 +5195,15 @@ function renderParent(sid,par,pi,total){
         swiHtml+
         '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncDOM();fullRender()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
         '<div style="display:flex;align-items:center;gap:3px;flex-shrink:0" title="Discount %"><span style="font-size:9px;color:var(--muted)">%</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:12px;padding:3px 5px" placeholder="0" title="Discount (%)"></div>'+
-        '<span class="ptotal mat">'+fmt(c.matSell)+'</span>'+
-        '<span class="ptotal lab">'+fmt(c.labSell)+'</span>'+
-        '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'">'+(c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)+'</span>'+
+        (par.lumpSum
+          ? '<span class="ptotal mat"><span class="ptotal-lbl">Price</span><input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)"></span>'
+          + '<span class="ptotal lab"></span>'
+          : '<span class="ptotal mat"><span class="ptotal-lbl">Mat.</span>'+fmt(c.matSell)+'</span>'
+          + '<span class="ptotal lab"><span class="ptotal-lbl">Lab.</span>'+fmt(c.labSell)+'</span>')+
+        '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">Total</span>'+(c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)+'</span>'+
         '<div class="ph-actions">'+optPill+photoThumb+photoBtn+menuBtn+'</div>'+
       '</div>'+
-      '<div style="padding:7px 14px 7px 36px;font-size:11px;color:var(--muted);background:var(--surface2)">'+(par.lumpSum?'Fixed price: '+fmt(c.total):subCount+' sub-item'+(subCount!==1?'s':'')+' hidden — '+fmt(c.total))+'</div>'+
+      '<div style="padding:7px 14px 7px 36px;font-size:11px;color:var(--muted);background:var(--surface2)">'+(par.lumpSum?'Fixed price'+( par.qty>1?' · '+fmt(par.lumpPrice||0)+' × '+par.qty+' = '+fmt(c.total):'')+' — use price field in header':subCount+' sub-item'+(subCount!==1?'s':'')+' hidden — '+fmt(c.total))+'</div>'+
     '</div>';
   }
 
@@ -5200,22 +5221,19 @@ function renderParent(sid,par,pi,total){
       swiHtml+
       '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncDOM();fullRender()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
       '<div style="display:flex;align-items:center;gap:3px;flex-shrink:0" title="Discount %"><span style="font-size:9px;color:var(--muted)">%</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:12px;padding:3px 5px" placeholder="0" title="Discount (%)"></div>'+
-      '<span class="ptotal mat">'+fmt(c.matSell)+'</span>'+
-      '<span class="ptotal lab">'+fmt(c.labSell)+'</span>'+
-      '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'">'+(c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)+'</span>'+
+      (par.lumpSum
+        ? '<span class="ptotal mat"><span class="ptotal-lbl">Price</span><input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)"></span>'
+        + '<span class="ptotal lab"></span>'
+        : '<span class="ptotal mat"><span class="ptotal-lbl">Mat.</span>'+fmt(c.matSell)+'</span>'
+        + '<span class="ptotal lab"><span class="ptotal-lbl">Lab.</span>'+fmt(c.labSell)+'</span>')+
+      '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">Total</span>'+(c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)+'</span>'+
       '<div class="ph-actions">'+optPill+photoThumb+photoBtn+menuBtn+'</div>'+
     '</div>'+
     descRow+
     (par.lumpSum
-      ? '<div class="subitems-wrap" style="padding:12px 16px 14px">'+
-          '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
-            '<span style="font-size:12px;color:var(--muted);font-weight:600">Fixed price (ex. GST)</span>'+
-            '<input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" '+
-              'onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" '+
-              'style="width:110px;text-align:right;font-size:13px;font-weight:600;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
-            '<span style="font-size:12px;color:var(--muted)">× '+(par.qty||1)+' = <strong>'+fmt((par.lumpPrice||0)*(par.qty||1))+'</strong></span>'+
-          '</div>'+
-        '</div>'
+      ? '<div style="padding:7px 14px;font-size:11px;color:var(--muted);background:var(--surface2);border-top:1px solid var(--border)">'
+        +(par.qty>1?'<span style="color:var(--text);font-weight:600">'+fmt(par.lumpPrice||0)+'</span> × '+par.qty+' = <span style="color:var(--accent);font-weight:700">'+fmt(c.total)+'</span>':'Fixed price — enter amount in the price field above')
+        +'</div>'
       : '<div class="subitems-wrap">'+
           '<div class="sub-col-headers">'+
             '<span>Type</span><span>Sub-item</span><span>Qty</span>'+
