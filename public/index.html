@@ -1392,6 +1392,10 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   <button id="qsub-back" onclick="goBack()">← <span id="qsub-back-label">Back</span></button>
   <!-- sub-tab pills — left -->
   <div style="display:flex;gap:2px;align-items:center;">
+    <button id="qsub-quote" class="qsub-btn" onclick="switchTab('quote')" style="display:none">
+      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Quote
+    </button>
     <button id="qsub-bom"     class="qsub-btn" onclick="switchTab('bom')">
       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
       Materials
@@ -7880,6 +7884,8 @@ function switchTab(tab) {
   document.body.classList.toggle('show-totals-bar', tab === 'quote');
   const colAllBtn = document.getElementById('qsub-collapse-all');
   if (colAllBtn) colAllBtn.style.display = isQuote ? '' : 'none';
+  const qsubQuoteBtn = document.getElementById('qsub-quote');
+  if (qsubQuoteBtn) qsubQuoteBtn.style.display = (isQuoteTool && !isQuote) ? '' : 'none';
   if (sidebar) sidebar.style.display = isQuote ? '' : 'none';
   if (sidebarToggle) sidebarToggle.style.display = isQuote ? '' : 'none';
   // Restore correct margins based on sidebar preset (don't let CSS default 248px right-margin bleed in)
