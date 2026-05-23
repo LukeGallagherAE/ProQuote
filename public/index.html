@@ -129,7 +129,7 @@ html.dark #cmdk-trigger kbd{background:var(--bg);border-color:var(--border)}
 .topbar-right{display:flex;gap:8px;align-items:center;flex-shrink:0}
 html.dark .topbar{background:#18180f;color:#fff;border-bottom:none;box-shadow:0 1px 0 rgba(255,255,255,.06)}
 
-.tab-page{margin-left:56px;height:calc(100vh - 114px);overflow-y:auto}
+.tab-page{margin-left:64px;height:calc(100vh - 114px);overflow-y:auto}
 .tab-page.with-subbar{height:calc(100vh - 150px)}
 .qsub-btn{font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-family:inherit;transition:background .1s,color .1s;display:flex;align-items:center;gap:5px}
 .qsub-btn:hover{background:rgba(60,50,30,.08);color:var(--text)}
@@ -139,7 +139,7 @@ html.dark .qsub-btn.active{background:rgba(255,255,255,.15);color:#fff}
 .layout{display:block}
 .sidebar{width:248px;flex-shrink:0;background:var(--surface2);border:none;border-left:1px solid var(--border);border-radius:0;padding:0 16px 20px;display:block;position:fixed;top:88px;right:0;bottom:62px;height:auto;overflow-y:scroll;z-index:100;transition:width .2s ease,padding .2s ease;box-shadow:-2px 0 12px rgba(0,0,0,.06)}
 html.dark .sidebar{box-shadow:-2px 0 16px rgba(0,0,0,.3)}
-.main{display:block;padding:20px 24px 80px;margin-left:56px;margin-right:248px;transition:margin-right .2s ease;height:calc(100vh - 114px);overflow-y:auto}
+.main{display:block;padding:20px 24px 80px;margin-left:64px;margin-right:248px;transition:margin-right .2s ease;height:calc(100vh - 114px);overflow-y:auto}
 
 .sh{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
 #sectionsWrap{margin-top:0;padding-top:0}
@@ -263,7 +263,7 @@ html.dark .parent-item:focus-within{background:var(--blue-bg)}
 .sf-val.lab{color:var(--blue)}.sf-val.tot{color:var(--text);font-size:13px;font-weight:700}
 
 /* ── Totals bar ── */
-.totals-bar{position:fixed;bottom:0;left:56px;right:0;z-index:200;background:var(--surface);display:flex;align-items:center;height:62px;border-top:1px solid var(--border);gap:0}
+.totals-bar{position:fixed;bottom:0;left:64px;right:0;z-index:200;background:var(--surface);display:flex;align-items:center;height:62px;border-top:1px solid var(--border);gap:0}
 /* Cost group — dimmed flat text on the left */
 .tot-costs{display:flex;align-items:center;gap:18px;padding:0 22px 0 20px;opacity:.5;border-right:1px solid var(--border);height:100%}
 /* Tile row — all coloured tiles fill the rest */
@@ -487,16 +487,17 @@ html.dark .sidebar.sb-floating{box-shadow:0 12px 48px rgba(0,0,0,.5)!important;}
 
 .client-suggest-row:hover{background:var(--blue-bg)}
 .nav-rail{
-  position:fixed;left:0;top:0;bottom:0;width:56px;
-  background:#f0ede6;border-right:1px solid #dedad2;
+  position:fixed;left:0;top:0;bottom:0;width:64px;
+  background:#f5f3ee;border-right:1px solid rgba(0,0,0,.07);
+  box-shadow:2px 0 12px rgba(0,0,0,.05);
   display:flex;flex-direction:column;align-items:center;
-  padding:0;gap:2px;z-index:250;
+  padding:0 0 6px;gap:1px;z-index:250;
 }
-html.dark .nav-rail{background:#18180f;border-right:none}
-.nav-version{margin-top:auto;padding-bottom:8px;font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(60,50,30,.25);text-align:center;user-select:none}
-html.dark .nav-version{color:rgba(255,255,255,.18)}
+html.dark .nav-rail{background:#131310;border-right:none;box-shadow:2px 0 16px rgba(0,0,0,.35)}
+.nav-version{margin-top:auto;padding-bottom:6px;font-size:8.5px;font-weight:600;letter-spacing:.4px;color:rgba(60,50,30,.22);text-align:center;user-select:none;line-height:1.4}
+html.dark .nav-version{color:rgba(255,255,255,.15)}
 /* ── Mobile layout mode ────────────────────────────── */
-html.mobile .nav-rail{top:auto!important;bottom:0;left:0;right:0;width:100%!important;height:56px;flex-direction:row;justify-content:space-around;border-right:none;border-top:1px solid var(--border);padding:0 2px;gap:0}
+html.mobile .nav-rail{top:auto!important;bottom:0;left:0;right:0;width:100%!important;height:56px;flex-direction:row;justify-content:space-around;border-right:none;border-top:1px solid var(--border);padding:0 2px;gap:0;box-shadow:none}
 html.mobile .nav-rail-top-spacer,html.mobile .nav-rail-divider,html.mobile .nav-version{display:none!important}
 html.mobile .nav-rail-btn{flex:1;height:56px;border-radius:0;min-width:0}
 html.mobile .nav-rail-btn .rail-label{font-size:8px;letter-spacing:.2px}
@@ -507,18 +508,20 @@ html.mobile .sidebar,html.mobile .sidebar-toggle{display:none!important}
 html.mobile #rail-flyout{display:none!important}
 .nav-rail-top-spacer{height:52px;flex-shrink:0}
 .nav-rail-btn{
-  width:42px;height:42px;border-radius:9px;border:none;
-  background:transparent;color:rgba(60,50,30,.4);
+  width:50px;height:46px;border-radius:12px;border:none;
+  background:transparent;color:rgba(60,50,30,.38);
   font-size:18px;cursor:pointer;display:flex;align-items:center;
-  justify-content:center;transition:background .12s,color .12s;position:relative;
+  justify-content:center;transition:background .13s,color .13s;position:relative;
   flex-direction:column;gap:2px;
 }
-.nav-rail-btn:hover{background:rgba(60,50,30,.08);color:rgba(60,50,30,.85)}
-.nav-rail-btn.active{background:rgba(60,50,30,.12);color:#18180f}
-html.dark .nav-rail-btn{color:rgba(255,255,255,.38)}
-html.dark .nav-rail-btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.85)}
-html.dark .nav-rail-btn.active{background:rgba(255,255,255,.13);color:#fff}
-#rail-flyout{position:fixed;left:60px;z-index:9000;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.18);width:230px;overflow:hidden;pointer-events:auto;font-family:-apple-system,sans-serif;}
+.nav-rail-btn:hover{background:rgba(60,50,30,.07);color:rgba(60,50,30,.8)}
+.nav-rail-btn.active{background:rgba(0,122,255,.1);color:#007aff}
+.nav-rail-btn.active::before{content:'';position:absolute;left:-1px;top:22%;bottom:22%;width:3px;border-radius:0 3px 3px 0;background:#007aff}
+html.dark .nav-rail-btn{color:rgba(255,255,255,.32)}
+html.dark .nav-rail-btn:hover{background:rgba(255,255,255,.07);color:rgba(255,255,255,.8)}
+html.dark .nav-rail-btn.active{background:rgba(56,139,255,.15);color:#4da6ff}
+html.dark .nav-rail-btn.active::before{background:#4da6ff}
+#rail-flyout{position:fixed;left:68px;z-index:9000;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.18);width:230px;overflow:hidden;pointer-events:auto;font-family:-apple-system,sans-serif;}
 #rail-flyout .rfl-head{padding:9px 12px 7px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 #rail-flyout .rfl-title{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
 #rail-flyout .rfl-viewall{font-size:11px;font-weight:600;color:var(--accent,#007aff);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;}
@@ -531,14 +534,14 @@ html.dark .nav-rail-btn.active{background:rgba(255,255,255,.13);color:#fff}
 html.dark #rail-flyout{background:#1e1e16;border-color:rgba(255,255,255,.1);}
 html.dark #rail-flyout .rfl-item:hover{background:rgba(255,255,255,.06);}
 .nav-rail-btn .rail-label{
-  font-size:7.5px;font-weight:600;letter-spacing:.4px;
+  font-size:8px;font-weight:600;letter-spacing:.3px;
   text-transform:uppercase;line-height:1;
   color:inherit;font-family:inherit;
 }
-.nav-rail-divider{width:26px;height:1px;background:rgba(60,50,30,.1);margin:3px 0}
+.nav-rail-divider{width:30px;height:1px;background:rgba(60,50,30,.08);margin:4px 0}
+html.dark .nav-rail-divider{background:rgba(255,255,255,.07)}
 .nav-rail-quote-btn{height:auto!important;min-height:42px;padding:6px 4px!important;gap:3px!important;}
 .rail-quote-ref{font-size:8px!important;font-weight:700!important;letter-spacing:.4px;color:inherit;max-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;}
-html.dark .nav-rail-divider{background:rgba(255,255,255,.09)}
 .nav-rail-add{
   width:36px;height:36px;border-radius:8px;border:1px dashed rgba(60,50,30,.25);
   background:transparent;color:rgba(60,50,30,.35);font-size:16px;cursor:pointer;
@@ -1416,7 +1419,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 </div>
 
 <!-- ── Quote action bar (sub-tabs + badge + publish) ── -->
-<div id="quote-sub-bar" style="display:none;position:sticky;top:52px;z-index:200;background:var(--surface2);border-bottom:1px solid var(--border);margin-left:56px;height:36px;align-items:center;padding:0 14px;gap:0;">
+<div id="quote-sub-bar" style="display:none;position:sticky;top:52px;z-index:200;background:var(--surface2);border-bottom:1px solid var(--border);margin-left:64px;height:36px;align-items:center;padding:0 14px;gap:0;">
   <!-- back button — shown when navigated from a list page -->
   <button id="qsub-back" onclick="goBack()">← <span id="qsub-back-label">Back</span></button>
   <!-- sub-tab pills — left -->
@@ -1638,7 +1641,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     <div id="bom-placeholder" style="display:none"></div>
 
 <!-- BOM Overlay Panel (legacy, keep for compatibility) -->
-<div id="bom-overlay" style="display:none;position:fixed;top:50px;left:56px;right:0;bottom:0;z-index:150;background:var(--bg);overflow-y:auto">
+<div id="bom-overlay" style="display:none;position:fixed;top:50px;left:64px;right:0;bottom:0;z-index:150;background:var(--bg);overflow-y:auto">
   <div style="max-width:1000px;margin:0 auto;padding:28px 24px 60px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
       <div>
