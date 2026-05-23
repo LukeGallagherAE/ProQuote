@@ -1390,14 +1390,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 <div id="quote-sub-bar" style="display:none;position:sticky;top:52px;z-index:200;background:var(--surface2);border-bottom:1px solid var(--border);margin-left:64px;height:36px;align-items:center;padding:0 14px;gap:0;">
   <!-- ① back to list — shown when navigated from dashboard/clients/etc -->
   <button id="qsub-back" onclick="goBack()">← <span id="qsub-back-label">Back</span></button>
-  <!-- ② quote context / back-to-quote — left identity anchor -->
-  <button id="qsub-quote-ctx" onclick="switchTab('quote')" style="display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);padding:3px 8px;border-radius:6px;font-family:inherit;max-width:210px;white-space:nowrap;overflow:hidden;flex-shrink:0" onmouseover="this.style.background='rgba(60,50,30,.07)'" onmouseout="this.style.background='none'">
-    <span id="qsub-ctx-arrow" style="color:var(--muted);display:none">←</span>
-    <span id="qsub-label" style="overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-weight:600">Quote</span>
-  </button>
-  <!-- ③ separator -->
-  <div style="width:1px;height:16px;background:var(--border);margin:0 6px;flex-shrink:0"></div>
-  <!-- ④ sub-view pills -->
+  <!-- ② sub-view pills -->
   <div style="display:flex;gap:2px;align-items:center;">
     <button id="qsub-bom" class="qsub-btn" onclick="switchTab('bom')">
       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
@@ -1412,8 +1405,15 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       Revisions
     </button>
   </div>
-  <!-- ⑤ spacer -->
+  <!-- ③ spacer -->
   <div style="flex:1"></div>
+  <!-- ④ quote name / back-to-quote — right side so full name is visible -->
+  <button id="qsub-quote-ctx" onclick="switchTab('quote')" style="display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);padding:3px 8px;border-radius:6px;font-family:inherit;white-space:nowrap;flex-shrink:0" onmouseover="this.style.background='rgba(60,50,30,.07)'" onmouseout="this.style.background='none'">
+    <span id="qsub-ctx-arrow" style="color:var(--muted);display:none">←</span>
+    <span id="qsub-label" style="color:var(--muted);font-weight:600">Quote</span>
+  </button>
+  <!-- ⑤ separator -->
+  <div style="width:1px;height:18px;background:var(--border);margin:0 6px 0 2px;flex-shrink:0"></div>
   <!-- ⑥ actions — right -->
   <span id="publish-badge" style="display:none;font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap;letter-spacing:.3px;cursor:default;margin-right:6px;"></span>
   <button class="btn btn-secondary btn-sm" id="pdf-btn" onclick="openModal()">📤 Publish</button>
@@ -2737,6 +2737,7 @@ function newSection(name) { return { id:uid(), name:name||'New Section', collaps
 function newParent(name) {
   return { id:uid(), name:name||'', description:'', qty:1, collapsed:false,
            category:'',
+           lumpSum:false, lumpPrice:0,
            activeCats:{supply:true,wire:true,install:true},
            subitems:[newSubitem('supply'),newSubitem('wire'),newSubitem('install')] };
 }
@@ -2767,6 +2768,12 @@ function calcSub(sub, par) {
   return {matSell,labSell,total:matSell+labSell,active:true};
 }
 function calcParent(par) {
+  if (par.lumpSum) {
+    const base=(par.lumpPrice||0)*(par.qty||1);
+    const disc=Math.min(Math.max(par.discount||0,0),100)/100;
+    const discAmt=base*disc;
+    return {matSell:0,labSell:0,total:base-discAmt,discAmt,base};
+  }
   let matSell=0,labSell=0;
   for (const sub of par.subitems) { const c=calcSub(sub,par); matSell+=c.matSell; labSell+=c.labSell; }
   const base=(matSell+labSell)*par.qty;
@@ -2834,6 +2841,7 @@ function syncDOM() {
       saveTemplate(par);
       const pq=document.getElementById('pq-'+par.id); if(pq) par.qty=parseFloat(pq.value)||1;
       const pdisc=document.getElementById('pdisc-'+par.id); if(pdisc) par.discount=parseFloat(pdisc.value)||0;
+      const plump=document.getElementById('plump-'+par.id); if(plump) par.lumpPrice=parseFloat(plump.value)||0;
       for (const sub of par.subitems) {
         const sq=document.getElementById('sq-'+sub.id); if(sq) sub.qty=parseFloat(sq.value)||1;
         const sm=document.getElementById('sm-'+sub.id); if(sm) sub.markup=parseFloat(sm.value)||0;
@@ -3073,6 +3081,7 @@ function toggleActiveCat(sid,pid,cat) {
   p.activeCats[cat]=!p.activeCats[cat]; fullRender();
 }
 function toggleParent(sid,pid) { const p=getP(sid,pid); if(p){p.collapsed=!p.collapsed;fullRender();} }
+function toggleLumpSum(sid,pid) { syncDOM(); const p=getP(sid,pid); if(p){p.lumpSum=!p.lumpSum;fullRender();} }
 function collapseExpandAll() {
   syncDOM();
   const allCollapsed = S.sections.every(s => s.collapsed);
@@ -5050,9 +5059,11 @@ function renderParent(sid,par,pi,total){
   const ac=par.activeCats||{supply:true,wire:true,install:true};
   const swiHtml=
     '<div class="swi-wrap">'+
-      '<button class="swi-btn'+(ac.supply?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'supply\')" title="Include supply items">S</button>'+
-      '<button class="swi-btn'+(ac.wire?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'wire\')" title="Include wire items">W</button>'+
-      '<button class="swi-btn'+(ac.install?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'install\')" title="Include install items">I</button>'+
+      (par.lumpSum ? '' :
+        '<button class="swi-btn'+(ac.supply?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'supply\')" title="Include supply items">S</button>'+
+        '<button class="swi-btn'+(ac.wire?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'wire\')" title="Include wire items">W</button>'+
+        '<button class="swi-btn'+(ac.install?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'install\')" title="Include install items">I</button>') +
+      '<button class="swi-btn'+(par.lumpSum?' on':'')+'" onclick="event.stopPropagation();toggleLumpSum('+sid+','+par.id+')" title="Fixed price mode — enter a single lump sum instead of sub-items" style="font-weight:700;'+(par.lumpSum?'background:var(--accent);color:#fff;border-color:var(--accent)':'')+'">$</button>'+
     '</div>';
   const menuBtn='<button class="parent-menu-btn" onclick="showParentMenu('+sid+','+par.id+',this)" title="Move / duplicate / remove">⋮</button>';
   const optPill = '<label onclick="event.stopPropagation()" title="Mark as optional extra — shown separately on quote with client checkbox" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;user-select:none">'
@@ -5117,7 +5128,7 @@ function renderParent(sid,par,pi,total){
         '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'">'+(c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)+'</span>'+
         '<div class="ph-actions">'+optPill+photoThumb+photoBtn+menuBtn+'</div>'+
       '</div>'+
-      '<div style="padding:7px 14px 7px 36px;font-size:11px;color:var(--muted);background:var(--surface2)">'+subCount+' sub-item'+(subCount!==1?'s':'')+' hidden — '+fmt(c.total)+'</div>'+
+      '<div style="padding:7px 14px 7px 36px;font-size:11px;color:var(--muted);background:var(--surface2)">'+(par.lumpSum?'Fixed price: '+fmt(c.total):subCount+' sub-item'+(subCount!==1?'s':'')+' hidden — '+fmt(c.total))+'</div>'+
     '</div>';
   }
 
@@ -5141,23 +5152,33 @@ function renderParent(sid,par,pi,total){
       '<div class="ph-actions">'+optPill+photoThumb+photoBtn+menuBtn+'</div>'+
     '</div>'+
     descRow+
-    '<div class="subitems-wrap">'+
-      '<div class="sub-col-headers">'+
-        '<span>Type</span><span>Sub-item</span><span>Qty</span>'+
-        '<span>Markup %</span><span>Wire min</span><span>Inst min</span>'+
-        '<span class="r">Materials</span><span class="r">Labour</span><span class="r">Total</span><span></span>'+
-      '</div>'+
-      subitemsHtml+
-      '<div id="ai-sub-panel-'+par.id+'"></div>'+
-      '<div class="add-sub-row">'+
-        '<button class="btn btn-ghost btn-sm" onclick="syncDOM();addSubitem('+sid+','+par.id+',\'supply\')">+ Supply</button>'+
-        '<button class="btn btn-ghost btn-sm" onclick="syncDOM();addSubitem('+sid+','+par.id+',\'wire\')">+ Wire</button>'+
-        '<button class="btn btn-ghost btn-sm" onclick="syncDOM();addSubitem('+sid+','+par.id+',\'install\')">+ Install</button>'+
-        '<div style="margin-left:auto">'+
-          '<button class="ai-btn" id="ai-sub-btn-'+par.id+'" onclick="syncDOM();suggestSubitems('+sid+','+par.id+')">✦ AI suggest sub-items</button>'+
-        '</div>'+
-      '</div>'+
-    '</div>'+
+    (par.lumpSum
+      ? '<div class="subitems-wrap" style="padding:12px 16px 14px">'+
+          '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+            '<span style="font-size:12px;color:var(--muted);font-weight:600">Fixed price (ex. GST)</span>'+
+            '<input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" '+
+              'onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" '+
+              'style="width:110px;text-align:right;font-size:13px;font-weight:600;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)">'+
+            '<span style="font-size:12px;color:var(--muted)">× '+(par.qty||1)+' = <strong>'+fmt((par.lumpPrice||0)*(par.qty||1))+'</strong></span>'+
+          '</div>'+
+        '</div>'
+      : '<div class="subitems-wrap">'+
+          '<div class="sub-col-headers">'+
+            '<span>Type</span><span>Sub-item</span><span>Qty</span>'+
+            '<span>Markup %</span><span>Wire min</span><span>Inst min</span>'+
+            '<span class="r">Materials</span><span class="r">Labour</span><span class="r">Total</span><span></span>'+
+          '</div>'+
+          subitemsHtml+
+          '<div id="ai-sub-panel-'+par.id+'"></div>'+
+          '<div class="add-sub-row">'+
+            '<button class="btn btn-ghost btn-sm" onclick="syncDOM();addSubitem('+sid+','+par.id+',\'supply\')">+ Supply</button>'+
+            '<button class="btn btn-ghost btn-sm" onclick="syncDOM();addSubitem('+sid+','+par.id+',\'wire\')">+ Wire</button>'+
+            '<button class="btn btn-ghost btn-sm" onclick="syncDOM();addSubitem('+sid+','+par.id+',\'install\')">+ Install</button>'+
+            '<div style="margin-left:auto">'+
+              '<button class="ai-btn" id="ai-sub-btn-'+par.id+'" onclick="syncDOM();suggestSubitems('+sid+','+par.id+')">✦ AI suggest sub-items</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>')+
   '</div>';
 }
 
@@ -5245,13 +5266,12 @@ async function suggestSubitems(sid,pid){
   const panel=document.getElementById('ai-sub-panel-'+pid);
   if(!btn||!panel)return;
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Thinking…';panel.innerHTML='';
-  const relevant=getRelevantItems(p.name||'electrical item');
-  const prompt='You are an experienced Australian electrician\'s quoting assistant.\n\nThe electrician is quoting an item called: "'+p.name+'"\n\nRelevant pricelist items:\n'+(relevant||'No exact matches.')+'\n\nSuggest the typical sub-items needed. Each element:\n{"name":"short description","cat":"supply"|"wire"|"install","code":"pricelist code or null","qty":1,"wireMin":0,"instMin":0,"markup":100,"note":"brief reason"}\n\nSupply=materials, Wire=running/connecting cable (labour), Install=fitting/fixing (labour).\nReturn 3–8 items. Return ONLY the JSON array.';
+  const relevantArr=getRelevantItems(p.name||'electrical item').split('\n').filter(Boolean);
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    const resp=await fetch('/api/ai/suggest-subitems',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({itemName:p.name||'electrical item',relevantItems:relevantArr})});
+    if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error||resp.statusText);}
     const data=await resp.json();
-    const text=(data.content||[]).map(c=>c.text||'').join('');
-    const sugs=JSON.parse(text.replace(/```json|```/g,'').trim());
+    const sugs=data.suggestions||[];
     sugs.forEach(s=>{if(s.code)s.plItem=PL.find(p=>p.c===s.code)||null;if(!s.plItem){const ql=(s.name||'').toLowerCase().split(' ')[0];s.plItem=PL.find(p=>p.d1.toLowerCase().includes(ql))||null;}});
     renderSubSugs(pid,sugs);
   }catch(err){panel.innerHTML='<div class="ai-panel" style="color:#c00">Error: '+err.message+'</div>';}
@@ -5296,13 +5316,11 @@ async function suggestSectionItems(sid){
   const panel=document.getElementById('ai-sec-panel-'+sid);
   if(!btn||!panel)return;
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Thinking…';panel.innerHTML='';
-  const prompt='You are an experienced Australian electrician\'s quoting assistant.\n\nThe electrician is quoting electrical work for a section called: "'+sec.name+'"\n\nSuggest typical electrical items for this area.\n\nRespond ONLY with a JSON array:\n{"name":"Item name","qty":1,"note":"brief reason"}\n\nReturn 3–8 items. Return ONLY the JSON array.';
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:prompt}]})});
+    const resp=await fetch('/api/ai/suggest-section-items',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sectionName:sec.name||'General'})});
+    if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error||resp.statusText);}
     const data=await resp.json();
-    const text=(data.content||[]).map(c=>c.text||'').join('');
-    const sugs=JSON.parse(text.replace(/```json|```/g,'').trim());
-    renderSecSugs(sid,sugs);
+    renderSecSugs(sid,data.suggestions||[]);
   }catch(err){panel.innerHTML='<div class="ai-panel" style="color:#c00">Error: '+err.message+'</div>';}
   btn.disabled=false;btn.innerHTML='✦ AI suggest items';
 }
