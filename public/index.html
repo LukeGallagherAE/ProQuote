@@ -65,6 +65,10 @@ html.dark .ai-panel{background:#0e1d2e;border-color:#1e3a5a}
 html.dark .ai-sug-row{background:var(--surface2);border-color:var(--blue-border)}
 /* swi-btn off state */
 html.dark .swi-btn.off{background:#2a2a2a;color:var(--muted);border-color:#333}
+.par-set-btn{font-size:11px;padding:2px 7px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-weight:700;flex-shrink:0;transition:all .12s;font-family:inherit;line-height:1.5}
+.par-set-btn:hover{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-border)}
+.par-set-btn.lump-on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.par-set-btn.partial{background:rgba(255,159,10,.1);color:#ff9f0a;border-color:rgba(255,159,10,.35)}
 /* btn-icon danger */
 html.dark .btn-icon.danger:hover{background:#2a0000}
 /* template drop */
@@ -1406,23 +1410,18 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   </div>
   <!-- ③ spacer -->
   <div style="flex:1"></div>
-  <!-- ④ new revision button — shown only on revisions tab -->
-  <button id="qsub-new-rev" onclick="createRevisionFromCurrentQuote()" style="display:none;align-items:center;gap:5px;padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface);font-size:11px;font-weight:600;color:var(--text);cursor:pointer;font-family:inherit;flex-shrink:0;transition:all .12s" onmouseover="this.style.background='var(--accent)';this.style.color='#fff';this.style.borderColor='var(--accent)'" onmouseout="this.style.background='var(--surface)';this.style.color='var(--text)';this.style.borderColor='var(--border)'">↪ New Revision</button>
-  <!-- ⑤ quote name / back-to-quote — right side so full name is visible -->
-  <button id="qsub-quote-ctx" onclick="switchTab('quote')" style="display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);padding:3px 8px;border-radius:6px;font-family:inherit;white-space:nowrap;flex-shrink:0" onmouseover="this.style.background='rgba(60,50,30,.07)'" onmouseout="this.style.background='none'">
-    <span id="qsub-ctx-arrow" style="color:var(--muted);display:none">←</span>
-    <span id="qsub-label" style="color:var(--muted);font-weight:600">Quote</span>
-  </button>
-  <!-- ⑤ separator -->
-  <div style="width:1px;height:18px;background:var(--border);margin:0 6px 0 2px;flex-shrink:0"></div>
-  <!-- ⑥ actions — right -->
+  <!-- ④ actions — right -->
   <span id="publish-badge" style="display:none;font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap;letter-spacing:.3px;cursor:default;margin-right:6px;"></span>
   <button class="btn btn-secondary btn-sm" id="pdf-btn" onclick="openModal()">📤 Publish</button>
+  <!-- ⑤ quote/revision dropdown — shows full quote name, opens revision switcher -->
   <div style="width:1px;height:18px;background:var(--border);margin:0 8px;flex-shrink:0"></div>
-  <button onclick="openWizard()" title="New Quote" style="display:flex;align-items:center;gap:5px;padding:4px 11px;background:#007aff;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
-    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    New
-  </button>
+  <div style="position:relative;flex-shrink:0" id="qsub-rev-wrap">
+    <button id="qsub-quote-ctx" onclick="openRevDropdown(event)" style="display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:600;color:var(--text);padding:4px 10px;border-radius:7px;font-family:inherit;white-space:nowrap;transition:all .12s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
+      <span id="qsub-ctx-arrow" style="color:var(--muted);display:none;font-size:11px">←</span>
+      <span id="qsub-label" style="color:var(--text);font-weight:600">Quote</span>
+      <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="color:var(--muted);flex-shrink:0"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+  </div>
 </div>
 
 <nav class="nav-rail" id="navRail">
@@ -3076,6 +3075,33 @@ function toggleActiveCat(sid,pid,cat) {
 }
 function toggleParent(sid,pid) { const p=getP(sid,pid); if(p){p.collapsed=!p.collapsed;fullRender();} }
 function toggleLumpSum(sid,pid) { syncDOM(); const p=getP(sid,pid); if(p){p.lumpSum=!p.lumpSum;fullRender();} }
+
+function openParentSettingsMenu(sid,pid,btn) {
+  document.querySelectorAll('.par-settings-dd').forEach(m=>m.remove());
+  const p=getP(sid,pid); if(!p) return;
+  const ac=p.activeCats||{supply:true,wire:true,install:true};
+  const rect=btn.getBoundingClientRect();
+  const m=document.createElement('div');
+  m.className='par-settings-dd';
+  m.style.cssText='position:fixed;top:'+(rect.bottom+4)+'px;left:'+rect.left+'px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:600;padding:4px;min-width:150px';
+  const row=(label,active,cb)=>{
+    const d=document.createElement('div');
+    d.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;cursor:pointer';
+    d.innerHTML='<span style="width:16px;height:16px;border-radius:3px;border:1.5px solid '+(active?'var(--accent)':'var(--border)')+';background:'+(active?'var(--accent)':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(active?'<svg width="9" height="9" fill="none" stroke="#fff" stroke-width="3" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg>':'')+'</span>'
+      +'<span style="font-size:12px;color:var(--text)">'+label+'</span>';
+    d.onmouseenter=()=>d.style.background='var(--surface2)';
+    d.onmouseleave=()=>d.style.background='';
+    d.onclick=e=>{e.stopPropagation();cb();m.remove();};
+    return d;
+  };
+  m.appendChild(row('Supply',ac.supply,()=>toggleActiveCat(sid,pid,'supply')));
+  m.appendChild(row('Wire',ac.wire,()=>toggleActiveCat(sid,pid,'wire')));
+  m.appendChild(row('Install',ac.install,()=>toggleActiveCat(sid,pid,'install')));
+  const sep=document.createElement('div');sep.style.cssText='height:1px;background:var(--border);margin:3px 0';m.appendChild(sep);
+  m.appendChild(row('Fixed price ($)',p.lumpSum,()=>toggleLumpSum(sid,pid)));
+  document.body.appendChild(m);
+  setTimeout(()=>document.addEventListener('click',()=>m.remove(),{once:true}),10);
+}
 function collapseExpandAll() {
   syncDOM();
   const allCollapsed = S.sections.every(s => s.collapsed);
@@ -3637,6 +3663,46 @@ function renderQuoteTabs() {
 
     bar.insertBefore(wrap, addBtn);
   });
+}
+
+function openRevDropdown(e) {
+  e.stopPropagation();
+  const existing = document.getElementById('qsub-rev-dd');
+  if (existing) { existing.remove(); return; }
+  const aq = _quotes.find(q => q.id === _activeQuoteId);
+  if (!aq) return;
+  const family = _getRevisionFamily(aq);
+  const wrap = document.getElementById('qsub-rev-wrap');
+  const rect = wrap ? wrap.getBoundingClientRect() : e.target.getBoundingClientRect();
+  const dd = document.createElement('div');
+  dd.id = 'qsub-rev-dd';
+  dd.style.cssText = 'position:fixed;top:'+(rect.bottom+4)+'px;right:'+(window.innerWidth-rect.right)+'px;min-width:240px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:900;overflow:hidden';
+  const close = () => dd.remove();
+  const itemHtml = family.length === 0
+    ? '<div style="padding:10px 12px;font-size:12px;color:var(--muted)">No revisions yet</div>'
+    : family.map((q, i) => {
+        const isActive = q.id === _activeQuoteId;
+        const letter = _revLetter(i);
+        const total = _calcQuoteTotal(q);
+        const status = q._approvedAt ? 'Approved' : q._emailSentAt ? 'Sent' : q._publishedAt ? 'Published' : 'Draft';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;margin:2px;'+(isActive?'background:var(--blue-bg)':'')+'" '
+          +'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\''+(isActive?'var(--blue-bg)':'')+'\';" '
+          +'onclick="loadRevisionCard(\''+q.id+'\');document.getElementById(\'qsub-rev-dd\')?.remove()">'
+          +'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;'+(isActive?'background:var(--accent);color:#fff':'background:var(--surface2);color:var(--muted)')+'">Rev '+letter+'</span>'
+          +'<span style="font-size:12px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(q.fields?.quoteRef||'')+'</span>'
+          +'<span style="font-size:11px;color:var(--accent);font-weight:600;white-space:nowrap">'+fmt(total)+'</span>'
+          +'<span style="font-size:10px;color:var(--muted);white-space:nowrap">'+escHtml(status)+'</span>'
+          +'</div>';
+      }).join('');
+  dd.innerHTML = '<div style="padding:4px">'+itemHtml+'</div>'
+    +'<div style="border-top:1px solid var(--border);padding:8px">'
+    +'<button onclick="createRevisionFromCurrentQuote();document.getElementById(\'qsub-rev-dd\')?.remove()" '
+    +'style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text);transition:all .12s;text-align:left" '
+    +'onmouseover="this.style.background=\'var(--accent)\';this.style.color=\'#fff\';this.style.borderColor=\'var(--accent)\'" '
+    +'onmouseout="this.style.background=\'var(--surface2)\';this.style.color=\'var(--text)\';this.style.borderColor=\'var(--border)\'">↪ New Revision</button>'
+    +'</div>';
+  document.body.appendChild(dd);
+  setTimeout(() => document.addEventListener('click', close, {once:true}), 10);
 }
 
 function openQuoteTabDropdown(e, qid) {
@@ -5041,14 +5107,8 @@ function renderSection(sec,si){
 function renderParent(sid,par,pi,total){
   const c=calcParent(par);
   const ac=par.activeCats||{supply:true,wire:true,install:true};
-  const swiHtml=
-    '<div class="swi-wrap">'+
-      (par.lumpSum ? '' :
-        '<button class="swi-btn'+(ac.supply?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'supply\')" title="Include supply items">S</button>'+
-        '<button class="swi-btn'+(ac.wire?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'wire\')" title="Include wire items">W</button>'+
-        '<button class="swi-btn'+(ac.install?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'install\')" title="Include install items">I</button>') +
-      '<button class="swi-btn'+(par.lumpSum?' on':'')+'" onclick="event.stopPropagation();toggleLumpSum('+sid+','+par.id+')" title="Fixed price mode — enter a single lump sum instead of sub-items" style="font-weight:700;'+(par.lumpSum?'background:var(--accent);color:#fff;border-color:var(--accent)':'')+'">$</button>'+
-    '</div>';
+  const _swiPartial = !par.lumpSum && (!ac.supply || !ac.wire || !ac.install);
+  const swiHtml='<button class="par-set-btn'+(par.lumpSum?' lump-on':_swiPartial?' partial':'')+'" onclick="event.stopPropagation();openParentSettingsMenu('+sid+','+par.id+',this)" title="Cost settings (S/W/I · Fixed price)">'+(par.lumpSum?'$':'⚙')+'</button>';
   const menuBtn='<button class="parent-menu-btn" onclick="showParentMenu('+sid+','+par.id+',this)" title="Move / duplicate / remove">⋮</button>';
   const optPill = '<label onclick="event.stopPropagation()" title="Mark as optional extra — shown separately on quote with client checkbox" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;user-select:none">'
     + '<span style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:'+(par.optional?'rgba(220,130,0,1)':'var(--muted)')+';transition:color .15s">Optional</span>'
@@ -7849,10 +7909,6 @@ function switchTab(tab) {
     if (b) b.classList.toggle('active', t === tab);
   });
   if (tab === 'revisions') renderRevisions();
-
-  // Show/hide New Revision button in sub-bar
-  const newRevBtn = document.getElementById('qsub-new-rev');
-  if (newRevBtn) newRevBtn.style.display = (tab === 'revisions') ? 'flex' : 'none';
 
   // Update breadcrumb
   const qsubLabel = document.getElementById('qsub-label');
