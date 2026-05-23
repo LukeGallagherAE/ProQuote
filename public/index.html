@@ -898,28 +898,27 @@ html.dark .clientModal-inner,html.dark .jobModal-inner{background:var(--surface)
 
 /* ── Revisions panel ── */
 .rev-page{padding:0 0 80px;max-width:100%}
-.rev-page-header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:2px solid var(--border);background:var(--surface);gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:50}
-.rev-page-title{font-size:17px;font-weight:700;color:var(--text)}
-.rev-page-subtitle{font-size:12px;color:var(--muted);margin-top:2px}
-.rev-list{padding:16px 24px;display:flex;flex-direction:column;gap:10px}
-.rev-card{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
-.rev-card:hover{border-color:var(--accent);box-shadow:0 2px 8px rgba(0,122,255,.1)}
-.rev-card.rev-card-active{border-color:var(--accent);background:var(--blue-bg,#e8f0ff)}
-.rev-card-header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.rev-card-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--surface2);color:var(--muted)}
-.rev-card-ref{font-size:13px;font-weight:700;color:var(--text)}
-.rev-card-date{font-size:11px;color:var(--muted);margin-left:auto}
-.rev-card-total{font-size:13px;font-weight:700;color:var(--accent);margin-top:4px}
-.rev-card-notes{font-size:12px;color:var(--muted);margin-top:6px;font-style:italic;white-space:pre-wrap}
+.rev-list{padding:12px 20px;display:flex;flex-direction:column;gap:5px}
+.rev-tile{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.rev-tile:hover{border-color:var(--accent);box-shadow:0 1px 6px rgba(0,122,255,.08)}
+.rev-tile.rev-tile-active{border-color:var(--accent);background:var(--blue-bg,#e8f0ff)}
+.rev-tile-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;background:var(--surface2);color:var(--muted);white-space:nowrap;flex-shrink:0}
+.rev-tile-badge.rev-current{background:var(--accent);color:#fff}
+.rev-tile-ref{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;flex-shrink:0}
+.rev-tile-date{font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+.rev-tile-changes{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.rev-tile-total{font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap;flex-shrink:0}
+.rev-tile-status{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--muted);flex-shrink:0}
+.rev-tile-open{padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:transparent;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;flex-shrink:0;font-family:inherit;transition:all .12s}
+.rev-tile-open:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
 .rev-notes-banner{background:var(--blue-bg,#e8f0ff);border:1.5px solid var(--blue-border,#b3d0ff);border-radius:8px;padding:10px 12px;margin-bottom:12px}
 .rev-notes-banner.rev-auto{background:rgba(255,159,10,.12);border-color:rgba(255,159,10,.5)}
 .rev-notes-banner.rev-auto .rev-notes-label{color:#ff9f0a}
 html.dark .rev-notes-banner.rev-auto{background:rgba(255,159,10,.12);border-color:rgba(255,159,10,.4)}
 .rev-notes-label{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px}
 .rev-diff-item{font-size:11px;color:var(--text);padding:2px 0;line-height:1.5}
-.rev-card-diff{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 html.dark .rev-notes-banner{background:rgba(0,122,255,.1);border-color:rgba(0,122,255,.3)}
-html.dark .rev-card-active{background:rgba(0,122,255,.1)}
+html.dark .rev-tile-active{background:rgba(0,122,255,.1)}
 </style>
 </head>
 <body>
@@ -1407,7 +1406,9 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   </div>
   <!-- ③ spacer -->
   <div style="flex:1"></div>
-  <!-- ④ quote name / back-to-quote — right side so full name is visible -->
+  <!-- ④ new revision button — shown only on revisions tab -->
+  <button id="qsub-new-rev" onclick="createRevisionFromCurrentQuote()" style="display:none;align-items:center;gap:5px;padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface);font-size:11px;font-weight:600;color:var(--text);cursor:pointer;font-family:inherit;flex-shrink:0;transition:all .12s" onmouseover="this.style.background='var(--accent)';this.style.color='#fff';this.style.borderColor='var(--accent)'" onmouseout="this.style.background='var(--surface)';this.style.color='var(--text)';this.style.borderColor='var(--border)'">↪ New Revision</button>
+  <!-- ⑤ quote name / back-to-quote — right side so full name is visible -->
   <button id="qsub-quote-ctx" onclick="switchTab('quote')" style="display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);padding:3px 8px;border-radius:6px;font-family:inherit;white-space:nowrap;flex-shrink:0" onmouseover="this.style.background='rgba(60,50,30,.07)'" onmouseout="this.style.background='none'">
     <span id="qsub-ctx-arrow" style="color:var(--muted);display:none">←</span>
     <span id="qsub-label" style="color:var(--muted);font-weight:600">Quote</span>
@@ -1920,13 +1921,6 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 <!-- ── REVISIONS TAB ── -->
 <div id="page-revisions" class="tab-page" style="display:none">
   <div class="rev-page">
-    <div class="rev-page-header">
-      <div>
-        <div class="rev-page-title">Revisions</div>
-        <div class="rev-page-subtitle" id="rev-page-subtitle">All versions of this quote</div>
-      </div>
-      <button class="btn btn-primary btn-sm" onclick="createRevisionFromCurrentQuote()">↪ New Revision</button>
-    </div>
     <div class="rev-list" id="rev-list"></div>
   </div>
 </div>
@@ -3616,13 +3610,18 @@ function renderQuoteTabs() {
   }, 50);
   const addBtn = bar.querySelector('.tab-new-quote');
 
-  _quotes.forEach(q => {
+  // Determine the root quote for whatever is currently active (handles revision-as-active)
+  const _aqForTabs = _quotes.find(q => q.id === _activeQuoteId);
+  const _activeBaseRef = _aqForTabs?._parentRef || _revBaseName(_aqForTabs?.fields?.quoteRef || '');
+
+  _quotes.filter(q => !q._parentRef).forEach(q => {
     const client = q.fields?.clientName?.trim() || '';
     const job    = q.fields?.jobName?.trim() || '';
     const ref    = q.fields?.quoteRef?.trim() || '';
     const parts  = [client, job, ref].filter(Boolean);
     const label  = parts.length ? parts.join(' · ') : 'New Quote';
-    const isActive = q.id === _activeQuoteId;
+    // Mark active if this IS the active quote, or if active quote is a revision under this root
+    const isActive = q.id === _activeQuoteId || _revBaseName(q.fields?.quoteRef || '') === _activeBaseRef;
 
     const _pdotEdited = q._editedAfterPublish;
     const _pdotColor = _pdotEdited ? '#ff3b30' : '#30d158';
@@ -4632,10 +4631,10 @@ function createRevisionFromQuote(qid) {
 
   _quotes.push(nq);
   loadQuoteState(nq.id);
-  switchTab('revisions');
   renderQuoteTabs();
+  switchTab('quote');
   saveActiveQuoteState();
-  showToast('↪ Rev ' + newLetter + ' created — tap Quote to edit', 3000);
+  showToast('↪ Rev ' + newLetter + ' created', 2000);
 }
 
 function createRevisionFromCurrentQuote() {
@@ -4648,46 +4647,31 @@ function renderRevisions() {
   const aq = _quotes.find(q => q.id === _activeQuoteId);
   if (!aq) return;
 
-  const family  = _getRevisionFamily(aq);
-  const baseRef = _revBaseName(aq._parentRef || aq.fields?.quoteRef || '');
-
-  const subtitle = document.getElementById('rev-page-subtitle');
-  if (subtitle) subtitle.textContent = family.length + ' version' + (family.length !== 1 ? 's' : '') + ' of ' + baseRef;
-
-  const list = document.getElementById('rev-list');
+  const family = _getRevisionFamily(aq);
+  const list   = document.getElementById('rev-list');
   if (!list) return;
 
   list.innerHTML = family.map((q, i) => {
-    const isActive = q.id === _activeQuoteId;
-    const letter   = _revLetter(i);
-    const total    = _calcQuoteTotal(q);
-    const date     = q.fields?.quoteDate || '';
-    const status   = q._approvedAt ? 'Approved' : q._emailSentAt ? 'Email Sent' : q._publishedAt ? 'Published' : 'Draft';
+    const isActive  = q.id === _activeQuoteId;
+    const letter    = _revLetter(i);
+    const total     = _calcQuoteTotal(q);
+    const date      = q.fields?.quoteDate ? new Date(q.fields.quoteDate).toLocaleDateString('en-AU', {day:'numeric',month:'short',year:'numeric'}) : '';
+    const status    = q._approvedAt ? 'Approved' : q._emailSentAt ? 'Sent' : q._publishedAt ? 'Published' : 'Draft';
 
-    // Compute diff vs previous version
-    let diffHtml = '';
+    let changesText = i === 0 ? 'Original' : '';
     if (i > 0) {
       const changes = diffQuotes(family[i - 1], q);
-      if (changes.length === 0) {
-        diffHtml = '<div class="rev-card-notes" style="font-style:italic">No changes recorded yet</div>';
-      } else {
-        diffHtml = '<div class="rev-card-diff">' +
-          changes.map(c => '<div class="rev-diff-item">· ' + escHtml(c) + '</div>').join('') +
-          '</div>';
-      }
+      changesText = changes.length ? changes.slice(0, 2).map(c => escHtml(c)).join(' · ') + (changes.length > 2 ? ' +' + (changes.length - 2) + ' more' : '') : 'No recorded changes';
     }
 
-    return `<div class="rev-card${isActive ? ' rev-card-active' : ''}" onclick="loadRevisionCard('${q.id}')">
-      <div class="rev-card-header">
-        <span class="rev-card-badge">Rev ${letter}</span>
-        <span class="rev-card-ref">${escHtml(q.fields?.quoteRef || '')}</span>
-        <span class="rev-card-date">${date}</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
-        <span class="rev-card-total">${fmt(total)} excl. GST</span>
-        <span style="font-size:11px;color:var(--muted)">${escHtml(status)}</span>
-      </div>
-      ${diffHtml}
+    return `<div class="rev-tile${isActive ? ' rev-tile-active' : ''}" onclick="loadRevisionCard('${q.id}')">
+      <span class="rev-tile-badge${isActive ? ' rev-current' : ''}">Rev ${letter}</span>
+      <span class="rev-tile-ref">${escHtml(q.fields?.quoteRef || '')}</span>
+      <span class="rev-tile-date">${date}</span>
+      <span class="rev-tile-changes">${changesText}</span>
+      <span class="rev-tile-total">${fmt(total)}</span>
+      <span class="rev-tile-status">${escHtml(status)}</span>
+      <button class="rev-tile-open" onclick="event.stopPropagation();loadRevisionCard('${q.id}')">Open →</button>
     </div>`;
   }).join('');
 }
@@ -4695,7 +4679,7 @@ function renderRevisions() {
 function loadRevisionCard(id) {
   saveActiveQuoteState();
   loadQuoteState(id);
-  renderQuoteTabs();
+  renderQuoteTabs();  // re-highlight parent tab in tabs bar
   switchTab('quote');
 }
 
@@ -7865,6 +7849,10 @@ function switchTab(tab) {
     if (b) b.classList.toggle('active', t === tab);
   });
   if (tab === 'revisions') renderRevisions();
+
+  // Show/hide New Revision button in sub-bar
+  const newRevBtn = document.getElementById('qsub-new-rev');
+  if (newRevBtn) newRevBtn.style.display = (tab === 'revisions') ? 'flex' : 'none';
 
   // Update breadcrumb
   const qsubLabel = document.getElementById('qsub-label');
