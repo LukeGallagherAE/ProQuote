@@ -1391,9 +1391,9 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 
 <!-- ── Quote action bar (sub-tabs + badge + publish) ── -->
 <div id="quote-sub-bar" style="display:none;position:sticky;top:52px;z-index:200;background:var(--surface2);border-bottom:1px solid var(--border);margin-left:64px;height:36px;align-items:center;padding:0 14px;gap:0;">
-  <!-- ① back to list — shown when navigated from dashboard/clients/etc -->
+  <!-- ① back to list -->
   <button id="qsub-back" onclick="goBack()">← <span id="qsub-back-label">Back</span></button>
-  <!-- ② sub-view pills -->
+  <!-- ② sub-view pills + revision switcher -->
   <div style="display:flex;gap:2px;align-items:center;">
     <button id="qsub-bom" class="qsub-btn" onclick="switchTab('bom')">
       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
@@ -1403,25 +1403,20 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       Tracker
     </button>
-    <button id="qsub-revisions" class="qsub-btn" onclick="switchTab('revisions')">
-      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-      Revisions
-    </button>
+    <div style="width:1px;height:14px;background:var(--border);margin:0 4px;flex-shrink:0"></div>
+    <div style="position:relative" id="qsub-rev-wrap">
+      <button id="qsub-rev-btn" class="qsub-btn" onclick="openRevDropdown(event)" style="gap:5px">
+        <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        <span id="qsub-rev-label">Revisions</span>
+        <svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="opacity:.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+    </div>
   </div>
   <!-- ③ spacer -->
   <div style="flex:1"></div>
   <!-- ④ actions — right -->
   <span id="publish-badge" style="display:none;font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap;letter-spacing:.3px;cursor:default;margin-right:6px;"></span>
   <button class="btn btn-secondary btn-sm" id="pdf-btn" onclick="openModal()">📤 Publish</button>
-  <!-- ⑤ quote/revision dropdown — shows full quote name, opens revision switcher -->
-  <div style="width:1px;height:18px;background:var(--border);margin:0 8px;flex-shrink:0"></div>
-  <div style="position:relative;flex-shrink:0" id="qsub-rev-wrap">
-    <button id="qsub-quote-ctx" onclick="openRevDropdown(event)" style="display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:600;color:var(--text);padding:4px 10px;border-radius:7px;font-family:inherit;white-space:nowrap;transition:all .12s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
-      <span id="qsub-ctx-arrow" style="color:var(--muted);display:none;font-size:11px">←</span>
-      <span id="qsub-label" style="color:var(--text);font-weight:600">Quote</span>
-      <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="color:var(--muted);flex-shrink:0"><polyline points="6 9 12 15 18 9"/></svg>
-    </button>
-  </div>
 </div>
 
 <nav class="nav-rail" id="navRail">
@@ -3665,6 +3660,17 @@ function renderQuoteTabs() {
   });
 }
 
+function updateRevLabel() {
+  const lbl = document.getElementById('qsub-rev-label');
+  if (!lbl) return;
+  const aq = _quotes.find(q => q.id === _activeQuoteId);
+  if (!aq) { lbl.textContent = 'Revisions'; return; }
+  const family = _getRevisionFamily(aq);
+  if (family.length <= 1) { lbl.textContent = 'Revisions'; return; }
+  const idx = family.findIndex(q => q.id === _activeQuoteId);
+  lbl.textContent = 'Rev ' + (idx >= 0 ? _revLetter(idx) : 'A');
+}
+
 function openRevDropdown(e) {
   e.stopPropagation();
   const existing = document.getElementById('qsub-rev-dd');
@@ -3673,36 +3679,38 @@ function openRevDropdown(e) {
   if (!aq) return;
   const family = _getRevisionFamily(aq);
   const wrap = document.getElementById('qsub-rev-wrap');
-  const rect = wrap ? wrap.getBoundingClientRect() : e.target.getBoundingClientRect();
+  const rect = (wrap || e.target).getBoundingClientRect();
   const dd = document.createElement('div');
   dd.id = 'qsub-rev-dd';
-  dd.style.cssText = 'position:fixed;top:'+(rect.bottom+4)+'px;right:'+(window.innerWidth-rect.right)+'px;min-width:240px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:900;overflow:hidden';
-  const close = () => dd.remove();
-  const itemHtml = family.length === 0
-    ? '<div style="padding:10px 12px;font-size:12px;color:var(--muted)">No revisions yet</div>'
-    : family.map((q, i) => {
-        const isActive = q.id === _activeQuoteId;
-        const letter = _revLetter(i);
-        const total = _calcQuoteTotal(q);
-        const status = q._approvedAt ? 'Approved' : q._emailSentAt ? 'Sent' : q._publishedAt ? 'Published' : 'Draft';
-        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;margin:2px;'+(isActive?'background:var(--blue-bg)':'')+'" '
-          +'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\''+(isActive?'var(--blue-bg)':'')+'\';" '
-          +'onclick="loadRevisionCard(\''+q.id+'\');document.getElementById(\'qsub-rev-dd\')?.remove()">'
-          +'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;'+(isActive?'background:var(--accent);color:#fff':'background:var(--surface2);color:var(--muted)')+'">Rev '+letter+'</span>'
-          +'<span style="font-size:12px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(q.fields?.quoteRef||'')+'</span>'
-          +'<span style="font-size:11px;color:var(--accent);font-weight:600;white-space:nowrap">'+fmt(total)+'</span>'
-          +'<span style="font-size:10px;color:var(--muted);white-space:nowrap">'+escHtml(status)+'</span>'
-          +'</div>';
-      }).join('');
-  dd.innerHTML = '<div style="padding:4px">'+itemHtml+'</div>'
-    +'<div style="border-top:1px solid var(--border);padding:8px">'
+  dd.style.cssText = 'position:fixed;top:'+(rect.bottom+5)+'px;left:'+rect.left+'px;min-width:260px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);z-index:900;overflow:hidden';
+  const rowHtml = family.map((q, i) => {
+    const isCurrent = q.id === _activeQuoteId;
+    const letter = _revLetter(i);
+    const total = _calcQuoteTotal(q);
+    const status = q._approvedAt ? 'Approved' : q._emailSentAt ? 'Sent' : q._publishedAt ? 'Published' : 'Draft';
+    const statusColor = q._approvedAt ? '#30d158' : q._publishedAt ? '#007aff' : 'var(--muted)';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;'+(isCurrent?'background:var(--blue-bg)':'')+'" '
+      + 'onmouseover="if(!'+isCurrent+')this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\''+(isCurrent?'var(--blue-bg)':'')+'\';" '
+      + (isCurrent ? '' : 'onclick="loadRevisionCard(\''+q.id+'\');document.getElementById(\'qsub-rev-dd\')?.remove()"')
+      + '>'
+      + '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;'+(isCurrent?'background:var(--accent);color:#fff':'background:var(--surface2);color:var(--muted)')+'">Rev '+letter+'</span>'
+      + '<span style="font-size:12px;font-weight:'+(isCurrent?'700':'500')+';color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(q.fields?.quoteRef||'—')+'</span>'
+      + '<span style="font-size:11px;font-weight:600;color:'+statusColor+';white-space:nowrap">'+fmt(total)+'</span>'
+      + '<span style="font-size:10px;color:'+statusColor+';white-space:nowrap">'+escHtml(status)+'</span>'
+      + (isCurrent ? '<span style="font-size:10px;color:var(--muted)">current</span>' : '')
+      + '</div>';
+  }).join('');
+  dd.innerHTML = '<div style="padding:4px 0">'+(rowHtml||'')+'</div>'
+    +'<div style="border-top:1px solid var(--border);padding:6px 8px">'
     +'<button onclick="createRevisionFromCurrentQuote();document.getElementById(\'qsub-rev-dd\')?.remove()" '
-    +'style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text);transition:all .12s;text-align:left" '
+    +'style="width:100%;padding:8px 12px;border-radius:7px;border:1.5px solid var(--border);background:transparent;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text);transition:all .15s;text-align:left;display:flex;align-items:center;gap:6px" '
     +'onmouseover="this.style.background=\'var(--accent)\';this.style.color=\'#fff\';this.style.borderColor=\'var(--accent)\'" '
-    +'onmouseout="this.style.background=\'var(--surface2)\';this.style.color=\'var(--text)\';this.style.borderColor=\'var(--border)\'">↪ New Revision</button>'
-    +'</div>';
+    +'onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--text)\';this.style.borderColor=\'var(--border)\'">'
+    +'<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+    +(family.length <= 1 ? 'Create first revision' : 'New revision')
+    +'</button></div>';
   document.body.appendChild(dd);
-  setTimeout(() => document.addEventListener('click', close, {once:true}), 10);
+  setTimeout(() => document.addEventListener('click', () => dd.remove(), {once:true}), 10);
 }
 
 function openQuoteTabDropdown(e, qid) {
@@ -4698,6 +4706,7 @@ function createRevisionFromQuote(qid) {
   _quotes.push(nq);
   loadQuoteState(nq.id);
   renderQuoteTabs();
+  updateRevLabel();
   switchTab('quote');
   saveActiveQuoteState();
   showToast('↪ Rev ' + newLetter + ' created', 2000);
@@ -4745,7 +4754,8 @@ function renderRevisions() {
 function loadRevisionCard(id) {
   saveActiveQuoteState();
   loadQuoteState(id);
-  renderQuoteTabs();  // re-highlight parent tab in tabs bar
+  renderQuoteTabs();
+  updateRevLabel();
   switchTab('quote');
 }
 
@@ -7903,21 +7913,16 @@ function switchTab(tab) {
     }
   }
 
-  // Sync sub-tab pills
-  ['bom','tracker','revisions'].forEach(t => {
+  // Sync sub-tab pills (revisions is now a dropdown, not a page)
+  ['bom','tracker'].forEach(t => {
     const b = document.getElementById('qsub-' + t);
     if (b) b.classList.toggle('active', t === tab);
   });
-  if (tab === 'revisions') renderRevisions();
+  // Revisions is no longer a separate page — redirect to quote
+  if (tab === 'revisions') { switchTab('quote'); return; }
 
-  // Update breadcrumb
-  const qsubLabel = document.getElementById('qsub-label');
-  if (qsubLabel && isQuoteTool) {
-    const aq = _quotes.find(q => q.id === _activeQuoteId);
-    const ref  = aq?.fields?.quoteRef  || '';
-    const name = aq?.fields?.jobName || aq?.fields?.clientName || '';
-    qsubLabel.textContent = [ref, name].filter(Boolean).join(' — ');
-  }
+  // Update revision dropdown label
+  updateRevLabel();
 
   // BOM / Tracker pages sit below the 36px action bar
   if (page && isQuoteTool && tab !== 'quote') page.classList.add('with-subbar');
@@ -7944,8 +7949,6 @@ function switchTab(tab) {
   const sidebarToggle = document.getElementById('sidebarToggle');
   const mainEl = document.querySelector('.main');
   document.body.classList.toggle('show-totals-bar', tab === 'quote');
-  const ctxArrow = document.getElementById('qsub-ctx-arrow');
-  if (ctxArrow) ctxArrow.style.display = (isQuoteTool && !isQuote) ? '' : 'none';
   if (sidebar) sidebar.style.display = isQuote ? '' : 'none';
   if (sidebarToggle) sidebarToggle.style.display = isQuote ? '' : 'none';
   // Restore correct margins based on sidebar preset (don't let CSS default 248px right-margin bleed in)
