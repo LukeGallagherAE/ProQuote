@@ -940,6 +940,9 @@ html.dark .clientModal-inner,html.dark .jobModal-inner{background:var(--surface)
 .rev-card-total{font-size:13px;font-weight:700;color:var(--accent);margin-top:4px}
 .rev-card-notes{font-size:12px;color:var(--muted);margin-top:6px;font-style:italic;white-space:pre-wrap}
 .rev-notes-banner{background:var(--blue-bg,#e8f0ff);border:1.5px solid var(--blue-border,#b3d0ff);border-radius:8px;padding:10px 12px;margin-bottom:12px}
+.rev-notes-banner.rev-auto{background:rgba(255,159,10,.12);border-color:rgba(255,159,10,.5)}
+.rev-notes-banner.rev-auto .rev-notes-label{color:#ff9f0a}
+html.dark .rev-notes-banner.rev-auto{background:rgba(255,159,10,.12);border-color:rgba(255,159,10,.4)}
 .rev-notes-label{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px}
 .rev-diff-item{font-size:11px;color:var(--text);padding:2px 0;line-height:1.5}
 .rev-card-diff{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
@@ -1502,7 +1505,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
     <span class="rail-label">Sign out</span>
   </button>
-  <div class="nav-version">v2.1</div>
+  <div class="nav-version" id="nav-build-stamp">ProQuote</div>
 </nav>
 <div id="rail-flyout" style="display:none"></div>
 <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" style="right:248px" title="Collapse sidebar">▶</button>
@@ -1616,6 +1619,8 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   </div>
   </div><!-- /sidebar flex wrapper -->
   <div class="main">
+    <!-- Auto-revision notice — shown when this revision was auto-created from a published quote -->
+    <div id="auto-rev-notice" style="display:none;margin:0 0 0 0;padding:12px 18px;background:#ff9f0a;color:#fff;border-radius:0 0 10px 10px;display:none;align-items:center;gap:10px;font-size:13px;font-weight:600;flex-wrap:wrap"></div>
     <div class="sections-scroll-wrap">
       <div id="sectionsWrap"></div>
       <div style="display:flex;gap:8px;margin-top:4px;align-items:center">
@@ -2580,6 +2585,9 @@ function loadQuoteState(id) {
   _activeQuoteId = id;
   S.sections = JSON.parse(JSON.stringify(q.sections));
   _restoreFields(q.fields);
+  // Show/hide auto-revision notice
+  const notice = document.getElementById('auto-rev-notice');
+  if (notice) notice.style.display = 'none'; // reset; showAutoRevisionNotice re-shows if needed
   fullRender();
   updateQuoteTabLabel();
   setTimeout(updatePublishBadge, 60);
@@ -4798,6 +4806,7 @@ function updateRevisionBanner() {
   if (!aq || !aq._parentRef) { banner.style.display = 'none'; return; }
 
   banner.style.display = '';
+  banner.classList.toggle('rev-auto', !!aq._autoCreatedFromPublish);
   const family = _getRevisionFamily(aq);
   const myIdx  = family.findIndex(q => q.id === _activeQuoteId);
   if (myIdx <= 0) { diffEl.innerHTML = ''; return; }
@@ -4805,7 +4814,8 @@ function updateRevisionBanner() {
   const prevQ  = family[myIdx - 1];
   const myLet  = _revLetter(myIdx);
   const preLet = _revLetter(myIdx - 1);
-  if (labelEl) labelEl.textContent = '↪ Rev ' + myLet + ' — Changes from Rev ' + preLet;
+  const autoLabel = aq._autoCreatedFromPublish ? ' · auto-created from published Rev ' + preLet : '';
+  if (labelEl) labelEl.textContent = '↪ Rev ' + myLet + autoLabel + ' — Changes from Rev ' + preLet;
 
   // Use live in-memory sections for the current quote
   const liveNew = { sections: S.sections };
@@ -4818,6 +4828,62 @@ function updateRevisionBanner() {
       '<div class="rev-diff-item">· ' + escHtml(c) + '</div>'
     ).join('');
   }
+}
+
+function _autoCreateRevisionOnEdit(aq) {
+  if (!aq || aq._autoRevisionCreated) return;
+  aq._autoRevisionCreated = true;
+
+  const baseRef = _revBaseName(aq.fields?.quoteRef || '') || (aq.fields?.quoteRef || '');
+  const escaped = baseRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pat = new RegExp('^' + escaped + '(\\s+Rev\\s+[A-Z]+|\\s+Revision\\s*\\(\\d+\\))?$', 'i');
+  const siblingCount = _quotes.filter(q => pat.test(q.fields?.quoteRef || '')).length;
+  const newLetter = _revLetter(siblingCount);
+  const prevLetter = _revLetter(siblingCount - 1);
+  const newRef = baseRef + ' Rev ' + newLetter;
+
+  // Use the clean published snapshot if available, otherwise clone current sections
+  const snap = aq._publishedSnapshot;
+  const revSections = snap
+    ? JSON.parse(JSON.stringify(snap.sections))
+    : JSON.parse(JSON.stringify(aq.sections || []));
+  const revFields = snap
+    ? { ...snap.fields, quoteRef: newRef, quoteDate: new Date().toISOString().slice(0, 10) }
+    : { ...(aq.fields || {}), quoteRef: newRef, quoteDate: new Date().toISOString().slice(0, 10) };
+
+  const nq = _newQuoteState({
+    fields: revFields,
+    sections: revSections,
+    _parentRef: baseRef,
+    _autoCreatedFromPublish: true,
+  });
+
+  const originalId = aq.id;
+  _quotes.push(nq);
+  loadQuoteState(nq.id);
+  renderQuoteTabs();
+  saveActiveQuoteState();
+  _persistSession();
+
+  showAutoRevisionNotice(newLetter, prevLetter, originalId);
+}
+
+function showAutoRevisionNotice(newLetter, prevLetter, originalId) {
+  const el = document.getElementById('auto-rev-notice');
+  if (!el) return;
+  el.style.display = 'flex';
+  el.innerHTML =
+    '<span style="font-size:18px;flex-shrink:0">↪</span>' +
+    '<div style="flex:1;min-width:0">' +
+      '<div style="font-size:14px;font-weight:800;margin-bottom:2px">Rev ' + newLetter + ' auto-created</div>' +
+      '<div style="font-size:12px;font-weight:500;opacity:.9">Rev ' + prevLetter + ' is locked as the published version. You\'re now editing Rev ' + newLetter + '.</div>' +
+    '</div>' +
+    '<button onclick="loadRevisionCard(\'' + originalId + '\');switchTab(\'revisions\')" ' +
+      'style="flex-shrink:0;padding:6px 14px;background:rgba(255,255,255,.25);border:1.5px solid rgba(255,255,255,.6);border-radius:8px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">' +
+      'View Rev ' + prevLetter + ' →' +
+    '</button>' +
+    '<button onclick="document.getElementById(\'auto-rev-notice\').style.display=\'none\'" ' +
+      'style="flex-shrink:0;margin-left:6px;background:none;border:none;color:#fff;font-size:20px;line-height:1;cursor:pointer;opacity:.8;padding:0 4px">×</button>';
 }
 
 function createRevisionFromQuote(qid) {
@@ -6957,6 +7023,9 @@ function doPrint(){
       aq._publishedAt = ts; aq.fields = aq.fields || {}; aq.fields._publishedAt = ts;
       aq._publishedFingerprint = _quoteFingerprint();
       aq._editedAfterPublish = false;
+      aq._autoRevisionCreated = false;
+      // Store a clean snapshot of the published state so auto-revision starts from it
+      aq._publishedSnapshot = { sections: JSON.parse(JSON.stringify(S.sections)), fields: _captureFields() };
     }
     // Stamp in localStorage client book
     const clients = loadClients();
@@ -7017,7 +7086,14 @@ function updatePublishBadge() {
   }
 
   const wasEdited = aq?._publishedFingerprint && _quoteFingerprint() !== aq._publishedFingerprint;
-  if (wasEdited && aq) { aq._editedAfterPublish = true; _persistSession(); }
+  if (wasEdited && aq) {
+    if (!aq._editedAfterPublish && !aq._autoRevisionCreated) {
+      // First edit since publish — auto-create the next revision
+      _autoCreateRevisionOnEdit(aq);
+    }
+    aq._editedAfterPublish = true;
+    _persistSession();
+  }
 
   // Approved — highest priority
   if (aq?._approvedAt) {
@@ -12576,6 +12652,17 @@ window._initStorage().then(() => {
   try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e){}
   init();
 }).catch(() => init());
+
+// Fetch build date and stamp the nav + help footer
+fetch('/api/build-info').then(r => r.json()).then(d => {
+  if (!d.built) return;
+  const dt = new Date(d.built);
+  const label = dt.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  const el  = document.getElementById('nav-build-stamp');
+  const el2 = document.getElementById('hp-build-stamp');
+  if (el)  el.textContent  = 'Built ' + label;
+  if (el2) el2.textContent = 'ProQuote · Built ' + label;
+}).catch(() => {});
 </script>
 <!-- Global file inputs — kept outside any hideable container so .click() always works -->
 <input type="file" id="ws-file-input" accept=".json" style="display:none" onchange="wsHandleFile(event)">
@@ -12641,7 +12728,7 @@ window._initStorage().then(() => {
     <div class="hp-tip-card">Send quotes directly from ProQuote — clients get a PDF with your branding and T&amp;Cs merged in.</div>
     <div class="hp-tip-card">Switch to Mobile mode (phone icon in nav) for a cleaner layout on tablets and phones.</div>
   </div>
-  <div class="hp-footer">ProQuote v2.1</div>
+  <div class="hp-footer" id="hp-build-stamp">ProQuote</div>
 </div>
 
 <!-- ── Welcome banner (injected by JS if first login) ── -->

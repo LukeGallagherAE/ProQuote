@@ -4,6 +4,7 @@ require('dns').setDefaultResultOrder('ipv4first');
 const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
+const fs      = require('fs');
 const bcrypt  = require('bcryptjs');
 
 const storageRoutes  = require('./routes/storage');
@@ -27,8 +28,12 @@ app.use('/api/email',   requireAuth, emailRoutes);
 app.use('/api/ai',      require('./routes/ai'));
 app.use('/api/pdf',     requireAuth, require('./routes/pdf'));
 
-// Health check
-app.get('/api/health', (req, res) => res.json({ ok: true, version: '2.1.0' }));
+// Health check + build info
+const _buildDate = (() => {
+  try { return fs.statSync(path.join(__dirname, 'public', 'index.html')).mtime; } catch { return new Date(); }
+})();
+app.get('/api/health',     (req, res) => res.json({ ok: true, built: _buildDate.toISOString() }));
+app.get('/api/build-info', (req, res) => res.json({ built: _buildDate.toISOString() }));
 
 // Serve the app for any non-API route (SPA fallback)
 app.get('*', (req, res) => {
