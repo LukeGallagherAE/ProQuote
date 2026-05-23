@@ -4695,8 +4695,8 @@ function renderRevisions() {
 function loadRevisionCard(id) {
   saveActiveQuoteState();
   loadQuoteState(id);
-  renderRevisions();
   renderQuoteTabs();
+  switchTab('quote');
 }
 
 function closeWizard() {
