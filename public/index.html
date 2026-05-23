@@ -8141,8 +8141,6 @@ function switchTab(tab) {
   if (subBar) subBar.style.display = isQuoteTool ? 'flex' : 'none';
 
   // Totals bar — only on quote-scoped views
-  const totalsBar = document.querySelector('.totals-bar');
-  if (totalsBar) totalsBar.style.display = isQuoteTool ? 'flex' : 'none';
 
   // Back button — show when we came from a list/global page
   const backBtn = document.getElementById('qsub-back');
@@ -8197,7 +8195,7 @@ function switchTab(tab) {
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
   const mainEl = document.querySelector('.main');
-  if (totalsBar) totalsBar.style.display = isQuote ? '' : 'none';
+  if (totalsBar) totalsBar.style.display = isQuoteTool ? '' : 'none';
   if (sidebar) sidebar.style.display = isQuote ? '' : 'none';
   if (sidebarToggle) sidebarToggle.style.display = isQuote ? '' : 'none';
   // Restore correct margins based on sidebar preset (don't let CSS default 248px right-margin bleed in)
