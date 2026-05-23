@@ -1388,15 +1388,18 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 
 <!-- ── Quote action bar (sub-tabs + badge + publish) ── -->
 <div id="quote-sub-bar" style="display:none;position:sticky;top:52px;z-index:200;background:var(--surface2);border-bottom:1px solid var(--border);margin-left:64px;height:36px;align-items:center;padding:0 14px;gap:0;">
-  <!-- back button — shown when navigated from a list page -->
+  <!-- ① back to list — shown when navigated from dashboard/clients/etc -->
   <button id="qsub-back" onclick="goBack()">← <span id="qsub-back-label">Back</span></button>
-  <!-- sub-tab pills — left -->
+  <!-- ② quote context / back-to-quote — left identity anchor -->
+  <button id="qsub-quote-ctx" onclick="switchTab('quote')" style="display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);padding:3px 8px;border-radius:6px;font-family:inherit;max-width:210px;white-space:nowrap;overflow:hidden;flex-shrink:0" onmouseover="this.style.background='rgba(60,50,30,.07)'" onmouseout="this.style.background='none'">
+    <span id="qsub-ctx-arrow" style="color:var(--muted);display:none">←</span>
+    <span id="qsub-label" style="overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-weight:600">Quote</span>
+  </button>
+  <!-- ③ separator -->
+  <div style="width:1px;height:16px;background:var(--border);margin:0 6px;flex-shrink:0"></div>
+  <!-- ④ sub-view pills -->
   <div style="display:flex;gap:2px;align-items:center;">
-    <button id="qsub-quote" class="qsub-btn" onclick="switchTab('quote')" style="display:none">
-      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      Quote
-    </button>
-    <button id="qsub-bom"     class="qsub-btn" onclick="switchTab('bom')">
+    <button id="qsub-bom" class="qsub-btn" onclick="switchTab('bom')">
       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
       Materials
     </button>
@@ -1409,9 +1412,9 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       Revisions
     </button>
   </div>
+  <!-- ⑤ spacer -->
   <div style="flex:1"></div>
-  <!-- quote label + status badge + publish — right -->
-  <span id="qsub-label" style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;font-family:inherit;margin-right:8px;"></span>
+  <!-- ⑥ actions — right -->
   <span id="publish-badge" style="display:none;font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap;letter-spacing:.3px;cursor:default;margin-right:6px;"></span>
   <button class="btn btn-secondary btn-sm" id="pdf-btn" onclick="openModal()">📤 Publish</button>
   <div style="width:1px;height:18px;background:var(--border);margin:0 8px;flex-shrink:0"></div>
@@ -7839,7 +7842,7 @@ function switchTab(tab) {
   }
 
   // Sync sub-tab pills
-  ['quote','bom','tracker','revisions'].forEach(t => {
+  ['bom','tracker','revisions'].forEach(t => {
     const b = document.getElementById('qsub-' + t);
     if (b) b.classList.toggle('active', t === tab);
   });
@@ -7879,8 +7882,8 @@ function switchTab(tab) {
   const sidebarToggle = document.getElementById('sidebarToggle');
   const mainEl = document.querySelector('.main');
   document.body.classList.toggle('show-totals-bar', tab === 'quote');
-  const qsubQuoteBtn = document.getElementById('qsub-quote');
-  if (qsubQuoteBtn) qsubQuoteBtn.style.display = (isQuoteTool && !isQuote) ? '' : 'none';
+  const ctxArrow = document.getElementById('qsub-ctx-arrow');
+  if (ctxArrow) ctxArrow.style.display = (isQuoteTool && !isQuote) ? '' : 'none';
   if (sidebar) sidebar.style.display = isQuote ? '' : 'none';
   if (sidebarToggle) sidebarToggle.style.display = isQuote ? '' : 'none';
   // Restore correct margins based on sidebar preset (don't let CSS default 248px right-margin bleed in)
