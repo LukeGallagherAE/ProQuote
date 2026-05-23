@@ -849,39 +849,6 @@ html.dark .tsd-btn.in-final_fix_tested{background:#082018;border-color:#1a7a4a;c
 .tracker-empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:13px}
 .tracker-empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
 
-/* ── Variations Register ── */
-.var-empty{text-align:center;padding:32px 20px;color:var(--muted);font-size:13px}
-.var-row{display:grid;grid-template-columns:48px 1fr 120px 120px 36px;gap:0;border-bottom:1px solid var(--border);align-items:center;min-height:44px;transition:background .08s}
-.var-row:hover{background:#fafaf8}
-html.dark .var-row:hover{background:var(--surface2)}
-.var-row:last-child{border-bottom:none}
-.var-num{padding:0 12px;font-size:11px;font-weight:700;color:var(--muted);font-family:'IBM Plex Mono',monospace;text-align:center}
-.var-desc-cell{padding:8px 12px;display:flex;flex-direction:column;gap:3px}
-.var-desc-inp{font-size:13px;font-weight:600;background:transparent;border:none;border-bottom:1px dashed transparent;outline:none;color:var(--text);width:100%;font-family:'IBM Plex Sans',sans-serif;padding:1px 0}
-.var-desc-inp:hover{border-bottom-color:var(--border)}
-.var-desc-inp:focus{border-bottom-color:var(--accent);background:transparent}
-.var-detail-inp{font-size:11px;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed transparent;outline:none;width:100%;font-family:'IBM Plex Sans',sans-serif;padding:0;font-style:italic}
-.var-detail-inp:hover{border-bottom-color:var(--border)}
-.var-detail-inp:focus{border-bottom-color:var(--accent);color:var(--text);font-style:normal}
-.var-amount-cell{padding:0 10px}
-.var-amount-inp{font-size:13px;font-weight:700;background:transparent;border:none;border-bottom:1px dashed transparent;outline:none;color:var(--text);width:100%;font-family:'IBM Plex Mono',monospace;padding:1px 0;text-align:right}
-.var-amount-inp:hover{border-bottom-color:var(--border)}
-.var-amount-inp:focus{border-bottom-color:var(--accent)}
-.var-status-cell{padding:0 10px}
-.var-status-btn{display:flex;align-items:center;gap:5px;width:100%;padding:5px 10px;border-radius:6px;border:1.5px solid;font-size:11px;font-weight:700;cursor:pointer;background:transparent;text-align:left;font-family:'IBM Plex Sans',sans-serif;transition:all .1s;white-space:nowrap}
-.var-status-btn.pending{border-color:#e8a000;color:#9a6200;background:#fffbf0}
-.var-status-btn.approved{border-color:#1a7a4a;color:#1a7a4a;background:#edfff4}
-.var-status-btn.rejected{border-color:#e05050;color:#c03030;background:#fff5f5}
-html.dark .var-status-btn.pending{background:#2a1800;border-color:#c08000;color:#f0c060}
-html.dark .var-status-btn.approved{background:#082018;border-color:#1a7a4a;color:#4caf82}
-html.dark .var-status-btn.rejected{background:#300;border-color:#c03030;color:#ff9090}
-.var-del-btn{padding:0 8px;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:13px;opacity:.4;transition:opacity .12s}
-.var-del-btn:hover{opacity:1;color:#e05050}
-.var-col-head{display:grid;grid-template-columns:48px 1fr 120px 120px 36px;border-bottom:2px solid var(--border);background:var(--surface2)}
-.var-ch{padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
-.var-footer{padding:10px 16px;background:var(--surface2);border-top:2px solid var(--border);display:flex;align-items:center;justify-content:flex-end;gap:16px}
-.var-total-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-.var-total-val{font-size:14px;font-weight:800;font-family:'IBM Plex Mono',monospace;color:var(--accent)}
 /* BOM supply status */
 .bom-supply-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:6px;border:1.5px solid;font-size:10px;font-weight:700;cursor:pointer;background:transparent;font-family:'IBM Plex Sans',sans-serif;transition:all .1s;white-space:nowrap}
 .bom-supply-btn.not_ordered{border-color:#e05050;color:#c03030;background:#fff5f5}
@@ -1634,11 +1601,6 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       </div>
     </div>
 
-    <!-- ── Variations Register ── -->
-    <div style="margin-top:24px" id="variations-panel">
-      <div id="var-content"></div>
-    </div>
-
     <div id="bom-placeholder" style="display:none"></div>
 
 <!-- BOM Overlay Panel (legacy, keep for compatibility) -->
@@ -2298,16 +2260,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--blue);margin-bottom:6px">Quote for</div>
         <div id="pdf-client-summary" style="color:var(--text)"></div>
       </div>
-      <!-- Export type — only shown if variations register has items -->
-      <div id="pdf-export-type-wrap" style="display:none">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">What to export</div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="radio" name="pdfExportType" value="quote" checked> Quote only</label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="radio" name="pdfExportType" value="variations"> Variations register only</label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="radio" name="pdfExportType" value="both"> Both</label>
-        </div>
-      </div>
-      <div class="field" id="pdf-detail-wrap"><label>Client view</label>
+            <div class="field" id="pdf-detail-wrap"><label>Client view</label>
         <select id="pDetail">
           <option value="full">Full itemised — items and sub-items</option>
           <option value="items">Items only — no sub-item detail</option>
@@ -2896,254 +2849,6 @@ function syncDOM() {
       }
     }
   }
-  // Also sync variation parent DOM inputs into var data
-  syncVarDOM();
-}
-
-function syncVarDOM() {
-  const vd = loadVarData();
-  let changed = false;
-  for (const g of vd.groups) {
-    for (const par of g.items) {
-      if (!par.subitems) continue;
-      const pn=document.getElementById('pn-'+par.id); if(pn&&par.name!==pn.value){par.name=pn.value;changed=true;}
-      const pd=document.getElementById('pd-'+par.id); if(pd&&par.description!==pd.value){par.description=pd.value;changed=true;}
-      const pq=document.getElementById('pq-'+par.id); if(pq){const v=parseFloat(pq.value)||1;if(par.qty!==v){par.qty=v;changed=true;}}
-      for (const sub of par.subitems) {
-        const sq=document.getElementById('sq-'+sub.id); if(sq){const v=parseFloat(sq.value)||1;if(sub.qty!==v){sub.qty=v;changed=true;}}
-        const sm=document.getElementById('sm-'+sub.id); if(sm){const v=parseFloat(sm.value)||0;if(sub.markup!==v){sub.markup=v;changed=true;}}
-        const sw=document.getElementById('sw-'+sub.id); if(sw){const v=parseFloat(sw.value)||0;if(sub.wireMin!==v){sub.wireMin=v;changed=true;}}
-        const si=document.getElementById('si-'+sub.id); if(si){const v=parseFloat(si.value)||0;if(sub.instMin!==v){sub.instMin=v;changed=true;}}
-        const scp=document.getElementById('scp-'+sub.id); if(scp){const v=parseFloat(scp.value)||0;if(sub.customPrice!==v){sub.customPrice=v;changed=true;}}
-        const scu=document.getElementById('scu-'+sub.id); if(scu&&sub.customUnit!==scu.value){sub.customUnit=scu.value;changed=true;}
-        const ss=document.getElementById('ss-'+sub.id); if(ss&&!sub.item&&sub.customName!==ss.value){sub.customName=ss.value;changed=true;}
-      }
-    }
-  }
-  if (changed) saveVarData(vd);
-}
-
-// ── Variation subitem mutations ────────────────────────────────────────────────
-function addVarSubitem(gid, pid, cat) {
-  syncVarDOM();
-  const vd = loadVarData();
-  const g = vd.groups.find(g=>g.id===gid); if(!g) return;
-  const par = g.items.find(p=>p.id===pid); if(!par) return;
-  if(!par.subitems) par.subitems=[];
-  par.subitems.push(newSubitem(cat||'supply'));
-  saveVarData(vd); renderVariations();
-}
-function removeVarSubitem(gid, pid, subid) {
-  syncVarDOM();
-  const vd = loadVarData();
-  const g = vd.groups.find(g=>g.id===gid); if(!g) return;
-  const par = g.items.find(p=>p.id===pid); if(!par) return;
-  par.subitems = par.subitems.filter(s=>s.id!==subid);
-  saveVarData(vd); renderVariations();
-}
-function toggleVarActiveCat(gid, pid, cat) {
-  syncVarDOM();
-  const vd = loadVarData();
-  const g = vd.groups.find(g=>g.id===gid); if(!g) return;
-  const par = g.items.find(p=>p.id===pid); if(!par) return;
-  if(!par.activeCats) par.activeCats={supply:true,wire:true,install:true};
-  par.activeCats[cat] = !par.activeCats[cat];
-  saveVarData(vd); renderVariations();
-}
-function toggleVarSubCat(gid, pid, subid) {
-  syncVarDOM();
-  const vd = loadVarData();
-  const g = vd.groups.find(g=>g.id===gid); if(!g) return;
-  const par = g.items.find(p=>p.id===pid); if(!par) return;
-  const sub = par.subitems.find(s=>s.id===subid); if(!sub) return;
-  const cats=['supply','wire','install'];
-  sub.cat = cats[(cats.indexOf(sub.cat)+1)%cats.length];
-  saveVarData(vd); renderVariations();
-}
-function toggleVarParent(gid, pid) {
-  syncVarDOM();
-  const vd = loadVarData();
-  const g = vd.groups.find(g=>g.id===gid); if(!g) return;
-  const par = g.items.find(p=>p.id===pid); if(!par) return;
-  par.collapsed = !par.collapsed;
-  saveVarData(vd); renderVariations();
-}
-function clearVarItem(gid, pid, subid) {
-  syncVarDOM();
-  const vd = loadVarData();
-  const g = vd.groups.find(g=>g.id===gid); if(!g) return;
-  const par = g.items.find(p=>p.id===pid); if(!par) return;
-  const sub = par.subitems.find(s=>s.id===subid); if(!sub) return;
-  sub.item=null; sub.customName=''; sub.customPrice=0;
-  saveVarData(vd); renderVariations();
-}
-function pickVarItem(gid, pid, subid, item) {
-  syncVarDOM();
-  const vd = loadVarData();
-  const g = vd.groups.find(g=>g.id===gid); if(!g) return;
-  const par = g.items.find(p=>p.id===pid); if(!par) return;
-  const sub = par.subitems.find(s=>s.id===subid); if(!sub) return;
-  sub.item=item; sub.customName='';
-  closeDrops(); saveVarData(vd); renderVariations();
-  setTimeout(()=>{const e=document.getElementById('sq-'+subid);if(e){e.focus();e.select();}},50);
-}
-function pickVarCustom(gid, pid, subid, item) {
-  syncVarDOM();
-  const vd = loadVarData();
-  const g = vd.groups.find(g=>g.id===gid); if(!g) return;
-  const par = g.items.find(p=>p.id===pid); if(!par) return;
-  const sub = par.subitems.find(s=>s.id===subid); if(!sub) return;
-  sub.item=null; sub.customName=item.name||''; sub.customPrice=item.price||0; sub.customUnit=item.unit||'EA';
-  closeDrops(); saveVarData(vd); renderVariations();
-  saveToCustomLib(item.name, item.price, item.unit);
-  setTimeout(()=>{const e=document.getElementById('sq-'+subid);if(e){e.focus();e.select();}},50);
-}
-
-// ── Render a variation parent (mirrors renderParent exactly, amber accent) ────
-function renderVarParent(gid, par, col) {
-  const ac = par.activeCats || {supply:true,wire:true,install:true};
-  const c = calcParent(par);
-  const subitems = par.subitems || [];
-
-  const swiHtml =
-    '<div class="swi-wrap">'+
-      '<button class="swi-btn'+(ac.supply?'':' off')+'" onclick="event.stopPropagation();toggleVarActiveCat('+gid+','+par.id+',\'supply\')">S</button>'+
-      '<button class="swi-btn'+(ac.wire?'':' off')+'" onclick="event.stopPropagation();toggleVarActiveCat('+gid+','+par.id+',\'wire\')">W</button>'+
-      '<button class="swi-btn'+(ac.install?'':' off')+'" onclick="event.stopPropagation();toggleVarActiveCat('+gid+','+par.id+',\'install\')">I</button>'+
-    '</div>';
-
-  if (par.collapsed) {
-    const subCount = subitems.filter(s=>s.item||s.customName).length;
-    return '<div class="parent-item" id="par-'+par.id+'" ondragover="event.preventDefault();event.stopPropagation();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="dropParentPhoto(event,sid,par.id);this.classList.remove(\'drag-over\')\">'+
-      '<div class="parent-header">'+
-        '<button class="cbtn" onclick="toggleVarParent('+gid+','+par.id+')">▶</button>'+
-        '<div style="flex:1;min-width:0"><input class="parent-name-inp" id="pn-'+par.id+'" value="'+esc(par.name)+'" placeholder="Variation item…" style="width:100%" onchange="syncVarDOM()"></div>'+
-        swiHtml+
-        '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncVarDOM();renderVariations()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
-        '<span class="ptotal mat">'+fmt(c.matSell)+'</span>'+
-        '<span class="ptotal lab">'+fmt(c.labSell)+'</span>'+
-        '<span class="ptotal tot" style="color:'+col+'">'+fmt(c.total)+'</span>'+
-        '<button class="parent-menu-btn" onclick="removeVarItem('+gid+','+par.id+')" title="Remove" style="font-size:11px">✕</button>'+
-      '</div>'+
-      '<div style="padding:7px 14px 7px 36px;font-size:11px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)">'+subCount+' sub-item'+(subCount!==1?'s':'')+' hidden — '+fmt(c.total)+'</div>'+
-    '</div>';
-  }
-
-  const subitemsHtml = subitems.map(sub => renderVarSubitem(gid, par, sub)).join('');
-
-  return '<div class="parent-item" id="par-'+par.id+'" ondragover="event.preventDefault();event.stopPropagation();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="dropParentPhoto(event,sid,par.id);this.classList.remove(\'drag-over\')\">'+
-    '<button class="parent-menu-btn" onclick="removeVarItem('+gid+','+par.id+')" title="Remove item">✕</button>'+
-    '<div class="parent-header">'+
-      '<button class="cbtn" onclick="toggleVarParent('+gid+','+par.id+')">▼</button>'+
-      '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">'+
-        '<input class="parent-name-inp" id="pn-'+par.id+'" value="'+esc(par.name)+'" placeholder="Variation item…" style="width:100%" onchange="syncVarDOM()">'+
-        '<textarea class="parent-desc" id="pd-'+par.id+'" placeholder="Scope / description…" rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';syncVarDOM()" style="width:100%">'+esc(par.description||'')+'</textarea>'+
-      '</div>'+
-      swiHtml+
-      '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncVarDOM();renderVariations()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
-      '<span class="ptotal mat">'+fmt(c.matSell)+'</span>'+
-      '<span class="ptotal lab">'+fmt(c.labSell)+'</span>'+
-      '<span class="ptotal tot" style="color:'+col+'">'+fmt(c.total)+'</span>'+
-    '</div>'+
-    '<div class="subitems-wrap">'+
-      '<div class="sub-col-headers">'+
-        '<span>Type</span><span>Sub-item</span><span>Qty</span>'+
-        '<span>Markup %</span><span>Wire min</span><span>Inst min</span>'+
-        '<span class="r">Materials</span><span class="r">Labour</span><span class="r">Total</span><span></span>'+
-      '</div>'+
-      subitemsHtml+
-      '<div class="add-sub-row">'+
-        '<button class="btn btn-ghost btn-sm" onclick="addVarSubitem('+gid+','+par.id+',\'supply\')">+ Supply</button>'+
-        '<button class="btn btn-ghost btn-sm" onclick="addVarSubitem('+gid+','+par.id+',\'wire\')">+ Wire</button>'+
-        '<button class="btn btn-ghost btn-sm" onclick="addVarSubitem('+gid+','+par.id+',\'install\')">+ Install</button>'+
-      '</div>'+
-    '</div>'+
-  '</div>';
-}
-
-function renderVarSubitem(gid, par, sub) {
-  const active = subActive(sub, par);
-  const c = calcSub(sub, par);
-  const hasItem = !!sub.item;
-  const isWire = sub.cat==='wire', isInstall = sub.cat==='install', isSupply = sub.cat==='supply';
-  const catLabel = isSupply?'Supply':isWire?'Wire':'Install';
-  const displayVal = hasItem?(sub.item.d1+(sub.item.d2?' — '+sub.item.d2:'')):(sub.customName||'');
-
-  const itemInfo = hasItem
-    ? '<div class="item-lbl">'+sub.item.c+' · '+sub.item.u+' · cost '+fmt(sub.item.p)+' <span style="color:var(--accent);cursor:pointer;font-size:9px" onclick="clearVarItem('+gid+','+par.id+','+sub.id+')">✕ clear</span></div>'
-    : (sub.customName&&sub.customPrice>0 ? '<div class="item-lbl">Custom · '+esc(sub.customUnit||'EA')+' · $'+Number(sub.customPrice||0).toFixed(2)+'</div>' : '');
-
-  const customPriceField = !hasItem
-    ? '<div style="display:flex;align-items:center;gap:4px;margin-top:3px">'+
-        '<span style="font-size:10px;color:var(--muted)">$</span>'+
-        '<input type="number" id="scp-'+sub.id+'" value="'+(sub.customPrice||0)+'" min="0" step="0.01" onchange="syncVarDOM();renderVariations()" style="width:72px;height:22px;font-size:11px;padding:2px 5px">'+
-        '<span style="font-size:10px;color:var(--muted)">/</span>'+
-        '<input type="text" id="scu-'+sub.id+'" value="'+esc(sub.customUnit||'EA')+'" onchange="syncVarDOM();renderVariations()" style="width:38px;height:22px;font-size:11px;padding:2px 4px">'+
-      '</div>'
-    : '<input type="number" id="scp-'+sub.id+'" value="'+(sub.customPrice||0)+'" style="display:none"><input type="text" id="scu-'+sub.id+'" value="'+esc(sub.customUnit||'EA')+'" style="display:none">';
-
-  const wireSug = !sub.wireMin ? suggestLabourTime(sub.item?sub.item.d1:sub.customName,'wire') : null;
-  const instSug = !sub.instMin ? suggestLabourTime(sub.item?sub.item.d1:sub.customName,'install') : null;
-
-  const wireField = isWire
-    ? '<input type="number" id="sw-'+sub.id+'" value="'+sub.wireMin+'" min="0" placeholder="'+(wireSug||'0')+'" onchange="syncVarDOM();renderVariations()" style="text-align:center">'
-    : '<input type="number" id="sw-'+sub.id+'" value="'+sub.wireMin+'" style="display:none"><span style="text-align:center;color:var(--border2);font-size:11px">—</span>';
-
-  const instField = (isInstall||isSupply)
-    ? '<input type="number" id="si-'+sub.id+'" value="'+sub.instMin+'" min="0" placeholder="'+(instSug||'0')+'" onchange="syncVarDOM();renderVariations()" style="text-align:center">'
-    : '<input type="number" id="si-'+sub.id+'" value="'+sub.instMin+'" style="display:none"><span style="text-align:center;color:var(--border2);font-size:11px">—</span>';
-
-  return '<div class="subitem-row'+(active?'':' faded')+'" id="sub-'+sub.id+'">'+
-    '<button class="cat-tag" onclick="syncVarDOM();toggleVarSubCat('+gid+','+par.id+','+sub.id+')" title="Click to change type">'+catLabel+'</button>'+
-    '<div class="sw" style="position:relative">'+
-      '<input class="ss" id="ss-'+sub.id+'" value="'+esc(displayVal)+'" placeholder="Search pricelist or type…"'+
-        ' oninput="onVarSearch('+gid+','+par.id+','+sub.id+',this.value)"'+
-        ' onfocus="onVarSearch('+gid+','+par.id+','+sub.id+',this.value)"'+
-        ' onblur="setTimeout(closeDrops,200)">'+
-      itemInfo+customPriceField+
-      '<div class="dropdown" id="drop-'+gid+'-'+par.id+'-'+sub.id+'"></div>'+
-    '</div>'+
-    '<input type="number" id="sq-'+sub.id+'" value="'+sub.qty+'" min="0" onchange="syncVarDOM();renderVariations()" style="text-align:center">'+
-    '<div style="display:flex;align-items:center;gap:2px">'+
-      '<input type="number" id="sm-'+sub.id+'" value="'+sub.markup+'" min="0" onchange="syncVarDOM();renderVariations()" style="text-align:center">'+
-      '<span style="font-size:10px;color:var(--muted)">%</span>'+
-    '</div>'+
-    wireField+instField+
-    '<span class="nc mat'+(active?'':' off')+'">'+(c.matSell>0?fmt(c.matSell):'—')+'</span>'+
-    '<span class="nc lab'+(active?'':' off')+'">'+(c.labSell>0?fmt(c.labSell):'—')+'</span>'+
-    '<span class="nc tot'+(active?'':' off')+'">'+(c.total>0?fmt(c.total):'—')+'</span>'+
-    '<div class="ctx-anchor"><button class="btn-icon" onclick="removeVarSubitem('+gid+','+par.id+','+sub.id+')" title="Remove" style="font-size:14px;font-weight:700;line-height:1">✕</button></div>'+
-  '</div>';
-}
-
-let _varDeb = null;
-function onVarSearch(gid, pid, subid, val) {
-  clearTimeout(_varDeb);
-  _varDeb = setTimeout(() => {
-    const vd = loadVarData();
-    const g = vd.groups.find(g=>g.id===gid); if(!g) return;
-    const par = g.items.find(p=>p.id===pid); if(!par) return;
-    const sub = par.subitems.find(s=>s.id===subid);
-    if(sub&&!sub.item){sub.customName=val;saveVarData(vd);}
-    if(val.length<2){closeDrops();return;}
-    const ql=val.toLowerCase();
-    const plHits=PL.filter(p=>p.c.toLowerCase().includes(ql)||p.d1.toLowerCase().includes(ql)||p.d2.toLowerCase().includes(ql)).slice(0,40);
-    const libHits=searchCustomLib(val);
-    const el=document.getElementById('drop-'+gid+'-'+pid+'-'+subid);
-    if(!el)return;
-    closeDrops();
-    let html='';
-    if(libHits.length){
-      html+='<div style="padding:5px 12px 3px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--blue);background:var(--blue-bg);border-bottom:1px solid var(--blue-border)">Your saved items</div>';
-      html+=libHits.map(item=>{const safe=JSON.stringify(item).replace(/"/g,'&quot;');return '<div class="dr" style="background:var(--blue-bg)" onmousedown="pickVarCustom('+gid+','+pid+','+subid+','+safe+')"><span class="dr-code" style="color:var(--blue)">★ Custom</span><span class="dr-desc">'+escHtml(item.name)+'</span><span class="dr-price">$'+Number(item.price||0).toFixed(2)+'</span></div>';}).join('');
-    }
-    if(plHits.length){
-      if(libHits.length) html+='<div style="padding:5px 12px 3px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)">Pricelist</div>';
-      html+=plHits.map(item=>'<div class="dr" onmousedown="pickVarItem('+gid+','+pid+','+subid+','+JSON.stringify(item).replace(/"/g,'&quot;')+')"><span class="dr-code">'+item.c+'</span><span class="dr-desc">'+item.d1+'</span><span class="dr-sub">'+item.d2+'</span><span class="dr-price">'+fmt(item.p)+'/'+item.u+'</span></div>').join('');
-    }
-    if(!html) html='<div class="dr-empty">No items found</div>';
-    el.innerHTML=html; el.style.display='block';
-  },80);
 }
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
@@ -3165,10 +2870,6 @@ function getP(sid,pid) {
   // Check main sections first
   const mainP = S.sections.find(s=>s.id===sid)?.parents.find(p=>p.id===pid);
   if (mainP) return mainP;
-  // Also check variation groups (sid is a group id for variations)
-  const vd = loadVarData();
-  const vg = vd.groups.find(g=>g.id===sid);
-  if (vg) { const vp = vg.items.find(p=>p.id===pid); if(vp) return vp; }
   return null;
 }
 function addParent(sid) {
@@ -3748,7 +3449,7 @@ function applyMarkupAll(){
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function fullRender(){renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();renderVariations();updateRevisionBanner();setTimeout(()=>{updatePublishBadge();},50);clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);}
+function fullRender(){renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();updateRevisionBanner();setTimeout(()=>{updatePublishBadge();},50);clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);}
 
 let _pubCheckTimer=null;
 function _schedulePublishCheck(){
@@ -4009,7 +3710,7 @@ function switchToQuote(qid) {
   if (!isQuoteTool) switchTab('quote');
   else switchTab(_activeTab);
   renderQuoteTabs();
-  renderVariations();
+  
 }
 
 let _cqwTargetId = null;
@@ -6316,16 +6017,6 @@ function openModal(){
     summaryEl.parentElement.style.display = lines.length ? '' : 'none';
   }
 
-  // Show variations export option only if register has items
-  const varData = loadVarData();
-  const hasVarItems = varData.groups.some(g => g.items.some(i => i.name && i.name !== 'New Item'));
-  const exportWrap = document.getElementById('pdf-export-type-wrap');
-  const detailWrap = document.getElementById('pdf-detail-wrap');
-  if (exportWrap) exportWrap.style.display = hasVarItems ? '' : 'none';
-  // Reset to quote-only selection
-  const radios = document.querySelectorAll('input[name="pdfExportType"]');
-  radios.forEach(r => { r.checked = r.value === 'quote'; });
-  if (detailWrap) detailWrap.style.display = '';
 
   document.getElementById('pdfModal').style.display='flex';
 }
@@ -6488,10 +6179,7 @@ async function confirmSendEmail() {
 }
 
 function doPrintExport(){
-  const selected = document.querySelector('input[name="pdfExportType"]:checked')?.value || 'quote';
-  if (selected === 'quote') { doPrint(); }
-  else if (selected === 'variations') { closeModal(); resubmitWithVariations(); }
-  else if (selected === 'both') { doPrint(); setTimeout(() => resubmitWithVariations(), 600); }
+  doPrint();
 }
 
 function doPrint(){
@@ -8263,7 +7951,6 @@ function switchTab(tab) {
   if (tab.startsWith('custom-')) renderCustomTab(tab);
   if (tab === 'tracker') renderTracker();
   if (tab === 'profile') { renderCategorySettings(); renderZonePresets(); initStagedMarkupUI(); _populateAccountPanel(); }
-  if (tab === 'quote') { const vb = document.getElementById('var-content'); if (vb) renderVariations(); }
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -8741,373 +8428,6 @@ function cycleBOMSupply(bomKey, btn) {
   btn.className = 'bom-supply-btn ' + nextStatus;
   btn.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;display:inline-block;background:'+dotColor+'"></span>' + SUPPLY_LABELS[nextStatus];
 }
-
-// ── Variations Register ────────────────────────────────────────────────────────
-// Data model: { [quoteId]: { groups: [{id,name,collapsed,items:[{id,desc,detail,amount,status,date}]}] } }
-const VAR_KEY = 'proquote_variations';
-const VAR_ACCENT = '#c87000'; // amber — distinct from quote blue
-const VAR_COLORS = ['#c87000','#b06000','#a05800','#905000','#804800'];
-const VAR_STATUS_META = {
-  pending:  { label:'Pending',  dot:'#e8a000', bg:'#fffbf0', border:'#e8a000', color:'#9a6200' },
-  approved: { label:'Approved', dot:'#1a7a4a', bg:'#edfff4', border:'#1a7a4a', color:'#1a7a4a' },
-  rejected: { label:'Rejected', dot:'#e05050', bg:'#fff5f5', border:'#e05050', color:'#c03030' },
-};
-
-function loadVarData() {
-  try {
-    const all = JSON.parse(localStorage.getItem(VAR_KEY) || '{}');
-    const d = all[_activeQuoteId] || { groups: [] };
-    if (!d.groups) d.groups = [];
-    return d;
-  } catch(e) { return { groups: [] }; }
-}
-function saveVarData(data) {
-  try {
-    const all = JSON.parse(localStorage.getItem(VAR_KEY) || '{}');
-    all[_activeQuoteId] = data;
-    localStorage.setItem(VAR_KEY, JSON.stringify(all));
-  } catch(e) {}
-}
-function varUid() { return Date.now() + Math.floor(Math.random()*1000); }
-
-// Group (section) operations
-function addVarGroup() {
-  const data = loadVarData();
-  const n = data.groups.length + 1;
-  data.groups.push({ id: varUid(), name: 'Variation ' + n, collapsed: false, items: [] });
-  saveVarData(data);
-  renderVariations();
-  setTimeout(() => {
-    const inputs = document.querySelectorAll('.var-group-name-inp');
-    if (inputs.length) inputs[inputs.length-1].focus();
-  }, 50);
-}
-function removeVarGroup(gid) {
-  if (!confirm('Remove this variation group and all its items?')) return;
-  const data = loadVarData();
-  data.groups = data.groups.filter(g => g.id !== gid);
-  saveVarData(data);
-  renderVariations();
-}
-function toggleVarGroup(gid) {
-  const data = loadVarData();
-  const g = data.groups.find(g => g.id === gid);
-  if (g) g.collapsed = !g.collapsed;
-  saveVarData(data);
-  renderVariations();
-}
-function updateVarGroupName(gid, name) {
-  const data = loadVarData();
-  const g = data.groups.find(g => g.id === gid);
-  if (g) g.name = name;
-  saveVarData(data);
-}
-
-// Item operations within a group
-function addVarItem(gid) {
-  syncVarDOM();
-  const vd = loadVarData();
-  const g = vd.groups.find(g => g.id === gid);
-  if (!g) return;
-  g.collapsed = false;
-  g.items.push({
-    id: varUid(), name: 'New Item', description: '', qty: 1, collapsed: false,
-    activeCats: {supply:true, wire:true, install:true},
-    subitems: [newSubitem('supply'), newSubitem('wire'), newSubitem('install')]
-  });
-  saveVarData(vd);
-  renderVariations();
-  setTimeout(() => {
-    const inputs = document.querySelectorAll('[data-gid="'+gid+'"].parent-name-inp, #par-'+g.items[g.items.length-1].id+' .parent-name-inp');
-    if (inputs.length) inputs[inputs.length-1].focus();
-  }, 60);
-}
-function removeVarItem(gid, iid) {
-  const data = loadVarData();
-  const g = data.groups.find(g => g.id === gid);
-  if (g) g.items = g.items.filter(i => i.id !== iid);
-  saveVarData(data);
-  renderVariations();
-}
-function updateVarItem(gid, iid, field, value) {
-  const data = loadVarData();
-  const g = data.groups.find(g => g.id === gid);
-  if (!g) return;
-  const item = g.items.find(i => i.id === iid);
-  if (item) item[field] = value;
-  saveVarData(data);
-  renderVarSummary(data);
-}
-function cycleVarItemStatus(gid, iid, btn) {
-  const cycle = ['pending','approved','rejected'];
-  const data = loadVarData();
-  const g = data.groups.find(g => g.id === gid);
-  if (!g) return;
-  const item = g.items.find(i => i.id === iid);
-  if (!item) return;
-  item.status = cycle[(cycle.indexOf(item.status)+1) % cycle.length];
-  saveVarData(data);
-  const meta = VAR_STATUS_META[item.status];
-  btn.className = 'var-status-btn ' + item.status;
-  btn.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;display:inline-block;background:'+meta.dot+'"></span>' + meta.label + ' ▾';
-  renderVarSummary(data);
-}
-
-function renderVarSummary(data) {
-  // Update the heading area summary without full re-render
-  const resubBtn = document.getElementById('resubmit-btn');
-  const totalGroups = data.groups.length;
-  const allItems = data.groups.flatMap(g => g.items);
-  const approved = allItems.filter(i => i.status === 'approved');
-  const approvedTotal = approved.reduce((s,i) => s + (parseFloat(i.amount)||0), 0);
-  if (resubBtn) resubBtn.style.display = totalGroups ? '' : 'none';
-}
-
-function renderVariations() {
-  const el = document.getElementById('var-content');
-  if (!el) return;
-  const data = loadVarData();
-  renderVarSummary(data);
-
-  if (!data.groups.length) {
-    el.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border:2px dashed var(--border);border-radius:var(--r);margin-bottom:4px">
-      <div>
-        <div style="font-size:14px;font-weight:700;color:var(--text)">Variations Register</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px">Log changes and additions to the original scope. Each group is a separate variation.</div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary btn-sm" style="background:${VAR_ACCENT};border-color:${VAR_ACCENT}" onclick="addVarGroup()">+ Add Variation Group</button>
-      </div>
-    </div>`;
-    return;
-  }
-
-  // Totals across all items using calcParent
-  let totalApprovedMat = 0, totalApprovedLab = 0;
-  data.groups.forEach(g => g.items.forEach(item => {
-    if ((item.subitems||[]).length) {
-      const c = calcParent(item);
-      totalApprovedMat += c.matSell;
-      totalApprovedLab += c.labSell;
-    }
-  }));
-  const grandTotal = totalApprovedMat + totalApprovedLab;
-
-  let html = `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 14px">
-    <div>
-      <div style="font-size:15px;font-weight:800;color:${VAR_ACCENT}">Variations Register</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:2px">
-        ${data.groups.length} variation group${data.groups.length!==1?'s':''}
-        ${grandTotal ? ' · <span style="color:'+VAR_ACCENT+';font-weight:700">+'+fmt(grandTotal)+' variations total</span>' : ''}
-      </div>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-secondary btn-sm" onclick="resubmitWithVariations()" id="resubmit-btn">⬡ Resubmit Quote</button>
-      <button class="btn btn-primary btn-sm" style="background:${VAR_ACCENT};border-color:${VAR_ACCENT}" onclick="addVarGroup()">+ Add Variation Group</button>
-    </div>
-  </div>`;
-
-  data.groups.forEach((g, gi) => {
-    const col = VAR_COLORS[gi % VAR_COLORS.length];
-    const itemCount = g.items.length;
-    const groupTotal = g.items.reduce((s, item) => {
-      if (!(item.subitems||[]).length) return s;
-      return s + calcParent(item).total;
-    }, 0);
-    const collapsed = !!g.collapsed;
-
-    html += `<div class="section-card" style="border-top:3px solid ${col};margin-bottom:14px">
-      <div class="section-header" style="background:${col}10">
-        <button class="cbtn" onclick="toggleVarGroup(${g.id})">${collapsed?'▶':'▼'}</button>
-        <div style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></div>
-        <input class="section-name-inp" value="${esc(g.name)}"
-          style="color:${col}"
-          onchange="updateVarGroupName(${g.id},this.value)"
-          oninput="updateVarGroupName(${g.id},this.value)">
-        <span class="section-badge" style="background:${col}18;color:${col};border:1px solid ${col}44">${groupTotal?fmt(groupTotal):(itemCount+' item'+(itemCount!==1?'s':''))}</span>
-        <button class="btn-icon danger" onclick="removeVarGroup(${g.id})" title="Remove group">✕</button>
-      </div>`;
-
-    if (collapsed) {
-      html += `<div style="padding:8px 14px;font-size:11px;color:var(--muted);background:#fafaf8;border-bottom:1px solid var(--border)">${itemCount} item${itemCount!==1?'s':''}${groupTotal?' · '+fmt(groupTotal):''}</div>`;
-    } else {
-      if (!g.items.length) {
-        html += `<div style="padding:16px 18px;font-size:12px;color:var(--muted);text-align:center;font-style:italic">No items yet — click + Add item below</div>`;
-      } else {
-        g.items.forEach(item => {
-          html += renderVarParent(g.id, item, col);
-        });
-      }
-      html += `<div class="add-parent-row">
-        <button class="btn btn-ghost btn-sm" style="color:${col}" onclick="addVarItem(${g.id})">+ Add item</button>
-      </div>`;
-
-      if (groupTotal) {
-        const gItems = g.items.filter(i=>(i.subitems||[]).length);
-        const gMat = gItems.reduce((s,i)=>s+calcParent(i).matSell,0);
-        const gLab = gItems.reduce((s,i)=>s+calcParent(i).labSell,0);
-        html += `<div class="section-footer" style="background:${col}0a">
-          <span class="sf-label">${itemCount} item${itemCount!==1?'s':''} · Section total</span>
-          <span class="sf-val">${fmt(gMat)}</span>
-          <span class="sf-val lab">${fmt(gLab)}</span>
-          <span class="sf-val tot" style="color:${col}">${fmt(groupTotal)}</span>
-          <span></span>
-        </div>`;
-      }
-    }
-    html += `</div>`;
-  });
-
-  el.innerHTML = html;
-  setTimeout(initTAs, 0);
-}
-
-function resubmitWithVariations() {
-  syncDOM();
-  const data = loadVarData();
-  if (!data.groups.length) { alert('No variations to include.'); return; }
-
-  // Flatten all items by group for the register — compute amounts from subitems
-  const allItems = data.groups.flatMap(g => g.items.map(i => {
-    const tot = (i.subitems||[]).length ? calcParent(i).total : 0;
-    return {...i, groupName: g.name, computedTotal: tot};
-  }));
-  const approved = allItems.filter(i => i.name && i.name !== 'New Item' && i.computedTotal > 0);
-  const pending  = allItems.filter(i => i.name && i.name !== 'New Item' && i.computedTotal === 0 && (i.subitems||[]).length);
-  const allNamed = allItems.filter(i => i.name && i.name !== 'New Item');
-
-  const fv = id => document.getElementById(id)?.value || '';
-  const biz = profileVal('pPreparedBy') || profileVal('pABN') || 'Your Business';
-  const client = fv('clientName'), jobName = fv('jobName'), jobNumber = fv('jobNumber');
-  const addr = fv('siteAddr'), ref = fv('quoteRef');
-  const abn = profileVal('pABN') || '';
-  const lic = profileVal('pLic') || '';
-  const t = calcAll();
-  const approvedTotal = approved.reduce((s,x) => s + x.computedTotal, 0);
-  const revisedTotal = t.total + approvedTotal;
-  const revGst = revisedTotal * 0.1;
-  const now = new Date().toLocaleDateString('en-AU', {day:'numeric',month:'long',year:'numeric'});
-  const revNum = 'Rev.' + approved.length;
-
-  // Build group register rows for the output
-  const groupRows = data.groups.map((g, gi) => {
-    const col = ['#1a7a4a','#c87000','#1a4fa0','#9040c0','#d94f00'][gi % 5];
-    const gItems = g.items.filter(i => i.name && i.name !== 'New Item');
-    if (!gItems.length) return '';
-    const gTotal = gItems.reduce((s,i) => s + ((i.subitems||[]).length ? calcParent(i).total : 0), 0);
-    return `<div style="margin-bottom:18px;border-radius:8px;overflow:hidden;border:1px solid ${col}30">
-      <div style="background:${col}12;padding:9px 14px;font-size:12px;font-weight:800;color:${col};border-bottom:2px solid ${col}30;display:flex;justify-content:space-between">
-        <span>${esc(g.name)}</span>
-        ${gTotal ? `<span style="font-family:monospace">${fmt(gTotal)}</span>` : ''}
-      </div>
-      <table style="width:100%;border-collapse:collapse">
-        <tbody>
-          ${gItems.map(i => {
-            const tot = (i.subitems||[]).length ? calcParent(i).total : 0;
-            return `<tr style="border-bottom:1px solid ${col}18">
-              <td style="padding:9px 14px;font-size:13px;vertical-align:top">
-                <div style="font-weight:600">${esc(i.name)}</div>
-                ${i.description?`<div style="font-size:11px;color:#888;margin-top:2px;font-style:italic">${esc(i.description)}</div>`:''}
-              </td>
-              <td style="padding:9px 14px;text-align:right;font-family:monospace;font-weight:700;white-space:nowrap;vertical-align:top">${tot?fmt(tot):'—'}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
-  }).join('');
-
-  const html = `<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Revised Quote ${esc(ref)} ${revNum} — ${esc(biz)}</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;background:#f2f1ed;color:#1a1a1a;font-size:14px;line-height:1.5}
-.page{max-width:820px;margin:0 auto;padding:32px 24px 60px}
-.card{background:#fff;border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden;margin-bottom:20px}
-.card-body{padding:24px 28px}
-@media print{body{background:#fff}.page{max-width:100%;padding:12px}@page{margin:10mm}}
-</style></head>
-<body><div class="page">
-
-  <div style="background:#fff8e0;border:2px solid #f0c040;border-radius:10px;padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:14px">
-    <div style="font-size:28px">⚡</div>
-    <div>
-      <div style="font-size:14px;font-weight:800;color:#7a5a00">REVISED QUOTE — ${revNum}</div>
-      <div style="font-size:12px;color:#a07020;margin-top:2px">Updated version of <strong>${esc(ref)}</strong> incorporating approved variations. Issued ${now}.</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div style="height:5px;background:linear-gradient(90deg,#007aff,#1a4fa0)"></div>
-    <div class="card-body">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
-        <div>
-          <div style="font-size:36px;font-weight:800;letter-spacing:-1.5px;color:#1a1a1a;margin-bottom:8px;line-height:1;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif">ProQuote</div>
-          <div style="font-size:12px;color:#888">ABN ${esc(abn)} · Lic ${esc(lic)}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:22px;font-weight:800;color:#1a1a1a">Revised Quote</div>
-          <div style="font-size:14px;font-weight:700;color:#007aff;margin-top:4px">${esc(ref)} <span style="background:#007aff;color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;vertical-align:middle">${revNum}</span></div>
-          <div style="font-size:12px;color:#888;margin-top:4px">${now}</div>
-        </div>
-      </div>
-      ${(client||jobName)?`<div style="margin-top:16px;padding:12px 16px;background:#f5f5f2;border-radius:8px">
-        ${client?`<div style="font-weight:700;font-size:13px">${esc(client)}</div>`:''}
-        ${jobName?`<div style="color:#666;font-size:12px">${esc(jobName)}${jobNumber?' · '+esc(jobNumber):''}</div>`:''}
-        ${addr?`<div style="color:#888;font-size:12px">${esc(addr)}</div>`:''}
-      </div>`:''}
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-body">
-      <div style="font-size:16px;font-weight:800;margin-bottom:4px;color:#c87000">Variation Register</div>
-      <div style="font-size:12px;color:#888;margin-bottom:20px">${data.groups.length} variation group${data.groups.length!==1?'s':''} · ${allNamed.length} items total</div>
-      ${groupRows}
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-body">
-      <div style="font-size:14px;font-weight:700;margin-bottom:12px">Revised Pricing Summary</div>
-      <table style="width:100%;border-collapse:collapse">
-        <tr style="border-bottom:1px solid #e0e0da">
-          <td style="padding:9px 0;font-size:13px;color:#888">Original quote (excl. GST)</td>
-          <td style="padding:9px 0;text-align:right;font-family:monospace;font-size:13px">${fmt(t.total)}</td>
-        </tr>
-        ${approved.map(x => `<tr style="border-bottom:1px solid #e0e0da">
-          <td style="padding:9px 0 9px 16px;font-size:13px;color:#1a7a4a">+ ${esc(x.groupName)} — ${esc(x.name)}</td>
-          <td style="padding:9px 0;text-align:right;font-family:monospace;font-size:13px;color:#1a7a4a">+${fmt(x.computedTotal)}</td>
-        </tr>`).join('')}
-        <tr style="border-bottom:2px solid #ddd">
-          <td style="padding:9px 0;font-size:13px;font-weight:700">Revised total (excl. GST)</td>
-          <td style="padding:9px 0;text-align:right;font-family:monospace;font-size:14px;font-weight:800">${fmt(revisedTotal)}</td>
-        </tr>
-        <tr style="border-bottom:1px solid #e0e0da">
-          <td style="padding:9px 0;font-size:13px;color:#888">GST (10%)</td>
-          <td style="padding:9px 0;text-align:right;font-family:monospace;font-size:13px">${fmt(revGst)}</td>
-        </tr>
-        <tr style="background:#007aff08">
-          <td style="padding:14px;font-size:15px;font-weight:800;color:#007aff">TOTAL (incl. GST)</td>
-          <td style="padding:14px;text-align:right;font-family:monospace;font-size:20px;font-weight:800;color:#007aff">${fmt(revisedTotal + revGst)}</td>
-        </tr>
-      </table>
-    </div>
-  </div>
-
-  <div style="text-align:center;font-size:11px;color:#bbb;margin-top:16px">${esc(biz)} · ABN ${esc(abn)} · ${esc(ref)} ${revNum} · ${now}</div>
-</div></body></html>`;
-
-  const blob = new Blob([html], {type:'text/html'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = (ref||'quote') + '-' + revNum.toLowerCase().replace('.','') + '-' + (client||'client').replace(/\s+/g,'-') + '.html';
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
 
 function exportBOM() {
   syncDOM();
@@ -11237,7 +10557,7 @@ function switchToQuoteFromFlyout(qid) {
   loadQuoteState(qid);
   switchTab('quote');
   renderQuoteTabs();
-  renderVariations();
+  
 }
 
 function toggleDarkMode() {
