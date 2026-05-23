@@ -263,7 +263,8 @@ html.dark .parent-item:focus-within{background:var(--blue-bg)}
 .sf-val.lab{color:var(--blue)}.sf-val.tot{color:var(--text);font-size:13px;font-weight:700}
 
 /* ── Totals bar ── */
-.totals-bar{position:fixed;bottom:0;left:64px;right:0;z-index:200;background:var(--surface);display:flex;align-items:center;height:62px;border-top:1px solid var(--border);gap:0}
+.totals-bar{position:fixed;bottom:0;left:64px;right:0;z-index:200;background:var(--surface);display:none;align-items:center;height:62px;border-top:1px solid var(--border);gap:0}
+body.show-totals-bar .totals-bar{display:flex}
 /* Cost group — dimmed flat text on the left */
 .tot-costs{display:flex;align-items:center;gap:18px;padding:0 22px 0 20px;opacity:.5;border-right:1px solid var(--border);height:100%}
 /* Tile row — all coloured tiles fill the rest */
@@ -1660,7 +1661,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 </div>
   </div>
 </div>
-<div class="totals-bar" style="display:none">
+<div class="totals-bar">
   <!-- Cost metrics — flat, dimmed -->
   <div class="tot-costs">
     <div class="ti"><span class="tl">Labour days</span><span class="tv" id="tDays">—</span></div>
@@ -8195,7 +8196,7 @@ function switchTab(tab) {
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
   const mainEl = document.querySelector('.main');
-  if (totalsBar) totalsBar.style.display = tab === 'quote' ? '' : 'none';
+  document.body.classList.toggle('show-totals-bar', tab === 'quote');
   if (sidebar) sidebar.style.display = isQuote ? '' : 'none';
   if (sidebarToggle) sidebarToggle.style.display = isQuote ? '' : 'none';
   // Restore correct margins based on sidebar preset (don't let CSS default 248px right-margin bleed in)
