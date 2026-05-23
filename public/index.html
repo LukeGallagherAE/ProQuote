@@ -1411,6 +1411,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   </div>
   <div style="flex:1"></div>
   <!-- quote label + badge + publish — right -->
+  <button id="qsub-collapse-all" class="btn btn-ghost btn-sm" onclick="collapseExpandAll()" style="display:none;font-size:11px;margin-right:4px" title="Collapse / expand all sections">⊟ Collapse all</button>
   <span id="qsub-label" style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;font-family:inherit;margin-right:10px;"></span>
   <span id="publish-badge" style="display:none;font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap;letter-spacing:.3px;cursor:default;margin-right:6px;"></span>
   <button class="btn btn-secondary btn-sm" id="pdf-btn" onclick="openModal()">📤 Publish</button>
@@ -3069,6 +3070,12 @@ function toggleActiveCat(sid,pid,cat) {
   p.activeCats[cat]=!p.activeCats[cat]; fullRender();
 }
 function toggleParent(sid,pid) { const p=getP(sid,pid); if(p){p.collapsed=!p.collapsed;fullRender();} }
+function collapseExpandAll() {
+  syncDOM();
+  const allCollapsed = S.sections.every(s => s.collapsed);
+  S.sections.forEach(s => { s.collapsed = !allCollapsed; });
+  fullRender();
+}
 function toggleSec(sid) {
   const s=S.sections.find(s=>s.id===sid); if(!s) return;
   s.collapsed = !s.collapsed;
@@ -4954,6 +4961,15 @@ function renderTotals(){
 }
 function renderSections(){
   const wrap=document.getElementById('sectionsWrap');if(!wrap)return;
+  // Update collapse-all button
+  const colBtn = document.getElementById('qsub-collapse-all');
+  if (colBtn && S.sections.length) {
+    colBtn.style.display = '';
+    const allCollapsed = S.sections.every(s => s.collapsed);
+    colBtn.textContent = allCollapsed ? '⊞ Expand all' : '⊟ Collapse all';
+  } else if (colBtn) {
+    colBtn.style.display = 'none';
+  }
   const zwBtn = document.getElementById('zone-wizard-btn');
   if(!S.sections.length){
     wrap.innerHTML='';
@@ -7885,6 +7901,8 @@ function switchTab(tab) {
   const sidebarToggle = document.getElementById('sidebarToggle');
   const mainEl = document.querySelector('.main');
   document.body.classList.toggle('show-totals-bar', tab === 'quote');
+  const colAllBtn = document.getElementById('qsub-collapse-all');
+  if (colAllBtn) colAllBtn.style.display = isQuote ? '' : 'none';
   if (sidebar) sidebar.style.display = isQuote ? '' : 'none';
   if (sidebarToggle) sidebarToggle.style.display = isQuote ? '' : 'none';
   // Restore correct margins based on sidebar preset (don't let CSS default 248px right-margin bleed in)
