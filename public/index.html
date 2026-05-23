@@ -1409,7 +1409,6 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       Revisions
     </button>
   </div>
-  <button id="qsub-collapse-all" class="btn btn-ghost btn-sm" onclick="collapseExpandAll()" style="display:none;font-size:11px;margin-left:6px" title="Collapse / expand all sections">⊟ Collapse all</button>
   <div style="flex:1"></div>
   <!-- quote label + status badge + publish — right -->
   <span id="qsub-label" style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;font-family:inherit;margin-right:8px;"></span>
@@ -4962,15 +4961,6 @@ function renderTotals(){
 }
 function renderSections(){
   const wrap=document.getElementById('sectionsWrap');if(!wrap)return;
-  // Update collapse-all button
-  const colBtn = document.getElementById('qsub-collapse-all');
-  if (colBtn && S.sections.length) {
-    colBtn.style.display = '';
-    const allCollapsed = S.sections.every(s => s.collapsed);
-    colBtn.textContent = allCollapsed ? '⊞ Expand all' : '⊟ Collapse all';
-  } else if (colBtn) {
-    colBtn.style.display = 'none';
-  }
   const zwBtn = document.getElementById('zone-wizard-btn');
   if(!S.sections.length){
     wrap.innerHTML='';
@@ -4978,7 +4968,14 @@ function renderSections(){
     return;
   }
   if(zwBtn) zwBtn.style.display='none';
-  wrap.innerHTML = S.sections.map(renderSection).join('');
+  const allCollapsed = S.sections.every(s => s.collapsed);
+  const colRow = S.sections.length > 1
+    ? '<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px;padding:0 2px">'
+      + '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--muted)" onclick="collapseExpandAll()">'
+      + (allCollapsed ? '⊞ Expand all' : '⊟ Collapse all')
+      + '</button></div>'
+    : '';
+  wrap.innerHTML = colRow + S.sections.map(renderSection).join('');
 }
 
 function renderSection(sec,si){
@@ -7882,8 +7879,6 @@ function switchTab(tab) {
   const sidebarToggle = document.getElementById('sidebarToggle');
   const mainEl = document.querySelector('.main');
   document.body.classList.toggle('show-totals-bar', tab === 'quote');
-  const colAllBtn = document.getElementById('qsub-collapse-all');
-  if (colAllBtn) colAllBtn.style.display = isQuote ? '' : 'none';
   const qsubQuoteBtn = document.getElementById('qsub-quote');
   if (qsubQuoteBtn) qsubQuoteBtn.style.display = (isQuoteTool && !isQuote) ? '' : 'none';
   if (sidebar) sidebar.style.display = isQuote ? '' : 'none';
