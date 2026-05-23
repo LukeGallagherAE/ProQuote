@@ -552,8 +552,9 @@ html.dark .nav-rail-add:hover{border-color:rgba(255,255,255,.6);color:#fff}
 #wt-overlay{
   position:fixed;inset:0;z-index:9000;pointer-events:none;
   transition:opacity .25s;
+  opacity:0;
 }
-#wt-overlay.wt-active{pointer-events:auto}
+#wt-overlay.wt-active{pointer-events:auto;opacity:1;}
 #wt-backdrop{
   position:absolute;inset:0;
   background:rgba(0,0,0,.55);
