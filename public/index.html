@@ -8195,7 +8195,7 @@ function switchTab(tab) {
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
   const mainEl = document.querySelector('.main');
-  if (totalsBar) totalsBar.style.display = isQuoteTool ? '' : 'none';
+  if (totalsBar) totalsBar.style.display = tab === 'quote' ? '' : 'none';
   if (sidebar) sidebar.style.display = isQuote ? '' : 'none';
   if (sidebarToggle) sidebarToggle.style.display = isQuote ? '' : 'none';
   // Restore correct margins based on sidebar preset (don't let CSS default 248px right-margin bleed in)
