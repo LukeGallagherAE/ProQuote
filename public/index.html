@@ -1363,6 +1363,32 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   </div>
 </div>
 
+<!-- ── Merge-as-Revisions wizard ────────────────────────────────────────────── -->
+<div id="merge-wizard" style="display:none;position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeWizard()">
+  <div style="background:var(--surface);border-radius:16px;width:580px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.3)">
+    <div style="padding:24px 28px 0;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:18px;font-weight:800;color:var(--text)">Merge as Revisions</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">Assign which is Rev A and Rev B, then set a shared base reference.</div>
+      </div>
+      <button onclick="closeMergeWizard()" style="background:none;border:none;font-size:20px;color:var(--muted);cursor:pointer;padding:4px;line-height:1">✕</button>
+    </div>
+    <div id="mwiz-cards" style="padding:20px 28px 8px;display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
+    <div style="text-align:center;padding:0 28px 16px">
+      <button onclick="swapMergeCards()" style="font-size:12px;color:#007aff;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit;padding:5px 14px;font-weight:600">⇄ Swap Rev A / Rev B</button>
+    </div>
+    <div style="padding:0 28px 20px">
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:6px">Base reference</label>
+      <input id="mwiz-base-ref" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box" placeholder="e.g. QUO-001">
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Both quotes will be linked as <strong>Rev A</strong> and <strong>Rev B</strong> under this reference.</div>
+    </div>
+    <div style="padding:16px 28px 24px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border)">
+      <button onclick="closeMergeWizard()" style="padding:10px 20px;background:var(--surface2);color:var(--muted);border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+      <button onclick="executeMergeWizard()" style="padding:10px 24px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Merge as Revisions ✓</button>
+    </div>
+  </div>
+</div>
+
 <!-- ⌘K Search overlay -->
 <div id="cmdk-overlay" onclick="if(event.target===this)closeCmdK()">
   <div id="cmdk-box">
@@ -1759,6 +1785,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         </select>
         <!-- Batch delete controls — shown in select mode -->
         <button id="qa-cancel-select" onclick="quotesAllExitSelect()" style="display:none;padding:7px 14px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+        <button id="qa-merge-btn" onclick="openMergeWizard()" style="display:none;padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">⇄ Merge as revisions</button>
         <button id="qa-delete-selected" onclick="batchDeleteQuotes()" style="display:none;padding:7px 14px;background:#ff3b30;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Delete selected (0)</button>
         <button id="qa-select-btn" onclick="quotesAllEnterSelect()" style="padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Select</button>
         <button onclick="openWizard()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit">
@@ -9474,6 +9501,7 @@ function quotesAllEnterSelect() {
   document.getElementById('qa-select-btn').style.display = 'none';
   document.getElementById('qa-cancel-select').style.display = '';
   document.getElementById('qa-delete-selected').style.display = '';
+  document.getElementById('qa-merge-btn').style.display = 'none';
   renderQuotesAll();
 }
 
@@ -9483,34 +9511,38 @@ function quotesAllExitSelect() {
   document.getElementById('qa-select-btn').style.display = '';
   document.getElementById('qa-cancel-select').style.display = 'none';
   document.getElementById('qa-delete-selected').style.display = 'none';
+  document.getElementById('qa-merge-btn').style.display = 'none';
   renderQuotesAll();
+}
+
+function _qaUpdateSelectionUI() {
+  const n = _qaSelected.size;
+  const delBtn = document.getElementById('qa-delete-selected');
+  if (delBtn) delBtn.textContent = 'Delete selected (' + n + ')';
+  const mergeBtn = document.getElementById('qa-merge-btn');
+  if (mergeBtn) mergeBtn.style.display = n === 2 ? '' : 'none';
+  const allCb = document.getElementById('qa-cb-all');
+  if (allCb && window._quotesAllRows) allCb.checked = n > 0 && n === window._quotesAllRows.length;
 }
 
 function qaToggleRow(key) {
   if (_qaSelected.has(key)) _qaSelected.delete(key);
   else _qaSelected.add(key);
-  // Update delete button label
-  const btn = document.getElementById('qa-delete-selected');
-  if (btn) btn.textContent = 'Delete selected (' + _qaSelected.size + ')';
-  // Update checkbox visual
   const cb = document.getElementById('qa-cb-' + key);
   if (cb) cb.checked = _qaSelected.has(key);
-  // Update select-all checkbox
-  const allCb = document.getElementById('qa-cb-all');
-  if (allCb && window._quotesAllRows) allCb.checked = _qaSelected.size === window._quotesAllRows.length;
+  _qaUpdateSelectionUI();
 }
 
 function qaToggleAll(checked) {
   if (!window._quotesAllRows) return;
-  window._quotesAllRows.forEach((r, i) => {
+  window._quotesAllRows.forEach(r => {
     const key = r.clientIdx + ':' + r.jobIdx + ':' + r.quoteIdx;
     if (checked) _qaSelected.add(key);
     else _qaSelected.delete(key);
     const cb = document.getElementById('qa-cb-' + key);
     if (cb) cb.checked = checked;
   });
-  const btn = document.getElementById('qa-delete-selected');
-  if (btn) btn.textContent = 'Delete selected (' + _qaSelected.size + ')';
+  _qaUpdateSelectionUI();
 }
 
 function batchDeleteQuotes() {
@@ -9538,6 +9570,160 @@ function batchDeleteQuotes() {
   if (typeof renderClients   === 'function' && document.getElementById('clients-content'))  renderClients();
   if (typeof renderProjects  === 'function' && document.getElementById('projects-content')) renderProjects();
   showToast(n + ' quote' + (n !== 1 ? 's' : '') + ' deleted');
+}
+
+// ── Merge-as-revisions ────────────────────────────────────────────────────────
+
+function openMergeWizard() {
+  const keys = [..._qaSelected];
+  if (keys.length !== 2) return;
+  const rows = window._quotesAllRows || [];
+  function findRow(key) {
+    const [ci, ji, qi] = key.split(':').map(Number);
+    return rows.find(r => r.clientIdx === ci && r.jobIdx === ji && r.quoteIdx === qi);
+  }
+  const r1 = findRow(keys[0]);
+  const r2 = findRow(keys[1]);
+  if (!r1 || !r2) return;
+  // Older quote becomes Rev A, newer becomes Rev B
+  const [revA, revB] = (r1.saved || 0) <= (r2.saved || 0) ? [r1, r2] : [r2, r1];
+  window._mergeWiz = {
+    revAKey: revA.clientIdx+':'+revA.jobIdx+':'+revA.quoteIdx,
+    revBKey: revB.clientIdx+':'+revB.jobIdx+':'+revB.quoteIdx
+  };
+  // Suggest base ref: strip any existing revision suffix from either ref
+  const suggestRef = _revBaseName(revA.ref) || _revBaseName(revB.ref) || revA.ref;
+  document.getElementById('mwiz-base-ref').value = suggestRef;
+  _renderMergeCards();
+  document.getElementById('merge-wizard').style.display = 'flex';
+}
+
+function _renderMergeCards() {
+  const rows = window._quotesAllRows || [];
+  const mw = window._mergeWiz;
+  if (!mw) return;
+  function findRow(key) {
+    const [ci, ji, qi] = key.split(':').map(Number);
+    return rows.find(r => r.clientIdx === ci && r.jobIdx === ji && r.quoteIdx === qi);
+  }
+  function card(r, rev, col) {
+    if (!r) return '<div style="border:2px dashed var(--border);border-radius:10px;padding:14px 16px;color:var(--muted)">Not found</div>';
+    const total = r.total ? '$' + r.total.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+    const date = r.saved ? new Date(r.saved).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : '—';
+    return '<div style="border:2px solid '+col+';border-radius:10px;padding:14px 16px;background:var(--surface2)">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+        + '<span style="font-size:11px;font-weight:800;color:#fff;background:'+col+';padding:3px 9px;border-radius:6px;letter-spacing:.5px">'+rev+'</span>'
+        + '<span style="font-size:11px;color:var(--muted)">'+date+'</span>'
+      + '</div>'
+      + '<div style="font-size:13px;font-weight:700;font-family:monospace;color:var(--text);margin-bottom:4px">'+esc(r.ref)+'</div>'
+      + '<div style="font-size:12px;color:var(--text);margin-bottom:2px">'+esc(r.clientName)+'</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">'+esc(r.jobName)+'</div>'
+      + '<div style="font-size:14px;font-weight:800;font-family:monospace;color:var(--accent)">'+total+'</div>'
+    + '</div>';
+  }
+  document.getElementById('mwiz-cards').innerHTML =
+    card(findRow(mw.revAKey), 'Rev A', '#007aff') +
+    card(findRow(mw.revBKey), 'Rev B', '#30d158');
+}
+
+function swapMergeCards() {
+  const mw = window._mergeWiz;
+  if (!mw) return;
+  [mw.revAKey, mw.revBKey] = [mw.revBKey, mw.revAKey];
+  _renderMergeCards();
+}
+
+function closeMergeWizard() {
+  document.getElementById('merge-wizard').style.display = 'none';
+  window._mergeWiz = null;
+}
+
+function executeMergeWizard() {
+  const mw = window._mergeWiz;
+  if (!mw) return;
+  const baseRef = (document.getElementById('mwiz-base-ref').value || '').trim();
+  if (!baseRef) {
+    const inp = document.getElementById('mwiz-base-ref');
+    inp.style.border = '1.5px solid #ff3b30';
+    inp.focus();
+    setTimeout(() => { inp.style.border = ''; }, 1800);
+    return;
+  }
+  const rows = window._quotesAllRows || [];
+  function findRow(key) {
+    const [ci, ji, qi] = key.split(':').map(Number);
+    return rows.find(r => r.clientIdx === ci && r.jobIdx === ji && r.quoteIdx === qi);
+  }
+  const rA = findRow(mw.revAKey);
+  const rB = findRow(mw.revBKey);
+  if (!rA || !rB) { closeMergeWizard(); return; }
+
+  function buildFields(r) {
+    const f = {};
+    ['clientName','clientPhone','clientEmail','jobName','jobNumber','siteAddr','quoteRef','quoteDate',
+     'labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes'].forEach(k => {
+      f[k] = r.qq[k] || r.qq.fields?.[k] || '';
+    });
+    f.clientName = f.clientName || r.clientName;
+    f.jobName    = f.jobName    || r.jobName;
+    return f;
+  }
+
+  const refA = baseRef + ' Rev A';
+  const refB = baseRef + ' Rev B';
+
+  // Create or update in-memory quote for Rev A
+  let qA = _quotes.find(q => (q.fields?.quoteRef || '') === rA.ref) || _quotes.find(q => (q.fields?.quoteRef || '') === refA);
+  if (!qA) {
+    qA = _newQuoteState({ fields: { ...buildFields(rA), quoteRef: refA }, sections: JSON.parse(JSON.stringify(rA.qq.sections || [])) });
+    if (rA.qq._publishedAt) qA._publishedAt = rA.qq._publishedAt;
+    if (rA.qq._emailSentAt) qA._emailSentAt = rA.qq._emailSentAt;
+    _quotes.push(qA);
+  } else {
+    qA.fields.quoteRef = refA;
+  }
+  qA._parentRef = baseRef;
+
+  // Create or update in-memory quote for Rev B
+  let qB = _quotes.find(q => (q.fields?.quoteRef || '') === rB.ref) || _quotes.find(q => (q.fields?.quoteRef || '') === refB);
+  if (!qB) {
+    qB = _newQuoteState({ fields: { ...buildFields(rB), quoteRef: refB }, sections: JSON.parse(JSON.stringify(rB.qq.sections || [])) });
+    if (rB.qq._publishedAt) qB._publishedAt = rB.qq._publishedAt;
+    if (rB.qq._emailSentAt) qB._emailSentAt = rB.qq._emailSentAt;
+    _quotes.push(qB);
+  } else {
+    qB.fields.quoteRef = refB;
+  }
+  qB._parentRef = baseRef;
+
+  // Remove both original stored entries (highest index first to avoid shifting)
+  const toDelete = [
+    { ci: rA.clientIdx, ji: rA.jobIdx, qi: rA.quoteIdx },
+    { ci: rB.clientIdx, ji: rB.jobIdx, qi: rB.quoteIdx }
+  ].sort((a, b) => b.qi - a.qi || b.ji - a.ji || b.ci - a.ci);
+  const clients = loadClients();
+  toDelete.forEach(({ ci, ji, qi }) => { clients[ci]?.jobs?.[ji]?.quotes?.splice(qi, 1); });
+  saveClients(clients);
+
+  // Persist Rev B (the newer revision) to client book under baseRef
+  saveQuoteToClientBook({
+    ...buildFields(rB), quoteRef: refB,
+    sections: rB.qq.sections || [],
+    _total: rB.total || 0,
+    _saved: Date.now()
+  });
+
+  _persistSession();
+  closeMergeWizard();
+  quotesAllExitSelect();
+
+  // Open Rev B so the user sees the result immediately
+  saveActiveQuoteState();
+  loadQuoteState(qB.id);
+  renderQuoteTabs();
+  updateRevLabel();
+  switchTab('quote');
+  showToast('Merged → ' + baseRef + ' Rev A / Rev B', 3000);
 }
 
 function renderQuotesAll() {
