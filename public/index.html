@@ -5477,33 +5477,35 @@ function saveQuote(){
 }
 
 function saveQuoteToClientBook(d) {
+  // Revisions always save under the root quote ref so they don't create extra rows
+  const baseRef = _revBaseName(d.quoteRef || '');
+  const storeRef = baseRef || d.quoteRef || '';
+  const storeData = { ...d, quoteRef: storeRef };
+
   const clients = loadClients();
-  let client = clients.find(c => c.name.toLowerCase() === (d.clientName||'').toLowerCase());
+  let client = clients.find(c => c.name.toLowerCase() === (storeData.clientName||'').toLowerCase());
   if (!client) {
-    client = { id: Date.now(), name: d.clientName, phone: d.clientPhone||'', email: d.clientEmail||'', company:'', notes:'', address: d.siteAddr||'', jobs: [] };
+    client = { id: Date.now(), name: storeData.clientName, phone: storeData.clientPhone||'', email: storeData.clientEmail||'', company:'', notes:'', address: storeData.siteAddr||'', jobs: [] };
     clients.unshift(client);
   } else {
-    if (d.clientPhone) client.phone = d.clientPhone;
-    if (d.clientEmail) client.email = d.clientEmail;
+    if (storeData.clientPhone) client.phone = storeData.clientPhone;
+    if (storeData.clientEmail) client.email = storeData.clientEmail;
   }
-  let job = client.jobs?.find(j => j.name?.toLowerCase() === (d.jobName||'').toLowerCase());
+  let job = client.jobs?.find(j => j.name?.toLowerCase() === (storeData.jobName||'').toLowerCase());
   if (!job) {
-    job = { id: Date.now()+1, name: d.jobName||'Unnamed job', address: d.siteAddr||'', quotes: [] };
+    job = { id: Date.now()+1, name: storeData.jobName||'Unnamed job', address: storeData.siteAddr||'', quotes: [] };
     if (!client.jobs) client.jobs = [];
     client.jobs.unshift(job);
   }
-  // Update job address if newly provided
-  if (d.siteAddr && !job.address) job.address = d.siteAddr;
+  if (storeData.siteAddr && !job.address) job.address = storeData.siteAddr;
   const _calc = calcAll();
-  const existing = job.quotes?.findIndex(q => q.quoteRef === d.quoteRef);
-  // Preserve creation timestamp from the in-memory quote if available, or carry forward from existing stored entry
+  const existing = job.quotes?.findIndex(q => q.quoteRef === storeRef);
   const aq = _quotes?.find(q => (q.fields?.quoteRef || q.quoteRef) === d.quoteRef);
   const _createdAt = aq?._createdAt || (existing >= 0 ? job.quotes[existing]._createdAt : null) || Date.now();
-  const quoteData = { ...d, _total: _calc.total, _profit: _calc.totalProfit, _matCost: _calc.matCost, _labCost: _calc.labourCost, _saved: Date.now(), _createdAt };
+  const quoteData = { ...storeData, _total: _calc.total, _profit: _calc.totalProfit, _matCost: _calc.matCost, _labCost: _calc.labourCost, _saved: Date.now(), _createdAt };
   if (existing >= 0) job.quotes[existing] = quoteData;
   else { if (!job.quotes) job.quotes = []; job.quotes.unshift(quoteData); }
   saveClients(clients);
-  // Show brief auto-save indicator
   const statusEl = document.getElementById('rolodex-save-status');
   if (statusEl) {
     statusEl.textContent = '✓ Auto-saved';
@@ -9543,6 +9545,8 @@ function renderQuotesAll() {
   const countEl = document.getElementById('quotes-all-count');
   if (!el) return;
 
+  window._qaRevSel = window._qaRevSel || {};
+
   const q = (document.getElementById('quotes-all-search')?.value || '').toLowerCase();
   const sort = document.getElementById('quotes-all-sort')?.value || 'recent';
   const clients = loadClients();
@@ -9584,7 +9588,6 @@ function renderQuotesAll() {
     const ref = r.ref;
     if (ref && ref !== '—' && _lsm[ref]) {
       Object.assign(r.qq, _lsm[ref]);
-      // Re-derive the denormalized fields used for filtering/sorting
       r.status = r.qq._approvedAt ? 'approved' : r.qq._emailSentAt ? 'emailed' : r.qq._publishedAt ? 'published' : 'draft';
       r.published = !!(r.qq._publishedAt || r.qq._emailSentAt || r.qq._approvedAt);
     }
@@ -9608,12 +9611,39 @@ function renderQuotesAll() {
   else if (sort === 'client') rows.sort((a,b) => a.clientName.localeCompare(b.clientName));
   else if (sort === 'value') rows.sort((a,b) => b.total - a.total);
 
+  // Deduplicate: group revisions under a single row per base ref within same client+job
+  const _seenKeys = {};
+  rows = rows.filter(r => {
+    const baseRef = _revBaseName(r.ref);
+    const key = r.clientIdx + ':' + r.jobIdx + ':' + (baseRef || r.ref);
+    if (_seenKeys[key]) return false;
+    _seenKeys[key] = true;
+    return true;
+  });
+
   countEl.textContent = rows.length + ' quote' + (rows.length !== 1 ? 's' : '');
 
   if (!rows.length) {
     el.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">📋</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No quotes yet</div><div style="font-size:13px">Quotes auto-save once you fill in the client name and start adding items.</div></div>';
     return;
   }
+
+  // Find all in-memory revisions for a given base ref
+  function _getInMemFamily(baseRef) {
+    if (!baseRef) return [];
+    const escaped = baseRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pat = new RegExp('^' + escaped + '(\\s+Rev\\s+[A-Z]+|\\s+Revision\\s*\\(\\d+\\))?$', 'i');
+    return _quotes
+      .filter(x => pat.test(x.fields?.quoteRef || ''))
+      .sort((a, b) => (a._createdAt || 0) - (b._createdAt || 0));
+  }
+
+  const STATUS_STYLES = {
+    approved:  {color:'#30d158', label:'Approved'},
+    emailed:   {color:'#007aff', label:'Emailed'},
+    published: {color:'#30d158', label:'Published'},
+    draft:     {color:'var(--muted)', label:'Draft'},
+  };
 
   const selectCol = _qaSelectMode ? '<th style="padding:10px 12px;width:36px"><input type="checkbox" id="qa-cb-all" onchange="qaToggleAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#007aff"></th>' : '';
   el.innerHTML = '<table style="width:100%;border-collapse:collapse">' +
@@ -9628,12 +9658,20 @@ function renderQuotesAll() {
     (_qaSelectMode ? '' : '<th style="padding:10px 16px"></th>') +
     '</tr></thead><tbody>' +
     rows.map((r, i) => {
-      const STATUS_STYLES = {
-        approved:  {color:'#30d158', label:'Approved'},
-        emailed:   {color:'#007aff', label:'Emailed'},
-        published: {color:'#30d158', label:'Published'},
-        draft:     {color:'var(--muted)', label:'Draft'},
-      };
+      const baseRef = _revBaseName(r.ref) || r.ref;
+      const family = _getInMemFamily(baseRef);
+      const hasRevs = family.length > 1;
+
+      // Rev selector — shown when multiple revisions are loaded in memory
+      let revSelHtml = '';
+      if (hasRevs) {
+        const curSelId = window._qaRevSel[i] || family[family.length - 1]?.id || '';
+        const opts = family.map((fq, fi) =>
+          '<option value="' + fq.id + '"' + (fq.id === curSelId ? ' selected' : '') + '>Rev ' + _revLetter(fi) + '</option>'
+        ).join('');
+        revSelHtml = '<select onchange="window._qaRevSel[' + i + ']=this.value" onclick="event.stopPropagation()" style="font-size:10px;padding:1px 4px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:inherit;margin-left:7px;cursor:pointer;vertical-align:middle">' + opts + '</select>';
+      }
+
       const ss = STATUS_STYLES[r.status] || STATUS_STYLES.draft;
       const statusDot = '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:'+ss.color+'"><span style="width:7px;height:7px;border-radius:50%;background:'+ss.color+';display:inline-block"></span>'+ss.label+'</span>';
       const _createdTs = r.createdAt || r.saved;
@@ -9651,7 +9689,7 @@ function renderQuotesAll() {
       const rowBg = isSelected ? 'background:var(--blue-bg)' : '';
       return '<tr style="border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer;'+rowBg+'" '+rowClick+' onmouseover="this.style.background=\''+(isSelected?'var(--blue-bg)':'var(--surface2)')+'\';" onmouseout="this.style.background=\''+(isSelected?'var(--blue-bg)':'')+'\';">' +
         cbCell +
-        '<td style="padding:12px 16px;font-size:13px;font-weight:700;font-family:monospace">' + esc(r.ref) + '</td>' +
+        '<td style="padding:12px 16px;font-size:13px;font-weight:700;font-family:monospace">' + esc(baseRef) + revSelHtml + '</td>' +
         '<td style="padding:12px 16px;font-size:13px">' + esc(r.clientName) + '</td>' +
         '<td style="padding:12px 16px;font-size:13px;color:var(--muted)">' + esc(r.jobName) + (r.jobNumber ? ' <span style="font-size:11px">#'+esc(r.jobNumber)+'</span>' : '') + '</td>' +
         '<td style="padding:12px 16px;font-size:12px;color:var(--muted)">' + savedStr + '</td>' +
@@ -9669,7 +9707,39 @@ function renderQuotesAll() {
 function openQuoteFromAll(i) {
   const r = window._quotesAllRows?.[i];
   if (!r) return;
-  // Build fields from saved quote data
+
+  // If the user picked a specific revision via the dropdown, open it directly
+  const selRevId = window._qaRevSel?.[i];
+  if (selRevId) {
+    const selQ = _quotes.find(q => q.id === selRevId);
+    if (selQ) {
+      saveActiveQuoteState();
+      loadQuoteState(selQ.id);
+      renderQuoteTabs();
+      switchTab('quote');
+      return;
+    }
+  }
+
+  // If any revision of this quote is already loaded in memory, open the most recent one
+  const baseRef = _revBaseName(r.ref) || r.ref;
+  if (baseRef && baseRef !== '—') {
+    const escaped = baseRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pat = new RegExp('^' + escaped + '(\\s+Rev\\s+[A-Z]+|\\s+Revision\\s*\\(\\d+\\))?$', 'i');
+    const family = _quotes
+      .filter(x => pat.test(x.fields?.quoteRef || ''))
+      .sort((a, b) => (a._createdAt || 0) - (b._createdAt || 0));
+    if (family.length > 0) {
+      const target = family[family.length - 1];
+      saveActiveQuoteState();
+      loadQuoteState(target.id);
+      renderQuoteTabs();
+      switchTab('quote');
+      return;
+    }
+  }
+
+  // Load from stored data
   const fields = {};
   ['clientName','clientPhone','clientEmail','jobName','jobNumber','siteAddr','quoteRef','quoteDate',
    'labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes'].forEach(k => {
@@ -9677,21 +9747,6 @@ function openQuoteFromAll(i) {
   });
   fields.clientName = fields.clientName || r.clientName;
   fields.jobName    = fields.jobName    || r.jobName;
-  // Check if already open
-  const openRef = fields.quoteRef || '';
-  if (openRef) {
-    const existing = _quotes.find(oq => (oq.fields?.quoteRef || '') === openRef);
-    if (existing) {
-      saveActiveQuoteState();
-      _activeQuoteId = existing.id;
-      S.sections = JSON.parse(JSON.stringify(existing.sections));
-      _restoreFields(existing.fields);
-      fullRender();
-      renderQuoteTabs();
-      switchTab('quote');
-      return;
-    }
-  }
   const nq = _newQuoteState({ fields, sections: r.qq.sections || [newSection()] });
   if (r.qq._publishedAt) nq._publishedAt = r.qq._publishedAt;
   if (r.qq._emailSentAt) nq._emailSentAt = r.qq._emailSentAt;
@@ -9784,6 +9839,21 @@ function renderProjects() {
   el.innerHTML = html;
 }
 
+function openProjQuote(pjKey, ci, ji, qi) {
+  const selRevId = (window._pjRevSel || {})[pjKey];
+  if (selRevId) {
+    const selQ = _quotes.find(q => q.id === selRevId);
+    if (selQ) {
+      saveActiveQuoteState();
+      loadQuoteState(selQ.id);
+      renderQuoteTabs();
+      switchTab('quote');
+      return;
+    }
+  }
+  loadAndSwitchQuote(ci, ji, qi);
+}
+
 function projectCard(r) {
   const dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : '—';
   const lastStr = r.lastQuote ? new Date(r.lastQuote).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : null;
@@ -9804,17 +9874,42 @@ function projectCard(r) {
     + JSON.stringify({name:r.clientName,phone:r.client.phone||'',email:r.client.email||'',address:r.address,jobName:r.projectName,jobNumber:r.jobNumber}).replace(/\\/g,'\\\\').replace(/'/g,"\\'")
     + ')\'>+ New quote</button>';
 
+  // Deduplicate quotes in panel by base ref (handles legacy multi-row revisions)
+  window._pjRevSel = window._pjRevSel || {};
+  const _pjSeen = {};
+  const dedupedQuotes = [];
+  quotes.forEach((qq, qi) => {
+    const baseRef = _revBaseName(qq.quoteRef || '');
+    const key = baseRef || qq.quoteRef || String(qi);
+    if (!_pjSeen[key]) { _pjSeen[key] = true; dedupedQuotes.push({qq, qi}); }
+  });
+
   const quotesPanel = quotes.length ? (
     '<div class="proj-quotes-panel" style="display:none;border-top:1px solid var(--border);padding:10px 16px 12px;background:var(--surface2)">'
-    + quotes.map((qq, qi) => {
-        const qRef   = qq.quoteRef || ('Quote ' + (qi + 1));
-        const qDate  = qq.quoteDate ? new Date(qq.quoteDate).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : '—';
-        const qTotal = qq._total ? '<span style="font-size:11px;font-weight:700;color:'+accentCol+';margin-left:8px">$'+Number(qq._total).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2})+'</span>' : '';
-        const qNotes = qq.quoteNotes || qq.notes || '';
+    + dedupedQuotes.map(({qq, qi}) => {
+        const baseRef = _revBaseName(qq.quoteRef || '') || qq.quoteRef || ('Quote ' + (qi + 1));
+        const qDate   = qq.quoteDate ? new Date(qq.quoteDate).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : '—';
+        const qTotal  = qq._total ? '<span style="font-size:11px;font-weight:700;color:'+accentCol+';margin-left:8px">$'+Number(qq._total).toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2})+'</span>' : '';
+        const qNotes  = qq.quoteNotes || qq.notes || '';
         const pubBadge = qq._publishedAt ? (function(ts){const d=new Date(ts);return '<span title="Published '+d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+'" style="font-size:9px;font-weight:700;color:#30d158;background:rgba(48,209,88,.12);border:1px solid rgba(48,209,88,.3);border-radius:10px;padding:1px 6px;margin-left:7px;letter-spacing:.3px">✓ Published</span>';})(qq._publishedAt) : '';
-        const openFn = (clientIdx >= 0 && jobIdx >= 0) ? 'loadAndSwitchQuote('+clientIdx+','+jobIdx+','+qi+')' : '';
+
+        // Check for in-memory revision family
+        const escaped = baseRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pat = new RegExp('^' + escaped + '(\\s+Rev\\s+[A-Z]+|\\s+Revision\\s*\\(\\d+\\))?$', 'i');
+        const family = _quotes.filter(x => pat.test(x.fields?.quoteRef || '')).sort((a,b)=>(a._createdAt||0)-(b._createdAt||0));
+        const pjKey = clientIdx + ':' + jobIdx + ':' + qi;
+        let revSelHtml = '';
+        if (family.length > 1) {
+          const curSelId = window._pjRevSel[pjKey] || family[family.length - 1]?.id || '';
+          const opts = family.map((fq, fi) =>
+            '<option value="' + fq.id + '"' + (fq.id === curSelId ? ' selected' : '') + '>Rev ' + _revLetter(fi) + '</option>'
+          ).join('');
+          revSelHtml = '<select onchange="(window._pjRevSel=window._pjRevSel||{})[\''+pjKey+'\']=this.value" onclick="event.stopPropagation()" style="font-size:10px;padding:1px 4px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:inherit;margin-left:7px;cursor:pointer">' + opts + '</select>';
+        }
+
+        const openFn = (clientIdx >= 0 && jobIdx >= 0) ? 'openProjQuote(\''+pjKey+'\','+clientIdx+','+jobIdx+','+qi+')' : '';
         const delBtn = (clientIdx >= 0 && jobIdx >= 0)
-          ? '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();deleteStoredQuote('+clientIdx+','+jobIdx+','+qi+',\''+esc(qRef)+'\')" style="color:#ff3b30;flex-shrink:0" title="Delete quote">✕</button>'
+          ? '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();deleteStoredQuote('+clientIdx+','+jobIdx+','+qi+',\''+esc(baseRef)+'\')" style="color:#ff3b30;flex-shrink:0" title="Delete quote">✕</button>'
           : '';
         const openBtn = (clientIdx >= 0 && jobIdx >= 0)
           ? '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();'+openFn+'" style="flex-shrink:0">Open</button>'
@@ -9823,7 +9918,8 @@ function projectCard(r) {
           + '<div style="width:3px;height:32px;border-radius:2px;background:'+accentCol+';opacity:.5;flex-shrink:0"></div>'
           + '<div style="flex:1;min-width:0">'
             + '<div style="display:flex;align-items:baseline;gap:0;flex-wrap:wrap">'
-              + '<span style="font-size:12px;font-weight:700;color:var(--text)">'+esc(qRef)+'</span>'
+              + '<span style="font-size:12px;font-weight:700;color:var(--text)">'+esc(baseRef)+'</span>'
+              + revSelHtml
               + '<span style="font-size:11px;color:var(--muted);margin-left:8px">'+qDate+'</span>'
               + qTotal
               + pubBadge
@@ -9858,7 +9954,7 @@ function projectCard(r) {
       + '</div>'
       + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;min-width:80px">'
         + (totalStr ? '<span style="font-size:14px;font-weight:800;color:var(--text)">'+totalStr+'</span>' : '')
-        + '<span style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">'+r.quoteCount+' quote'+(r.quoteCount!==1?'s':'')+'</span>'
+        + '<span style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">'+dedupedQuotes.length+' quote'+(dedupedQuotes.length!==1?'s':'')+'</span>'
       + '</div>'
       + '<div style="display:flex;gap:6px;flex-shrink:0" onclick="event.stopPropagation()">'
         + (quotes.length
