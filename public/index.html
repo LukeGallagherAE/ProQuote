@@ -213,7 +213,7 @@ html.dark ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38)}
 html.dark .parent-item:focus-within{background:var(--blue-bg)}
 @keyframes newItemGlow{0%{box-shadow:0 0 30px 12px rgba(0,122,255,.5),0 0 60px 20px rgba(0,122,255,.25);background:rgba(0,122,255,.07)}80%{box-shadow:0 0 10px 4px rgba(0,122,255,.08);background:rgba(0,122,255,.02)}100%{box-shadow:none;background:transparent}}
 .new-item-glow{animation:newItemGlow 10s ease-out forwards;z-index:2;position:relative}
-.parent-header{display:grid;grid-template-columns:18px 24px auto 1fr 56px 60px 80px 80px 96px auto;align-items:center;gap:8px;padding:9px 14px;background:var(--surface);transition:background .1s}
+.parent-header{display:grid;grid-template-columns:18px 24px auto 1fr 56px 60px 90px auto;align-items:center;gap:8px;padding:9px 14px;background:var(--surface);transition:background .1s}
 .ph-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
 .parent-header:hover{background:#fafaf8}
 .parent-name-inp{font-size:13px;font-weight:600;background:transparent;border:1px solid transparent;border-radius:4px;padding:2px 6px;color:var(--text);width:100%}
@@ -5238,12 +5238,7 @@ function renderParent(sid,par,pi,total){
         swiHtml+
         '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncDOM();fullRender()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
         '<div style="display:flex;align-items:center;gap:3px;flex-shrink:0" title="Discount %"><span style="font-size:9px;color:var(--muted)">%</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:12px;padding:3px 5px" placeholder="0" title="Discount (%)"></div>'+
-        (par.lumpSum
-          ? '<span class="ptotal mat"><span class="ptotal-lbl">Price</span><input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)"></span>'
-          + '<span class="ptotal lab"></span>'
-          : '<span class="ptotal mat"><span class="ptotal-lbl">Mat.</span>'+fmt(c.matSell)+'</span>'
-          + '<span class="ptotal lab"><span class="ptotal-lbl">Lab.</span>'+fmt(c.labSell)+'</span>')+
-        '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">Total</span>'+(c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)+'</span>'+
+        '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">'+(par.lumpSum?'Price':'Total')+'</span>'+(par.lumpSum?'<input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)">':((c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)))+'</span>'+
         '<div class="ph-actions">'+optPill+photoThumb+photoBtn+menuBtn+'</div>'+
       '</div>'+
       '<div style="padding:7px 14px 7px 36px;font-size:11px;color:var(--muted);background:var(--surface2)">'+(par.lumpSum?'Fixed price'+( par.qty>1?' · '+fmt(par.lumpPrice||0)+' × '+par.qty+' = '+fmt(c.total):'')+' — use price field in header':subCount+' sub-item'+(subCount!==1?'s':'')+' hidden — '+fmt(c.total))+'</div>'+
@@ -5264,12 +5259,7 @@ function renderParent(sid,par,pi,total){
       swiHtml+
       '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncDOM();fullRender()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
       '<div style="display:flex;align-items:center;gap:3px;flex-shrink:0" title="Discount %"><span style="font-size:9px;color:var(--muted)">%</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:12px;padding:3px 5px" placeholder="0" title="Discount (%)"></div>'+
-      (par.lumpSum
-        ? '<span class="ptotal mat"><span class="ptotal-lbl">Price</span><input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)"></span>'
-        + '<span class="ptotal lab"></span>'
-        : '<span class="ptotal mat"><span class="ptotal-lbl">Mat.</span>'+fmt(c.matSell)+'</span>'
-        + '<span class="ptotal lab"><span class="ptotal-lbl">Lab.</span>'+fmt(c.labSell)+'</span>')+
-      '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">Total</span>'+(c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)+'</span>'+
+      '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">'+(par.lumpSum?'Price':'Total')+'</span>'+(par.lumpSum?'<input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)">':((c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)))+'</span>'+
       '<div class="ph-actions">'+optPill+photoThumb+photoBtn+menuBtn+'</div>'+
     '</div>'+
     descRow+
