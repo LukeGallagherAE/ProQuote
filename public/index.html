@@ -5330,11 +5330,11 @@ function renderSubitem(sid,pid,par,sub){
     : '<input type="number" id="si-'+sub.id+'" value="'+sub.instMin+'" style="display:none"><span style="text-align:center;color:var(--border2);font-size:11px">—</span>';
 
   const menuBtn='<div class="ctx-anchor" style="position:relative">'+
-    '<button class="btn-icon" onclick="showSubMenu('+sid+','+pid+','+sub.id+',this)" title="Move / duplicate / remove" style="font-size:14px;font-weight:700;line-height:1">⋮</button>'+
+    '<button class="btn-icon" draggable="true" ondragstart="_onSubDragStart(event,'+sid+','+pid+','+sub.id+')" onclick="showSubMenu('+sid+','+pid+','+sub.id+',this)" title="Drag to reorder · Click for options" style="font-size:14px;font-weight:700;line-height:1;cursor:grab">⋮</button>'+
   '</div>';
 
   return '<div class="subitem-row'+(active?'':' faded')+'" id="sub-'+sub.id+'" ondragover="_onSubDragOver(event,'+sid+','+pid+','+sub.id+')" ondragleave="this.classList.remove(\'item-drag-over\')" ondrop="_onSubDrop(event,'+sid+','+pid+','+sub.id+')">'+
-    '<button class="cat-tag" draggable="true" ondragstart="_onSubDragStart(event,'+sid+','+pid+','+sub.id+')" onclick="syncDOM();toggleSubCat('+sid+','+pid+','+sub.id+')" title="Click to change type · Drag to reorder" style="cursor:grab">'+catLabel+'</button>'+
+    '<button class="cat-tag" onclick="syncDOM();toggleSubCat('+sid+','+pid+','+sub.id+')" title="Click to change type">'+catLabel+'</button>'+
     '<div class="sw">'+
       '<input id="ss-'+sub.id+'" value="'+esc(displayVal)+'" placeholder="'+placeholder+'" autocomplete="off" style="width:100%;box-sizing:border-box"'+
         ' oninput="onSearch('+sid+','+pid+','+sub.id+',this.value)"'+
