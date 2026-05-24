@@ -171,7 +171,7 @@ html.dark ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38)}
 .notes-editor:empty:before{content:attr(data-placeholder);color:var(--muted);pointer-events:none;display:block}
 .notes-editor a{color:var(--accent);text-decoration:underline}
 .notes-editor ul{margin:4px 0;padding-left:20px}
-.parent-desc{overflow:hidden!important;resize:none!important}
+.parent-desc{overflow-y:auto!important;resize:none!important}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 14px;border-radius:var(--rs);border:none;font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:600;white-space:nowrap;transition:all .12s}
 .btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#0062cc}
@@ -212,7 +212,7 @@ html.dark .parent-item:focus-within{background:var(--blue-bg)}
 .parent-name-inp{font-size:13px;font-weight:600;background:transparent;border:1px solid transparent;border-radius:4px;padding:2px 6px;color:var(--text);width:100%}
 .parent-name-inp:hover{border-color:var(--border);background:var(--surface2)}
 .parent-name-inp:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px rgba(0,122,255,.1);outline:none}
-.parent-desc{width:100%;margin-top:3px;font-size:11px;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed transparent;border-radius:0;padding:1px 6px;min-height:22px;line-height:1.5;font-family:'IBM Plex Sans',sans-serif;outline:none;overflow:hidden;resize:none;display:block}
+.parent-desc{width:100%;margin-top:3px;font-size:11px;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed transparent;border-radius:0;padding:1px 6px;min-height:18px;max-height:40px;line-height:1.5;font-family:'IBM Plex Sans',sans-serif;outline:none;overflow-y:auto;resize:none;display:block}
 .parent-desc:hover{border-bottom-color:var(--border)}
 .parent-desc:focus{border-bottom-color:var(--accent);background:transparent;box-shadow:none}
 
@@ -3524,7 +3524,7 @@ function _schedulePublishCheck(){
   _pubCheckTimer=setTimeout(()=>{syncDOM();updatePublishBadge();},800);
 }
 function softRender(){renderTotals();renderNav();clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);}
-function initTAs(){document.querySelectorAll('.parent-desc').forEach(t=>{t.style.height='auto';t.style.height=t.scrollHeight+'px';});}
+function initTAs(){document.querySelectorAll('.parent-desc').forEach(t=>{t.style.height='auto';t.style.height=Math.min(t.scrollHeight,40)+'px';});}
 
 function navJumpToSection(sid) {
   syncDOM();
@@ -5248,7 +5248,7 @@ function renderParent(sid,par,pi,total){
       catPill+
       '<div style="min-width:0;display:flex;flex-direction:column;gap:2px">'+
         '<div style="position:relative;width:100%"><input class="parent-name-inp" id="pn-'+par.id+'" value="'+esc(par.name)+'" placeholder="Item name…" style="width:100%" oninput="onParentNameInput('+sid+','+par.id+',this.value)" onblur="setTimeout(closeTemplateDrop,200)"></div>'+
-        '<textarea class="parent-desc" id="pd-'+par.id+'" placeholder="Add a description…" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';syncDOM()" rows="1" style="width:100%">'+esc(par.description||'')+'</textarea>'+
+        '<textarea class="parent-desc" id="pd-'+par.id+'" placeholder="Add a description…" oninput="this.style.height=\'auto\';this.style.height=Math.min(this.scrollHeight,40)+\'px\';syncDOM()" rows="1" style="width:100%">'+esc(par.description||'')+'</textarea>'+
       '</div>'+
       swiHtml+
       '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncDOM();fullRender()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
