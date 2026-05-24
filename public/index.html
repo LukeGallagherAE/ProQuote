@@ -9864,7 +9864,7 @@ function renderQuotesAll() {
       const savedStr = _createdTs ? new Date(_createdTs).toLocaleDateString('en-AU', {day:'numeric',month:'short',year:'numeric'}) : r.date || '—';
       const rowKey = r.clientIdx + ':' + r.jobIdx + ':' + r.quoteIdx;
       const isSelected = _qaSelected.has(rowKey);
-      const cbCell = _qaSelectMode ? '<td style="padding:12px 12px;width:36px" onclick="event.stopPropagation();qaToggleRow(\''+rowKey+'\')"><input type="checkbox" id="qa-cb-'+rowKey+'" '+(isSelected?'checked':'')+' onchange="qaToggleRow(\''+rowKey+'\')" style="width:15px;height:15px;cursor:pointer;accent-color:#007aff"></td>' : '';
+      const cbCell = _qaSelectMode ? '<td style="padding:12px 12px;width:36px" onclick="event.stopPropagation();if(event.target.type!==\'checkbox\')qaToggleRow(\''+rowKey+'\')"><input type="checkbox" id="qa-cb-'+rowKey+'" '+(isSelected?'checked':'')+' onchange="qaToggleRow(\''+rowKey+'\')" style="width:15px;height:15px;cursor:pointer;accent-color:#007aff"></td>' : '';
       const actionsCell = _qaSelectMode ? '' :
         '<td style="padding:12px 16px;white-space:nowrap" onclick="event.stopPropagation()">' +
           '<button class="btn btn-secondary btn-sm" onclick="openQuoteFromAll(' + i + ')" style="margin-right:6px">Open</button>' +
