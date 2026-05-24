@@ -213,7 +213,7 @@ html.dark ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38)}
 html.dark .parent-item:focus-within{background:var(--blue-bg)}
 @keyframes newItemGlow{0%{box-shadow:0 0 30px 12px rgba(0,122,255,.5),0 0 60px 20px rgba(0,122,255,.25);background:rgba(0,122,255,.07)}80%{box-shadow:0 0 10px 4px rgba(0,122,255,.08);background:rgba(0,122,255,.02)}100%{box-shadow:none;background:transparent}}
 .new-item-glow{animation:newItemGlow 10s ease-out forwards;z-index:2;position:relative}
-.parent-header{display:grid;grid-template-columns:18px 24px 96px 1fr auto 56px 80px 80px 96px auto;align-items:center;gap:8px;padding:9px 14px;background:var(--surface);transition:background .1s}
+.parent-header{display:grid;grid-template-columns:18px 24px auto 1fr 56px 60px 80px 80px 96px auto;align-items:center;gap:8px;padding:9px 14px;background:var(--surface);transition:background .1s}
 .ph-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
 .parent-header:hover{background:#fafaf8}
 .parent-name-inp{font-size:13px;font-weight:600;background:transparent;border:1px solid transparent;border-radius:4px;padding:2px 6px;color:var(--text);width:100%}
@@ -5171,12 +5171,7 @@ function renderParent(sid,par,pi,total){
   const c=calcParent(par);
   const ac=par.activeCats||{supply:true,wire:true,install:true};
   const _swiPartial = !par.lumpSum && (!ac.supply || !ac.wire || !ac.install);
-  const swiHtml='<div class="swi-pills">'
-    +'<button class="swi-pill'+(ac.supply?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'supply\')" title="Toggle Supply cost">S</button>'
-    +'<button class="swi-pill'+(ac.wire?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'wire\')" title="Toggle Wire labour">W</button>'
-    +'<button class="swi-pill'+(ac.install?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'install\')" title="Toggle Install labour">I</button>'
-    +'<button class="swi-pill'+(par.lumpSum?' lump-on':'')+'" onclick="event.stopPropagation();toggleLumpSum('+sid+','+par.id+')" title="Fixed price">$</button>'
-    +'</div>';
+  const swiHtml='';
   const menuBtn='<button class="parent-menu-btn" onclick="showParentMenu('+sid+','+par.id+',this)" title="Move / duplicate / remove">⋮</button>';
   const optPill = '<label onclick="event.stopPropagation()" title="Mark as optional extra — shown separately on quote with client checkbox" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;user-select:none">'
     + '<span style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:'+(par.optional?'rgba(220,130,0,1)':'var(--muted)')+';transition:color .15s">Optional</span>'
@@ -5210,12 +5205,20 @@ function renderParent(sid,par,pi,total){
     ).join('') +
     '<option value="__add__" style="color:var(--blue);font-style:italic">+ Add category…</option>';
   const catPill=
-    '<select id="pc-'+par.id+'" onchange="handleCatChange('+par.id+',this)" '+
+    '<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">'
+    +'<select id="pc-'+par.id+'" onchange="handleCatChange('+par.id+',this)" '+
       'style="font-size:10px;padding:1px 4px;border-radius:8px;border:1px solid '+catBorder+';'+
       'background:'+catBg+';color:'+catTextColor+';font-weight:700;cursor:pointer;'+
       'font-family:inherit;flex-shrink:0;height:20px;max-width:100px">'+
       catOptions+
-    '</select>';
+    '</select>'
+    +'<div class="swi-pills">'
+      +'<button class="swi-pill'+(ac.supply?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'supply\')" title="Toggle Supply cost">S</button>'
+      +'<button class="swi-pill'+(ac.wire?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'wire\')" title="Toggle Wire labour">W</button>'
+      +'<button class="swi-pill'+(ac.install?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'install\')" title="Toggle Install labour">I</button>'
+      +'<button class="swi-pill'+(par.lumpSum?' lump-on':'')+'" onclick="event.stopPropagation();toggleLumpSum('+sid+','+par.id+')" title="Fixed price">$</button>'
+    +'</div>'
+    +'</div>';
   // Description row (below header, only rendered if has content or expanded)
   const descRow='';
 
