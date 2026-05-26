@@ -6505,8 +6505,9 @@ function doPrint(){
         return 0; // preserve manual order within category when sort not active
       });
 
-      // Filter to parents that have something (subitems or a fixed lump price)
+      // Include any named item — even if subitems are empty or using a fixed price
       const pars = sorted.filter(p =>
+        (p.name && p.name.trim()) ||
         (p.lumpSum && (p.lumpPrice||0) > 0) ||
         p.subitems.some(s => s.item || s.customName || s.wireMin || s.instMin)
       );
@@ -6639,6 +6640,7 @@ function doPrint(){
   } else if (detail === 'section') {
     lineRows = S.sections.map(sec => {
       const pars = sec.parents.filter(p =>
+        (p.name && p.name.trim()) ||
         (p.lumpSum && (p.lumpPrice||0) > 0) ||
         p.subitems.some(s => s.item||s.customName||s.wireMin||s.instMin)
       );
@@ -6656,6 +6658,7 @@ function doPrint(){
     lineRows = S.sections.map(sec => {
       const sorted = [...sec.parents].sort((a,b)=>{ const cd=catOrderPdf2(a.category)-catOrderPdf2(b.category); return cd!==0?cd:0; });
       const pars = sorted.filter(p =>
+        (p.name && p.name.trim()) ||
         (p.lumpSum && (p.lumpPrice||0) > 0) ||
         p.subitems.some(s => s.item||s.customName||s.wireMin||s.instMin)
       );
@@ -6701,6 +6704,7 @@ function doPrint(){
       return cd!==0?cd:0;
     });
     const pars = sorted.filter(p =>
+      (p.name && p.name.trim()) ||
       (p.lumpSum && (p.lumpPrice||0) > 0) ||
       p.subitems.some(s=>s.item||s.customName||s.wireMin||s.instMin)
     );
