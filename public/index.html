@@ -6505,8 +6505,11 @@ function doPrint(){
         return 0; // preserve manual order within category when sort not active
       });
 
-      // Filter to parents that have something
-      const pars = sorted.filter(p => p.subitems.some(s => s.item || s.customName || s.wireMin || s.instMin));
+      // Filter to parents that have something (subitems or a fixed lump price)
+      const pars = sorted.filter(p =>
+        (p.lumpSum && (p.lumpPrice||0) > 0) ||
+        p.subitems.some(s => s.item || s.customName || s.wireMin || s.instMin)
+      );
       if (!pars.length) return '';
 
       const sc = calcSection(sec);
@@ -6635,7 +6638,10 @@ function doPrint(){
 
   } else if (detail === 'section') {
     lineRows = S.sections.map(sec => {
-      const pars = sec.parents.filter(p => p.subitems.some(s => s.item||s.customName||s.wireMin||s.instMin));
+      const pars = sec.parents.filter(p =>
+        (p.lumpSum && (p.lumpPrice||0) > 0) ||
+        p.subitems.some(s => s.item||s.customName||s.wireMin||s.instMin)
+      );
       if (!pars.length) return '';
       const sc = calcSection(sec);
       return '<tr><td colspan="4" style="padding:0"><div style="display:flex;align-items:stretch">'
@@ -6649,7 +6655,10 @@ function doPrint(){
   } else if (detail === 'sectcat') {
     lineRows = S.sections.map(sec => {
       const sorted = [...sec.parents].sort((a,b)=>{ const cd=catOrderPdf2(a.category)-catOrderPdf2(b.category); return cd!==0?cd:0; });
-      const pars = sorted.filter(p => p.subitems.some(s => s.item||s.customName||s.wireMin||s.instMin));
+      const pars = sorted.filter(p =>
+        (p.lumpSum && (p.lumpPrice||0) > 0) ||
+        p.subitems.some(s => s.item||s.customName||s.wireMin||s.instMin)
+      );
       if (!pars.length) return '';
       const sc = calcSection(sec);
       // Accumulate category totals in display order
@@ -6691,7 +6700,10 @@ function doPrint(){
       const cd=catOrderPdf2(a.category)-catOrderPdf2(b.category);
       return cd!==0?cd:0;
     });
-    const pars = sorted.filter(p=>p.subitems.some(s=>s.item||s.customName||s.wireMin||s.instMin));
+    const pars = sorted.filter(p =>
+      (p.lumpSum && (p.lumpPrice||0) > 0) ||
+      p.subitems.some(s=>s.item||s.customName||s.wireMin||s.instMin)
+    );
     if(!pars.length) return '';
     const sc = calcSection(sec);
     const up = par => { const pc=calcParent(par); return par.qty>0?(pc.total/par.qty):0; };
