@@ -6377,6 +6377,103 @@ function doPrint(){
   const overrideExGst=useOverride?(parseFloat(gtValueEl?.value)||0):0;
   const showPrices=!useOverride;
   const validUntil=validity?new Date(new Date(date||Date.now()).getTime()+validity*864e5).toLocaleDateString('en-AU'):'';
+
+  // ── Revision changes summary for PDF ─────────────────────────────────────
+  let revChangesHtml = '';
+  {
+    const _aq = _quotes.find(q => q.id === _activeQuoteId);
+    if (_aq) {
+      const _family = _getRevisionFamily(_aq);
+      const _idx = _family.findIndex(q => q.id === _activeQuoteId);
+      if (_idx > 0) {
+        const _prevQ = _family[_idx - 1];
+        const _prevRef = _prevQ.fields?.quoteRef || 'previous revision';
+        const _prevMap = {}, _curMap = {};
+        (_prevQ.sections || []).forEach(sec =>
+          (sec.parents || []).forEach(par => { _prevMap[par.id] = {zone: sec.name||'', par}; })
+        );
+        S.sections.forEach(sec =>
+          (sec.parents || []).forEach(par => { _curMap[par.id] = {zone: sec.name||'', par}; })
+        );
+        const _changeRows = [];
+        // Removed items
+        Object.values(_prevMap).forEach(({zone, par}) => {
+          if (!_curMap[par.id])
+            _changeRows.push({type:'removed', label:(zone?zone+' · ':'')+esc(par.name||'Item'), details:[]});
+        });
+        // Added items — include qty and price detail
+        Object.values(_curMap).forEach(({zone, par}) => {
+          if (_prevMap[par.id]) return;
+          const details = [];
+          if ((par.qty||1) !== 1) details.push('qty: '+(par.qty||1));
+          const pc = calcParent(par);
+          if (pc.total > 0) details.push('total: $'+pc.total.toFixed(2));
+          _changeRows.push({type:'added', label:(zone?zone+' · ':'')+esc(par.name||'Item'), details});
+        });
+        // Changed items — group all property changes under the same item
+        Object.values(_curMap).forEach(({zone, par:np}) => {
+          const prev = _prevMap[np.id]; if (!prev) return;
+          const pp = prev.par;
+          const details = [];
+          if ((np.qty||1) !== (pp.qty||1))
+            details.push('qty '+(pp.qty||1)+' → '+(np.qty||1));
+          const prevAC=pp.activeCats||{supply:true,wire:true,install:true};
+          const newAC =np.activeCats||{supply:true,wire:true,install:true};
+          if (!prevAC.supply && newAC.supply)  details.push('supply added');
+          if (prevAC.supply  && !newAC.supply)  details.push('supply removed');
+          if (!prevAC.wire   && newAC.wire)     details.push('wiring added');
+          if (prevAC.wire    && !newAC.wire)     details.push('wiring removed');
+          if (!prevAC.install && newAC.install) details.push('install added');
+          if (prevAC.install  && !newAC.install) details.push('install removed');
+          if (!!np.optional !== !!pp.optional)
+            details.push(np.optional ? 'marked optional' : 'no longer optional');
+          if (!!np.lumpSum !== !!pp.lumpSum)
+            details.push(np.lumpSum ? 'switched to lump sum' : 'switched to itemised');
+          if (np.lumpSum && pp.lumpSum && (np.lumpPrice||0) !== (pp.lumpPrice||0))
+            details.push('price $'+(pp.lumpPrice||0).toFixed(2)+' → $'+(np.lumpPrice||0).toFixed(2));
+          // Subitem-level changes
+          const prevSubs={}, newSubs={};
+          (pp.subitems||[]).forEach(s=>{prevSubs[s.id]=s;});
+          (np.subitems||[]).forEach(s=>{newSubs[s.id]=s;});
+          Object.values(newSubs).forEach(ns=>{
+            const ps=prevSubs[ns.id];
+            if (!ps) { const lbl=ns.item?ns.item.d1:(ns.customName||ns.cat); details.push(ns.cat+' item added: '+lbl); return; }
+            if ((ns.qty||1)!==(ps.qty||1)) details.push(ns.cat+' qty '+(ps.qty||1)+' → '+(ns.qty||1));
+            if (ns.cat==='wire' && (ns.wireMin||0)!==(ps.wireMin||0))
+              details.push('wire '+(ps.wireMin||0)+' → '+(ns.wireMin||0)+' min');
+            if ((ns.cat==='install'||ns.cat==='supply') && (ns.instMin||0)!==(ps.instMin||0))
+              details.push('install '+(ps.instMin||0)+' → '+(ns.instMin||0)+' min');
+            const np_=ns.item?(ns.item.p||0):(parseFloat(ns.customPrice)||0);
+            const pp_=ps.item?(ps.item.p||0):(parseFloat(ps.customPrice)||0);
+            if (Math.abs(np_-pp_)>0.005 && (np_||pp_))
+              details.push('price $'+pp_.toFixed(2)+' → $'+np_.toFixed(2));
+            if ((ns.markup||0)!==(ps.markup||0) && (ns.markup||ps.markup))
+              details.push('markup '+(ps.markup||0)+'% → '+(ns.markup||0)+'%');
+          });
+          Object.values(prevSubs).forEach(ps=>{
+            if (!newSubs[ps.id]) { const lbl=ps.item?ps.item.d1:(ps.customName||ps.cat); details.push(ps.cat+' item removed: '+lbl); }
+          });
+          if (details.length) _changeRows.push({type:'changed', label:(zone?zone+' · ':'')+esc(np.name||pp.name||'Item'), details});
+        });
+        if (_changeRows.length) {
+          const _icons  = {added:'✚', removed:'−', changed:'≈'};
+          const _colors = {added:'#1a7a4a', removed:'#c0392b', changed:'#007aff'};
+          const _rowsHtml = _changeRows.map(r =>
+            '<tr>'
+            +'<td style="padding:4px 10px 4px 0;width:16px;font-size:14px;color:'+_colors[r.type]+';vertical-align:top;font-weight:700;line-height:1.4">'+_icons[r.type]+'</td>'
+            +'<td style="padding:4px 12px 4px 0;font-size:12px;color:#1a1a1a;font-weight:600;vertical-align:top;line-height:1.5;white-space:nowrap">'+r.label+'</td>'
+            +'<td style="padding:4px 0;font-size:12px;color:#555;vertical-align:top;line-height:1.5">'+(r.details.length ? r.details.map(d=>esc(d)).join(' &nbsp;·&nbsp; ') : esc(r.type))+'</td>'
+            +'</tr>'
+          ).join('');
+          revChangesHtml =
+            '<div style="background:#f5f9ff;border:1px solid #c0d8ff;border-radius:8px;padding:14px 18px;margin-bottom:20px;page-break-inside:avoid">'
+            +'<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#007aff;margin-bottom:10px">Changes from '+esc(_prevRef)+'</div>'
+            +'<table style="width:100%;border-collapse:collapse"><tbody>'+_rowsHtml+'</tbody></table>'
+            +'</div>';
+        }
+      }
+    }
+  }
   let body='';
   if(detail==='total'){body='<p style="font-size:15px;padding:20px 0">Please refer to the total below for all electrical works.</p>';}
   else if(detail==='section'){body=S.sections.map(sec=>{const c=calcSection(sec);return'<div style="display:flex;justify-content:space-between;padding:12px 16px;background:var(--surface2);border-left:4px solid #d94f00;margin-bottom:12px"><span style="font-weight:700">'+esc(sec.name)+'</span><span style="font-family:monospace;font-weight:700">'+fmt(c.total)+'</span></div>';}).join('');}
@@ -6786,6 +6883,9 @@ function doPrint(){
     +'<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Notes &amp; Exclusions</div>'
     +'<div style="font-size:12px;color:var(--muted);line-height:1.7">'+notes+'</div>'
   +'</div>':'')
+
+  // ── REVISION CHANGES ──
+  +revChangesHtml
 
   // ── LINE ITEMS TABLE ──
   +'<table style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:0">'
