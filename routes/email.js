@@ -10,12 +10,17 @@ const LOGO_PATH = path.join(__dirname, '../public/logo.png');
 
 async function generatePDF(html) {
   const puppeteer = require('puppeteer');
+  const { execSync } = require('child_process');
   const launchOpts = {
     headless: 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
   };
   if (process.env.CHROME_EXECUTABLE_PATH) {
     launchOpts.executablePath = process.env.CHROME_EXECUTABLE_PATH;
+  } else {
+    try {
+      launchOpts.executablePath = execSync('which chromium || which chromium-browser || which google-chrome-stable || which google-chrome', {encoding:'utf8'}).trim();
+    } catch(e) {}
   }
   const browser = await puppeteer.launch(launchOpts);
   try {

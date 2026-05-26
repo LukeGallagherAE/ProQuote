@@ -1,5 +1,6 @@
-# Cache Puppeteer's Chrome download between Railway builds.
-# First build still downloads ~170MB, but subsequent builds reuse the cache (~2min).
+[phases.setup]
+nixPkgs = ["chromium", "nss", "nspr", "atk", "at-spi2-atk", "xorg.libX11", "xorg.libxcb", "glib", "gtk3", "cairo", "pango", "cups", "libxkbcommon", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXfixes", "xorg.libXrandr", "mesa"]
+
 [phases.install]
 cmds = ["npm ci"]
-cacheDirectories = ["/root/.cache/puppeteer", "/root/.npm"]
+cacheDirectories = ["/root/.npm"]
