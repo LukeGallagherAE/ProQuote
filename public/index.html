@@ -296,6 +296,7 @@ body.show-totals-bar .totals-bar{display:flex}
 .tot-tile-indigo{background:rgba(99,102,241,.09);border-color:rgba(99,102,241,.25)}
 .tot-tile-indigo .tl{color:rgba(99,102,241,.8)}
 .tot-tile-indigo .tv{font-size:14px;color:#6366f1}
+.tot-tile-indigo.override-active{background:rgba(99,102,241,.18);border-color:rgba(99,102,241,.5);border-style:solid;border-width:1.5px}
 /* Amber tile — GST */
 .tot-tile-amber{background:rgba(245,158,11,.09);border-color:rgba(245,158,11,.25)}
 .tot-tile-amber .tl{color:rgba(217,119,6,.9)}
@@ -1591,6 +1592,19 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
           <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="applyMarkupAll()">Apply to all lines</button>
         </div>
         <div class="field"><label>Deposit (%)</label><input type="number" id="depositAmount" value="20" placeholder="e.g. 20" min="0" max="100" step="1" oninput="clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800)"></div>
+        <div class="field" style="border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
+          <label style="display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer">
+            <span>Grand total override</span>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0">
+              <input type="checkbox" id="grandTotalActive" onchange="onGrandTotalToggle(this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:var(--accent)">
+            </label>
+          </label>
+          <div id="grand-total-value-wrap" style="display:none;margin-top:6px">
+            <label style="margin-bottom:3px">Total ex GST ($)</label>
+            <input type="number" id="grandTotalValue" min="0" step="0.01" placeholder="0.00" oninput="onGrandTotalInput(this.value)" style="font-size:15px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--accent);border-color:var(--accent)">
+            <div id="grand-total-inc" style="margin-top:4px;font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;text-align:right"></div>
+          </div>
+        </div>
       </div>
     </div>
     <hr class="div">
@@ -1683,7 +1697,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       <span class="tv" id="tOpt" style="color:#d97706;font-size:13px">$0.00</span>
     </div>
     <!-- Excl. GST — indigo -->
-    <div class="tot-tile tot-tile-indigo" style="margin-left:8px"><span class="tl">Excl. GST</span><span class="tv" id="tSub">$0.00</span></div>
+    <div class="tot-tile tot-tile-indigo" style="margin-left:8px"><span class="tl">Excl. GST<span id="tSubOverrideBadge" style="display:none;margin-left:5px;font-size:8px;background:rgba(99,102,241,.2);border-radius:3px;padding:1px 4px;letter-spacing:.4px">OVERRIDE</span></span><span class="tv" id="tSub">$0.00</span></div>
     <!-- GST — amber -->
     <div class="tot-tile tot-tile-amber"><span class="tl">GST 10%</span><span class="tv" id="tGST">$0.00</span></div>
     <!-- Total — blue hero -->
@@ -2519,9 +2533,11 @@ function _newQuoteState(overrides) {
 
 function _captureFields() {
   const ids = ['clientName','clientPhone','clientEmail','jobName','jobNumber',
-    'siteAddr','quoteRef','quoteDate','labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes'];
+    'siteAddr','quoteRef','quoteDate','labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes','grandTotalValue'];
   const fields = {};
   ids.forEach(id => { const el = document.getElementById(id); if(el) fields[id] = el.value||''; });
+  const gtActive = document.getElementById('grandTotalActive');
+  if (gtActive) fields.grandTotalActive = gtActive.checked ? '1' : '';
   return fields;
 }
 
@@ -2535,6 +2551,13 @@ function _restoreFields(fields) {
   if (ne) ne.innerHTML = document.getElementById('quoteNotes')?.value || '';
   // Always re-derive jobName from the restored address
   autoFillJobName(document.getElementById('siteAddr')?.value || '');
+  // Restore grand total override
+  const gtActive = document.getElementById('grandTotalActive');
+  if (gtActive) {
+    gtActive.checked = !!(fields.grandTotalActive);
+    const wrap = document.getElementById('grand-total-value-wrap');
+    if (wrap) wrap.style.display = gtActive.checked ? '' : 'none';
+  }
 }
 
 function saveActiveQuoteState() {
@@ -3506,6 +3529,16 @@ function lockCustomName(sid,pid,subid,val) {
 }
 
 // ── Markup ────────────────────────────────────────────────────────────────────
+function onGrandTotalToggle(active){
+  const wrap=document.getElementById('grand-total-value-wrap');
+  if(wrap) wrap.style.display=active?'':'none';
+  renderTotals();
+  clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);
+}
+function onGrandTotalInput(){
+  renderTotals();
+  clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);
+}
 function setMarkup(v){document.getElementById('defaultMarkup').value=v;document.querySelectorAll('.mc').forEach(c=>c.classList.toggle('active',parseInt(c.textContent)===v));}
 function applyMarkupAll(){
   syncDOM();
@@ -5068,21 +5101,44 @@ function renderTotals(){
   const t=calcAll(),gst=t.total*.1;
   document.getElementById('tMat').textContent=fmt(t.matSell);
   document.getElementById('tLab').textContent=fmt(t.labSell);
-  document.getElementById('tSub').textContent=fmt(t.total);
-  document.getElementById('tGST').textContent=fmt(gst);
-  document.getElementById('tInc').textContent=fmt(t.total+gst);
-  const optEl=document.getElementById('tOpt');
-  if(optEl){
-    const optWrap=document.getElementById('tOptWrap');
-    if(t.optTotal>0){ optEl.textContent=fmt(t.optTotal); if(optWrap) optWrap.style.display=''; }
-    else { if(optWrap) optWrap.style.display='none'; }
-  }
   const mins=calcLabourMins(),days=mins/60/7.5;
   const de=document.getElementById('tDays');if(de)de.textContent=days<0.1?'—':days.toFixed(1)+' days';
   const mc=document.getElementById('tMatCost');if(mc)mc.textContent=fmt(t.matCost);
   const lc=document.getElementById('tLabCost');if(lc)lc.textContent=fmt(t.labourCost);
   const pr=document.getElementById('tProfit');if(pr){pr.textContent=fmt(t.totalProfit);pr.style.color=t.totalProfit>=0?'#4caf50':'#ef5350';}
   const pp=document.getElementById('tProfitPct');if(pp)pp.textContent=t.profitPct>0?t.profitPct.toFixed(1)+'% margin':'';
+  const optEl=document.getElementById('tOpt');
+  if(optEl){
+    const optWrap=document.getElementById('tOptWrap');
+    if(t.optTotal>0){ optEl.textContent=fmt(t.optTotal); if(optWrap) optWrap.style.display=''; }
+    else { if(optWrap) optWrap.style.display='none'; }
+  }
+  // Grand total override
+  const gtActive = document.getElementById('grandTotalActive');
+  const gtVal = document.getElementById('grandTotalValue');
+  const overrideOn = gtActive?.checked && gtVal;
+  const indigoTile = document.getElementById('tSub')?.closest('.tot-tile-indigo');
+  if (overrideOn) {
+    const exGst = parseFloat(gtVal.value) || 0;
+    const oGst = exGst * 0.1;
+    document.getElementById('tSub').textContent = fmt(exGst);
+    document.getElementById('tGST').textContent = fmt(oGst);
+    document.getElementById('tInc').textContent = fmt(exGst + oGst);
+    if (indigoTile) indigoTile.classList.add('override-active');
+    const badge = document.getElementById('tSubOverrideBadge');
+    if (badge) badge.style.display = '';
+    const incEl = document.getElementById('grand-total-inc');
+    if (incEl) incEl.textContent = 'GST '+fmt(oGst)+' · inc. '+fmt(exGst+oGst);
+  } else {
+    document.getElementById('tSub').textContent = fmt(t.total);
+    document.getElementById('tGST').textContent = fmt(gst);
+    document.getElementById('tInc').textContent = fmt(t.total+gst);
+    if (indigoTile) indigoTile.classList.remove('override-active');
+    const badge = document.getElementById('tSubOverrideBadge');
+    if (badge) badge.style.display = 'none';
+    const incEl = document.getElementById('grand-total-inc');
+    if (incEl) incEl.textContent = '';
+  }
 }
 function renderSections(){
   const wrap=document.getElementById('sectionsWrap');if(!wrap)return;
