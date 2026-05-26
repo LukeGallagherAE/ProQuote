@@ -6371,6 +6371,11 @@ function doPrint(){
   const biz='Adonai Electrical',client=v('clientName'),clientPhone=v('clientPhone'),clientEmail=v('clientEmail'),addr=v('siteAddr'),ref=v('quoteRef'),date=v('quoteDate'),notes=v('quoteNotes');
   const abn=v('pABN'),phone=v('pPhone'),email=v('pEmail'),lic=v('pLic'),validity=v('pValidity'),detail=v('pDetail'),preparedBy=v('pPreparedBy');
   const t=calcAll(),gst=t.total*.1;
+  const gtActiveEl=document.getElementById('grandTotalActive');
+  const gtValueEl=document.getElementById('grandTotalValue');
+  const useOverride=!!(gtActiveEl?.checked);
+  const overrideExGst=useOverride?(parseFloat(gtValueEl?.value)||0):0;
+  const showPrices=!useOverride;
   const validUntil=validity?new Date(new Date(date||Date.now()).getTime()+validity*864e5).toLocaleDateString('en-AU'):'';
   let body='';
   if(detail==='total'){body='<p style="font-size:15px;padding:20px 0">Please refer to the total below for all electrical works.</p>';}
@@ -6526,7 +6531,7 @@ function doPrint(){
 
   // Build line items
   // ── LINE ITEMS: branch by detail level ─────────────────────────────────
-  const hasDisc = S.sections.some(sec => sec.parents.some(p => (p.discount||0) > 0));
+  const hasDisc = showPrices && S.sections.some(sec => sec.parents.some(p => (p.discount||0) > 0));
   let lineRows = '';
   if (detail === 'total') {
     lineRows = '<tr><td colspan="4" style="padding:24px 16px;font-size:13px;color:var(--muted);text-align:center;font-style:italic">Please refer to the total below for all electrical works.</td></tr>';
@@ -6539,7 +6544,7 @@ function doPrint(){
       return '<tr><td colspan="4" style="padding:0"><div style="display:flex;align-items:stretch">'
         +'<div style="width:4px;background:#007aff;flex-shrink:0"></div>'
         +'<div style="background:#f0f2f8;padding:11px 16px;font-weight:800;font-size:14px;color:#1a1a1a;flex:1">'+esc(sec.name)+'</div>'
-        +'<div style="background:#f0f2f8;padding:11px 16px;font-family:monospace;font-weight:700;font-size:14px;color:#007aff">$'+Number(sc.total).toFixed(2)+'</div>'
+        +(showPrices?'<div style="background:#f0f2f8;padding:11px 16px;font-family:monospace;font-weight:700;font-size:14px;color:#007aff">$'+Number(sc.total).toFixed(2)+'</div>':'')
         +'</div></td></tr>'
         +'<tr><td colspan="4" style="height:4px;padding:0"></td></tr>';
     }).join('');
@@ -6567,14 +6572,16 @@ function doPrint(){
             +(cat||'Uncategorised')
             +' <span style="font-size:11px;color:var(--muted)">('+ct.count+' item'+(ct.count!==1?'s':'')+')'
             +'</span></td>'
-          +'<td colspan="2" style="padding:9px 16px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">subtotal</td>'
-          +'<td style="padding:9px 16px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:13px;font-weight:700;font-family:monospace;color:var(--text)">$'+Number(ct.total).toFixed(2)+'</td>'
+          +(showPrices
+            ?'<td colspan="2" style="padding:9px 16px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">subtotal</td>'
+             +'<td style="padding:9px 16px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:13px;font-weight:700;font-family:monospace;color:var(--text)">$'+Number(ct.total).toFixed(2)+'</td>'
+            :'<td style="border-bottom:1px solid #f0f0f0"></td>')
         +'</tr>';
       }).join('');
       return '<tr><td colspan="4" style="padding:0"><div style="display:flex;align-items:stretch">'
         +'<div style="width:4px;background:#007aff;flex-shrink:0"></div>'
         +'<div style="background:#f0f2f8;padding:9px 14px;font-weight:800;font-size:13px;color:#1a1a1a;flex:1">'+esc(sec.name)+'</div>'
-        +'<div style="background:#f0f2f8;padding:9px 16px;font-family:monospace;font-weight:700;font-size:13px;color:#007aff">$'+Number(sc.total).toFixed(2)+'</div>'
+        +(showPrices?'<div style="background:#f0f2f8;padding:9px 16px;font-family:monospace;font-weight:700;font-size:13px;color:#007aff">$'+Number(sc.total).toFixed(2)+'</div>':'')
         +'</div></td></tr>'
         + catRows
         +'<tr><td colspan="4" style="height:10px;padding:0;background:#fafafa;border-bottom:2px solid #e8e8e8"></td></tr>';
@@ -6601,7 +6608,7 @@ function doPrint(){
       groups[groups.length-1].pars.push(par);
     });
 
-    const pdfColSpan = hasDisc ? 5 : 4;
+    const pdfColSpan = showPrices ? (hasDisc ? 5 : 4) : 2;
     const groupHtml = groups.map(g => {
       const catCol = CAT_COLORS_PDF[g.cat] || '#666';
       const catRow = g.cat
@@ -6629,9 +6636,11 @@ function doPrint(){
             +(par.description?'<div style="font-size:11px;color:var(--muted);margin-top:3px;font-style:italic">'+esc(par.description)+'</div>':'')
           +'</td>'
           +'<td style="padding:11px 16px;border-bottom:1px solid '+(isLast?'#e0e0e0':'#f0f0f0')+';text-align:center;font-size:13px;color:var(--muted);vertical-align:top;white-space:nowrap">'+par.qty+'</td>'
-          +'<td style="padding:11px 16px;border-bottom:1px solid '+(isLast?'#e0e0e0':'#f0f0f0')+';text-align:right;font-size:13px;color:var(--muted);vertical-align:top;white-space:nowrap;font-family:monospace">'+Number(up(par)).toFixed(2)+'</td>'
-          +discCell
-          +'<td class="'+(isOpt?'opt-amt':'')+'" style="padding:11px 16px;border-bottom:1px solid '+(isLast?'#e0e0e0':'#f0f0f0')+';text-align:right;font-size:13px;font-weight:700;color:'+(isOpt?'#b06000':'#1a1a1a')+';vertical-align:top;white-space:nowrap;font-family:monospace">'+Number(pc.total).toFixed(2)+'</td>'
+          +(showPrices
+            ?'<td style="padding:11px 16px;border-bottom:1px solid '+(isLast?'#e0e0e0':'#f0f0f0')+';text-align:right;font-size:13px;color:var(--muted);vertical-align:top;white-space:nowrap;font-family:monospace">'+Number(up(par)).toFixed(2)+'</td>'
+              +discCell
+              +'<td class="'+(isOpt?'opt-amt':'')+'" style="padding:11px 16px;border-bottom:1px solid '+(isLast?'#e0e0e0':'#f0f0f0')+';text-align:right;font-size:13px;font-weight:700;color:'+(isOpt?'#b06000':'#1a1a1a')+';vertical-align:top;white-space:nowrap;font-family:monospace">'+Number(pc.total).toFixed(2)+'</td>'
+            :'')
         +'</tr>';
         if (detail === 'full') {
           const activeSubs = par.subitems.filter(sub => {
@@ -6656,8 +6665,10 @@ function doPrint(){
             return '<tr style="background:#fafaf8">'
               +'<td style="padding:5px 16px 5px 36px;font-size:11px;color:var(--muted);border-bottom:1px solid #f0f0f0">'+catLabel+esc(subName||'(unnamed)')+metaStr+'</td>'
               +'<td style="padding:5px 16px;text-align:center;font-size:11px;color:#888;border-bottom:1px solid #f0f0f0">'+(sub.qty||1)+'</td>'
-              +'<td style="padding:5px 16px;text-align:right;font-size:11px;color:#888;font-family:monospace;border-bottom:1px solid #f0f0f0">'+Number(unitPrice).toFixed(2)+'</td>'
-              +'<td style="padding:5px 16px;text-align:right;font-size:11px;color:var(--muted);font-family:monospace;border-bottom:1px solid #f0f0f0">'+Number(sc.total).toFixed(2)+'</td>'
+              +(showPrices
+                ?'<td style="padding:5px 16px;text-align:right;font-size:11px;color:#888;font-family:monospace;border-bottom:1px solid #f0f0f0">'+Number(unitPrice).toFixed(2)+'</td>'
+                 +'<td style="padding:5px 16px;text-align:right;font-size:11px;color:var(--muted);font-family:monospace;border-bottom:1px solid #f0f0f0">'+Number(sc.total).toFixed(2)+'</td>'
+                :'')
             +'</tr>';
           }).join('');
         }
@@ -6672,14 +6683,16 @@ function doPrint(){
       +'<tr><td colspan="'+pdfColSpan+'" style="padding:0"><div style="display:flex;align-items:stretch">'
         +'<div style="width:4px;background:#007aff;flex-shrink:0;border-radius:0"></div>'
         +'<div style="background:#f0f2f8;padding:9px 14px;font-weight:800;font-size:13px;color:#1a1a1a;flex:1;letter-spacing:-.1px">'+esc(sec.name)+'</div>'
-        +'<div style="background:#f0f2f8;padding:9px 16px;font-family:monospace;font-weight:700;font-size:13px;color:#007aff">'+Number(sc2.total).toFixed(2)+'</div>'
+        +(showPrices?'<div style="background:#f0f2f8;padding:9px 16px;font-family:monospace;font-weight:700;font-size:13px;color:#007aff">'+Number(sc2.total).toFixed(2)+'</div>':'')
       +'</div></td></tr>'
       + groupHtml
       // Section subtotal row
-      +'<tr style="background:#f8f6f2">'
-        +'<td colspan="'+(pdfColSpan-1)+'" style="padding:8px 16px;text-align:right;font-size:11px;font-weight:700;color:#888;letter-spacing:.5px;text-transform:uppercase">Subtotal — '+esc(sec.name)+'</td>'
-        +'<td style="padding:8px 16px;text-align:right;font-size:13px;font-weight:800;font-family:monospace;color:var(--text)">'+Number(sc2.total).toFixed(2)+'</td>'
-      +'</tr>'
+      +(showPrices
+        ?'<tr style="background:#f8f6f2">'
+          +'<td colspan="'+(pdfColSpan-1)+'" style="padding:8px 16px;text-align:right;font-size:11px;font-weight:700;color:#888;letter-spacing:.5px;text-transform:uppercase">Subtotal — '+esc(sec.name)+'</td>'
+          +'<td style="padding:8px 16px;text-align:right;font-size:13px;font-weight:800;font-family:monospace;color:var(--text)">'+Number(sc2.total).toFixed(2)+'</td>'
+        +'</tr>'
+        :'')
       +'<tr><td colspan="'+pdfColSpan+'" style="height:12px;padding:0"></td></tr>';
     }).join('');
   }
@@ -6780,9 +6793,11 @@ function doPrint(){
       +'<tr style="background:#1a1a1a;color:#fff">'
         +'<th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase">Description</th>'
         +'<th style="padding:10px 16px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:60px">Qty</th>'
-        +'<th style="padding:10px 16px;text-align:right;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:100px">Unit</th>'
-        +(hasDisc?'<th style="padding:10px 16px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:90px">Discount</th>':'')
-        +'<th style="padding:10px 16px;text-align:right;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:100px">Amount</th>'
+        +(showPrices
+          ?'<th style="padding:10px 16px;text-align:right;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:100px">Unit</th>'
+           +(hasDisc?'<th style="padding:10px 16px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:90px">Discount</th>':'')
+           +'<th style="padding:10px 16px;text-align:right;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;width:100px">Amount</th>'
+          :'')
       +'</tr>'
     +'</thead>'
     +'<tbody>'+lineRows+'</tbody>'
@@ -6791,14 +6806,14 @@ function doPrint(){
   // ── TOTALS + DEPOSIT/PAYMENT ──
   +(function(){
     const depositPct = parseFloat(document.getElementById('depositAmount')?.value||'0');
-    const totalIncGst = t.total + t.total*.1;
+    const reqOnly = useOverride ? overrideExGst : t.total - (t.optTotal||0);
+    const optTotal = useOverride ? 0 : (t.optTotal||0);
+    const totalIncGst = (reqOnly + optTotal) * 1.1;
     const depositDollar = depositPct>0 ? totalIncGst * depositPct/100 : 0;
     const depositLine = depositPct>0
       ? '<div style="font-size:12px;font-weight:700;color:#007aff;margin-bottom:6px">Deposit required: '+depositPct+'% ($'+depositDollar.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2})+')</div>'
       : '';
     const policyPct = depositPct>0 ? depositPct+'%' : '10–30%';
-    const reqOnly = t.total - (t.optTotal||0);
-    const optTotal = t.optTotal||0;
     const optLine = optTotal > 0
       ? '<div id="pdf-opt-line" style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #ffe9a0;background:#fffbf0">'
         +'<span style="font-size:12px;color:#b06000">Optional extras (selected)</span>'
@@ -6851,7 +6866,7 @@ function doPrint(){
   +'</body></html>');
 
   // ── pdfRecalc JS (for interactive optional checkboxes) ──────────────────
-  const reqTotal = calcAll().total - (calcAll().optTotal||0);
+  const reqTotal = useOverride ? overrideExGst : calcAll().total - (calcAll().optTotal||0);
   const pdfRecalcScript =
     '<script>'
     +'var _reqTotal='+reqTotal.toFixed(2)+';'
