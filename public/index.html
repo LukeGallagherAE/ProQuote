@@ -288,7 +288,7 @@ body.show-totals-bar .totals-bar{display:flex}
 .tot-tile.tile-masked{opacity:.35}
 .tot-tile.tile-masked:hover{opacity:.55}
 .tot-tile.tile-masked .tv{display:none}
-.tot-tile.tile-masked>div{display:none}
+.tot-tile.tile-masked>div{display:none!important}
 /* Muted tile — mat sell, labour sell */
 .tot-tile-muted{background:rgba(120,120,120,.08);border-color:rgba(120,120,120,.16)}
 .tot-tile-muted .tl{color:var(--muted)}
@@ -1451,6 +1451,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   </div>
   <div class="topbar-right" style="display:flex;gap:8px;align-items:center;flex-shrink:0">
     <span id="save-status-chip" style="font-size:12px;color:var(--muted);opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap"></span>
+    <button id="manual-save-btn" onclick="saveActiveQuoteState()" title="Save now" style="display:none;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit;transition:all .12s" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--border2)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">Save</button>
     <div id="topbar-quote-actions" style="display:none"></div>
   </div>
 </div>
@@ -8308,6 +8309,8 @@ function switchTab(tab) {
   document.body.classList.toggle('show-totals-bar', tab === 'quote' && !_sidebarCollapsed);
   if (sidebar) sidebar.style.display = isQuote ? '' : 'none';
   if (sidebarToggle) sidebarToggle.style.display = isQuote ? '' : 'none';
+  const saveBtn = document.getElementById('manual-save-btn');
+  if (saveBtn) saveBtn.style.display = isQuoteTool ? '' : 'none';
   // Restore correct margins based on sidebar preset (don't let CSS default 248px right-margin bleed in)
   if (mainEl) {
     const _sbl = _loadSbLayout();
