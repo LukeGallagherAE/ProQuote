@@ -283,7 +283,12 @@ body.show-totals-bar .totals-bar{display:flex}
 /* Tile row — all coloured tiles fill the rest */
 .tot-tiles{display:flex;align-items:center;gap:8px;padding:0 18px;flex:1;justify-content:flex-end}
 /* Base tile */
-.tot-tile{display:flex;flex-direction:column;align-items:flex-end;gap:0px;border-radius:9px;padding:5px 11px;border:1px solid;white-space:nowrap}
+.tot-tile{display:flex;flex-direction:column;align-items:flex-end;gap:0px;border-radius:9px;padding:5px 11px;border:1px solid;white-space:nowrap;cursor:pointer;user-select:none;transition:opacity .15s}
+.tot-tile:hover{opacity:.8}
+.tot-tile.tile-masked{opacity:.35}
+.tot-tile.tile-masked:hover{opacity:.55}
+.tot-tile.tile-masked .tv{display:none}
+.tot-tile.tile-masked>div{display:none}
 /* Muted tile — mat sell, labour sell */
 .tot-tile-muted{background:rgba(120,120,120,.08);border-color:rgba(120,120,120,.16)}
 .tot-tile-muted .tl{color:var(--muted)}
@@ -309,7 +314,11 @@ body.show-totals-bar .totals-bar{display:flex}
 .tot-tile .tl{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase}
 .tot-tile .tv{font-family:'IBM Plex Mono',monospace;font-weight:700}
 /* Flat cells (cost group) */
-.ti{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.ti{display:flex;flex-direction:column;align-items:flex-end;gap:1px;cursor:pointer;user-select:none;transition:opacity .15s}
+.ti:hover{opacity:.7}
+.ti.tile-masked{opacity:.3}
+.ti.tile-masked:hover{opacity:.55}
+.ti.tile-masked .tv{display:none}
 .tl{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
 .tv{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:var(--text)}
 /* Dark mode */
@@ -1692,17 +1701,17 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 <div class="totals-bar">
   <!-- Cost metrics — flat, dimmed -->
   <div class="tot-costs">
-    <div class="ti"><span class="tl">Labour days</span><span class="tv" id="tDays">—</span></div>
-    <div class="ti"><span class="tl">Mat cost</span><span class="tv" id="tMatCost">$0.00</span></div>
-    <div class="ti"><span class="tl">Labour cost</span><span class="tv" id="tLabCost">$0.00</span></div>
+    <div class="ti" data-tile-id="t-days" onclick="toggleTotTile('t-days')" title="Click to hide/show"><span class="tl">Labour days</span><span class="tv" id="tDays">—</span></div>
+    <div class="ti" data-tile-id="t-matcost" onclick="toggleTotTile('t-matcost')" title="Click to hide/show"><span class="tl">Mat cost</span><span class="tv" id="tMatCost">$0.00</span></div>
+    <div class="ti" data-tile-id="t-labcost" onclick="toggleTotTile('t-labcost')" title="Click to hide/show"><span class="tl">Labour cost</span><span class="tv" id="tLabCost">$0.00</span></div>
   </div>
   <!-- Coloured tiles -->
   <div class="tot-tiles">
     <!-- Muted sell tiles -->
-    <div class="tot-tile tot-tile-muted"><span class="tl">Mat sell</span><span class="tv" id="tMat">$0.00</span></div>
-    <div class="tot-tile tot-tile-muted"><span class="tl">Labour sell</span><span class="tv" id="tLab">$0.00</span></div>
+    <div class="tot-tile tot-tile-muted" data-tile-id="t-mat" onclick="toggleTotTile('t-mat')" title="Click to hide/show"><span class="tl">Mat sell</span><span class="tv" id="tMat">$0.00</span></div>
+    <div class="tot-tile tot-tile-muted" data-tile-id="t-lab" onclick="toggleTotTile('t-lab')" title="Click to hide/show"><span class="tl">Labour sell</span><span class="tv" id="tLab">$0.00</span></div>
     <!-- Profit — green -->
-    <div class="tot-tile tot-tile-green">
+    <div class="tot-tile tot-tile-green" data-tile-id="t-profit" onclick="toggleTotTile('t-profit')" title="Click to hide/show">
       <span class="tl">Profit</span>
       <div style="display:flex;align-items:baseline;gap:5px">
         <span class="tv" id="tProfit">$0.00</span>
@@ -1710,16 +1719,16 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       </div>
     </div>
     <!-- Optional extras -->
-    <div class="tot-tile" id="tOptWrap" style="display:none;background:rgba(255,165,0,.08);border-color:rgba(255,165,0,.4);border-style:dashed">
+    <div class="tot-tile" id="tOptWrap" data-tile-id="t-opt" onclick="toggleTotTile('t-opt')" title="Click to hide/show" style="display:none;background:rgba(255,165,0,.08);border-color:rgba(255,165,0,.4);border-style:dashed">
       <span class="tl" style="color:rgba(200,120,0,.9)">Optional</span>
       <span class="tv" id="tOpt" style="color:#d97706;font-size:13px">$0.00</span>
     </div>
     <!-- Excl. GST — indigo -->
-    <div class="tot-tile tot-tile-indigo" style="margin-left:8px"><span class="tl">Excl. GST<span id="tSubOverrideBadge" style="display:none;margin-left:5px;font-size:8px;background:rgba(99,102,241,.2);border-radius:3px;padding:1px 4px;letter-spacing:.4px">OVERRIDE</span></span><span class="tv" id="tSub">$0.00</span></div>
+    <div class="tot-tile tot-tile-indigo" data-tile-id="t-excl" onclick="toggleTotTile('t-excl')" title="Click to hide/show" style="margin-left:8px"><span class="tl">Excl. GST<span id="tSubOverrideBadge" style="display:none;margin-left:5px;font-size:8px;background:rgba(99,102,241,.2);border-radius:3px;padding:1px 4px;letter-spacing:.4px">OVERRIDE</span></span><span class="tv" id="tSub">$0.00</span></div>
     <!-- GST — amber -->
-    <div class="tot-tile tot-tile-amber"><span class="tl">GST 10%</span><span class="tv" id="tGST">$0.00</span></div>
+    <div class="tot-tile tot-tile-amber" data-tile-id="t-gst" onclick="toggleTotTile('t-gst')" title="Click to hide/show"><span class="tl">GST 10%</span><span class="tv" id="tGST">$0.00</span></div>
     <!-- Total — blue hero -->
-    <div class="tot-tile tot-tile-blue"><span class="tl">Total inc. GST</span><span class="tv" id="tInc">$0.00</span></div>
+    <div class="tot-tile tot-tile-blue" data-tile-id="t-total" onclick="toggleTotTile('t-total')" title="Click to hide/show"><span class="tl">Total inc. GST</span><span class="tv" id="tInc">$0.00</span></div>
   </div>
 </div>
 </div>
@@ -5203,7 +5212,25 @@ function renderTotals(){
     const incEl = document.getElementById('grand-total-inc');
     if (incEl) incEl.textContent = '';
   }
+  _applyHiddenTiles();
 }
+
+function _loadHiddenTiles() {
+  try { return new Set(JSON.parse(localStorage.getItem('proquote_hidden_tiles') || '[]')); } catch(e) { return new Set(); }
+}
+function toggleTotTile(id) {
+  const set = _loadHiddenTiles();
+  if (set.has(id)) set.delete(id); else set.add(id);
+  localStorage.setItem('proquote_hidden_tiles', JSON.stringify([...set]));
+  _applyHiddenTiles();
+}
+function _applyHiddenTiles() {
+  const set = _loadHiddenTiles();
+  document.querySelectorAll('[data-tile-id]').forEach(el => {
+    el.classList.toggle('tile-masked', set.has(el.dataset.tileId));
+  });
+}
+
 function renderSections(){
   const wrap=document.getElementById('sectionsWrap');if(!wrap)return;
   const zwBtn = document.getElementById('zone-wizard-btn');
