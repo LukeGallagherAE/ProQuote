@@ -3221,6 +3221,12 @@ function collapseExpandAll() {
   S.sections.forEach(s => { s.collapsed = !allCollapsed; });
   fullRender();
 }
+function collapseExpandAllItems() {
+  syncDOM();
+  const allCollapsed = S.sections.every(s => s.parents.every(p => p.collapsed));
+  S.sections.forEach(s => { s.parents.forEach(p => { p.collapsed = !allCollapsed; }); });
+  fullRender();
+}
 function toggleSec(sid) {
   const s=S.sections.find(s=>s.id===sid); if(!s) return;
   s.collapsed = !s.collapsed;
@@ -5208,10 +5214,14 @@ function renderSections(){
   }
   if(zwBtn) zwBtn.style.display='none';
   const allCollapsed = S.sections.every(s => s.collapsed);
+  const allItemsCollapsed = S.sections.every(s => s.parents.every(p => p.collapsed));
   const colRow = S.sections.length > 1
-    ? '<div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:6px;padding:0 2px">'
+    ? '<div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-bottom:6px;padding:0 2px">'
+      + '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--muted)" onclick="collapseExpandAllItems()">'
+      + (allItemsCollapsed ? '⊞ Expand items' : '⊟ Collapse items')
+      + '</button>'
       + '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--muted)" onclick="collapseExpandAll()">'
-      + (allCollapsed ? '⊞ Expand all' : '⊟ Collapse all')
+      + (allCollapsed ? '⊞ Expand sections' : '⊟ Collapse sections')
       + '</button></div>'
     : '';
   wrap.innerHTML = colRow + S.sections.map(renderSection).join('');
