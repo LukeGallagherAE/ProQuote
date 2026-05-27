@@ -3574,14 +3574,14 @@ function applyMarkupAll(){
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function fullRender(){renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();updateRevisionBanner();setTimeout(()=>{updatePublishBadge();},50);scheduleSave();}
+function fullRender(){syncDOM();renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();updateRevisionBanner();setTimeout(()=>{updatePublishBadge();},50);scheduleSave();}
 
 let _pubCheckTimer=null;
 function _schedulePublishCheck(){
   if(_pubCheckTimer)clearTimeout(_pubCheckTimer);
   _pubCheckTimer=setTimeout(()=>{syncDOM();updatePublishBadge();},800);
 }
-function softRender(){renderTotals();renderNav();scheduleSave();}
+function softRender(){syncDOM();renderTotals();renderNav();scheduleSave();}
 function initTAs(){document.querySelectorAll('.parent-desc').forEach(t=>{t.style.height='auto';t.style.height=t.scrollHeight+'px';});}
 
 function navJumpToSection(sid) {
