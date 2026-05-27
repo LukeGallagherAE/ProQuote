@@ -3018,6 +3018,20 @@ function addParent(sid) {
     },50);
   }
 }
+function addParentWithCat(sid, cat) {
+  const s=S.sections.find(s=>s.id===sid);
+  if(s){
+    s.parents.forEach(p=>p.collapsed=true);
+    const np=newParent();
+    np.category=cat||'';
+    s.parents.push(np);
+    fullRender();
+    setTimeout(()=>{
+      const e=document.getElementById('pn-'+np.id);if(e){e.focus();}
+      const row=document.getElementById('par-'+np.id);if(row){row.classList.add('new-item-glow');setTimeout(()=>row.classList.remove('new-item-glow'),10000);}
+    },50);
+  }
+}
 function removeParent(sid,pid) {
   const s=S.sections.find(s=>s.id===sid); if(!s) return;
   s.parents=s.parents.filter(p=>p.id!==pid);
@@ -5318,9 +5332,14 @@ function renderSection(sec,si){
         const thisCat = par.category||'';
         if (pi === 0 || thisCat !== prevCat) {
           const catColor = getCatColor(thisCat);
-          divider = thisCat
-            ? '<div style="padding:5px 14px 3px;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:'+catColor+';background:var(--surface2);border-bottom:1px solid var(--border)">'+esc(thisCat)+'</div>'
-            : (pi > 0 ? '<div style="padding:5px 14px 3px;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)">Uncategorised</div>' : '');
+          const catLabel = esc(thisCat||'Uncategorised');
+          const showDivider = thisCat || pi > 0;
+          divider = showDivider
+            ? '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 18px 3px;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:'+(thisCat?catColor:'var(--muted)')+';background:var(--surface2);border-bottom:1px solid var(--border)">'
+              + '<span>'+catLabel+'</span>'
+              + '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();syncDOM();addParentWithCat('+sec.id+',\''+esc(thisCat||'')+'\')" style="font-size:10px;padding:1px 7px;text-transform:none;letter-spacing:0;opacity:.6" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.6">+ Add</button>'
+              + '</div>'
+            : '';
         }
         return divider + renderParent(sec.id,par,pi,sortedParents.length);
       }).join('')+
@@ -11799,7 +11818,99 @@ function _ffUpdateLink(rowId, val) {
 }
 
 function printFittings() {
-  window.print();
+  syncFittings();
+  const pw = window.open('', '_blank');
+  if (!pw) { alert('Please allow pop-ups to export the schedule.'); return; }
+
+  const q = _quotes.find(q => q.id === _activeQuoteId);
+  const f = q?.fields || {};
+  const ref = f.quoteRef || '';
+  const client = f.clientName || '';
+  const job = f.jobName || '';
+  const heading = [ref, client, job].filter(Boolean).join(' — ') || 'Fittings & Fixtures Schedule';
+
+  let _logo = null;
+  try { _logo = localStorage.getItem(LOGO_STORAGE_KEY) || null; } catch(e) {}
+  const biz = document.getElementById('pBizName')?.value || 'ProQuote';
+  const phone = document.getElementById('pPhone')?.value || '';
+  const email = document.getElementById('pEmail')?.value || '';
+  const prepBy = document.getElementById('pPreparedBy')?.value || '';
+
+  // Build parId lookup
+  const parMap = {};
+  S.sections.forEach(sec => (sec.parents||[]).forEach(par => { parMap[par.id] = {sec, par}; }));
+
+  const sched = _getFittingsSchedule();
+  let rows = '';
+  sched.forEach((row, idx) => {
+    const entry = parMap[row.parId];
+    const nm = entry ? esc(entry.par.name) : '<em style="color:#aaa">Item removed</em>';
+    const desc = entry?.par.description ? '<div style="font-size:10px;color:#888;margin-top:2px">'+esc(entry.par.description)+'</div>' : '';
+    const zone = entry?.sec.name ? '<div style="font-size:10px;color:#aaa;margin-top:1px">'+esc(entry.sec.name)+'</div>' : '';
+    const linkVal = row.ffLink || '';
+    const linkCell = linkVal
+      ? '<a href="'+esc(linkVal)+'" style="color:#007aff;word-break:break-all;font-size:11px">'+esc(linkVal)+'</a>'
+      : '<span style="color:#ccc">—</span>';
+    const bg = idx % 2 === 0 ? '#fff' : '#fafafa';
+    rows += '<tr style="background:'+bg+'">'
+      + '<td style="width:32px;color:#aaa;font-family:monospace;font-size:11px">'+(idx+1)+'</td>'
+      + '<td><div style="font-weight:600">'+nm+'</div>'+desc+zone+'</td>'
+      + '<td>'+esc(row.ffCode||'')+'</td>'
+      + '<td>'+esc(row.ffRating||'')+'</td>'
+      + '<td>'+esc(row.ffNote||'')+'</td>'
+      + '<td>'+linkCell+'</td>'
+      + '</tr>';
+  });
+
+  const emptyMsg = !sched.length ? '<p style="color:#aaa;font-style:italic;padding:20px 0">No items in schedule.</p>' : '';
+
+  pw.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    + '<title>Fittings & Fixtures Schedule' + (ref ? ' — ' + ref : '') + '</title>'
+    + '<style>'
+    + '*{box-sizing:border-box;margin:0;padding:0}'
+    + 'body{font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;color:#1a1a1a;background:#fff;font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    + '@page{margin:12mm 14mm;size:A4}'
+    + '@media print{.no-print{display:none!important}body{background:#fff!important}}'
+    + 'table{border-collapse:collapse;width:100%}'
+    + 'th{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#888;text-align:left;padding:7px 10px;border-bottom:2px solid #e0e0e0;background:#f7f7f7}'
+    + 'td{padding:8px 10px;border-bottom:1px solid #efefef;vertical-align:top}'
+    + 'tr:last-child td{border-bottom:none}'
+    + '</style></head><body>'
+    + '<div style="height:4px;background:linear-gradient(90deg,#007aff,#1a4fa0)"></div>'
+    + '<div style="padding:24px 32px 0">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px">'
+      + '<div>'
+        + (_logo ? '<img src="'+_logo+'" style="max-height:52px;max-width:180px;object-fit:contain;display:block;margin-bottom:6px">' : '<div style="font-size:26px;font-weight:800;letter-spacing:-1px;color:#1a1a1a;margin-bottom:4px">'+esc(biz)+'</div>')
+        + (prepBy ? '<div style="font-size:11px;color:#888">'+esc(prepBy)+'</div>' : '')
+        + (phone ? '<div style="font-size:11px;color:#888">'+esc(phone)+'</div>' : '')
+        + (email ? '<div style="font-size:11px;color:#888">'+esc(email)+'</div>' : '')
+      + '</div>'
+      + '<div style="text-align:right">'
+        + '<div style="font-size:18px;font-weight:800;color:#1a1a1a;margin-bottom:4px">Fittings &amp; Fixtures Schedule</div>'
+        + (ref ? '<div style="font-size:13px;font-weight:700;color:#007aff">'+esc(ref)+'</div>' : '')
+        + (client ? '<div style="font-size:12px;color:#555">'+esc(client)+'</div>' : '')
+        + (job ? '<div style="font-size:11px;color:#888">'+esc(job)+'</div>' : '')
+      + '</div>'
+    + '</div>'
+    + '<div style="height:2px;background:#f0f0f0;margin-bottom:20px"></div>'
+    + (sched.length
+      ? '<table><thead><tr>'
+        + '<th style="width:32px">#</th>'
+        + '<th>Description</th>'
+        + '<th style="width:110px">Item Code</th>'
+        + '<th style="width:80px">Rating</th>'
+        + '<th>Spec / Notes</th>'
+        + '<th style="width:160px">Link</th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table>'
+      : emptyMsg)
+    + '<div style="margin-top:28px;padding-top:10px;border-top:1px solid #e0e0e0;display:flex;justify-content:space-between;font-size:10px;color:#bbb">'
+      + '<span>Generated by ProQuote</span>'
+      + '<span>'+new Date().toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'})+'</span>'
+    + '</div>'
+    + '</div>'
+    + '<script>window.onload=function(){window.print();};<\/script>'
+    + '</body></html>');
+  pw.document.close();
 }
 
 function renderTracker() {
