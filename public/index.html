@@ -863,6 +863,19 @@ html.dark .tsd-btn.in-final_fix_tested{background:#082018;border-color:#1a7a4a;c
 .tracker-empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:13px}
 .tracker-empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
 
+/* Fittings & Fixtures Schedule */
+.fittings-page{padding:0 0 80px;max-width:100%}
+.fittings-header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:2px solid var(--border);background:var(--surface);gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:50}
+.fittings-table{width:100%;border-collapse:collapse;font-size:13px}
+.fittings-table th{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 12px;border-bottom:2px solid var(--border);background:var(--surface2)}
+.fittings-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.fittings-zone-row td{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--accent);padding:10px 12px 6px;background:rgba(0,122,255,.04);border-bottom:1px solid var(--border2)}
+.fittings-note-inp{font-size:12px;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed transparent;outline:none;width:100%;min-width:160px;font-family:'IBM Plex Sans',sans-serif;padding:0}
+.fittings-note-inp:hover{border-bottom-color:var(--border)}
+.fittings-note-inp:focus{border-bottom-color:var(--accent);color:var(--text)}
+.fittings-empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:13px}
+@media print{.fittings-header{position:static}.fittings-note-inp{border-bottom:none!important}}
+
 /* BOM supply status */
 .bom-supply-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:6px;border:1.5px solid;font-size:10px;font-weight:700;cursor:pointer;background:transparent;font-family:'IBM Plex Sans',sans-serif;transition:all .1s;white-space:nowrap}
 .bom-supply-btn.not_ordered{border-color:#e05050;color:#c03030;background:#fff5f5}
@@ -1440,6 +1453,10 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       Tracker
     </button>
+    <button id="qsub-fittings" class="qsub-btn" onclick="switchTab('fittings')">
+      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="5" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="3" y="12" width="18" height="5" rx="1"/><rect x="3" y="19" width="18" height="2" rx="1"/></svg>
+      Schedule
+    </button>
     <div style="width:1px;height:14px;background:var(--border);margin:0 4px;flex-shrink:0"></div>
     <div style="position:relative" id="qsub-rev-wrap">
       <button id="qsub-rev-btn" class="qsub-btn" onclick="openRevDropdown(event)" style="gap:5px">
@@ -1967,6 +1984,23 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 <div id="page-revisions" class="tab-page" style="display:none">
   <div class="rev-page">
     <div class="rev-list" id="rev-list"></div>
+  </div>
+</div>
+
+<!-- ── FITTINGS & FIXTURES SCHEDULE TAB ── -->
+<div id="page-fittings" class="tab-page" style="display:none">
+  <div class="fittings-page">
+    <div class="fittings-header">
+      <div>
+        <div style="font-size:17px;font-weight:700;color:var(--text)">Fittings &amp; Fixtures Schedule</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px" id="fittings-subtitle">All named items for the active quote</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn btn-secondary btn-sm" onclick="printFittings()">🖨 Print / PDF</button>
+        <button class="btn btn-primary btn-sm" onclick="switchTab('quote')">← Quote</button>
+      </div>
+    </div>
+    <div id="fittings-content" style="padding:20px 24px 60px"></div>
   </div>
 </div>
 
@@ -2928,6 +2962,7 @@ function syncDOM() {
           saveToCustomLib(sub.customName, sub.customPrice, sub.customUnit||'EA');
         }
       }
+      const fn=document.getElementById('ff-note-'+par.id); if(fn) par.ffNote=fn.value;
     }
   }
 }
@@ -3574,7 +3609,7 @@ function applyMarkupAll(){
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function fullRender(){syncDOM();renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();updateRevisionBanner();setTimeout(()=>{updatePublishBadge();},50);scheduleSave();}
+function fullRender(){syncDOM();renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();if(_activeTab==='fittings')renderFittings();updateRevisionBanner();setTimeout(()=>{updatePublishBadge();},50);scheduleSave();}
 
 let _pubCheckTimer=null;
 function _schedulePublishCheck(){
@@ -8135,7 +8170,7 @@ function goBack() {
 function switchTab(tab) {
   // Track previous tab for back-button (only list/global pages count as "back" destinations)
   const listTabs = ['dashboard','quotes-all','clients','projects'];
-  const isQuoteTool = tab === 'quote' || tab === 'bom' || tab === 'tracker' || tab === 'revisions';
+  const isQuoteTool = tab === 'quote' || tab === 'bom' || tab === 'tracker' || tab === 'fittings' || tab === 'revisions';
   if (isQuoteTool && listTabs.includes(_activeTab)) {
     _prevTab = _activeTab;
   } else if (!isQuoteTool) {
@@ -8174,7 +8209,7 @@ function switchTab(tab) {
   }
 
   // Sync sub-tab pills (revisions is now a dropdown, not a page)
-  ['bom','tracker'].forEach(t => {
+  ['bom','tracker','fittings'].forEach(t => {
     const b = document.getElementById('qsub-' + t);
     if (b) b.classList.toggle('active', t === tab);
   });
@@ -8208,7 +8243,8 @@ function switchTab(tab) {
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
   const mainEl = document.querySelector('.main');
-  document.body.classList.toggle('show-totals-bar', tab === 'quote');
+  const _sidebarCollapsed = document.getElementById('sidebar')?.classList.contains('collapsed');
+  document.body.classList.toggle('show-totals-bar', tab === 'quote' && !_sidebarCollapsed);
   if (sidebar) sidebar.style.display = isQuote ? '' : 'none';
   if (sidebarToggle) sidebarToggle.style.display = isQuote ? '' : 'none';
   // Restore correct margins based on sidebar preset (don't let CSS default 248px right-margin bleed in)
@@ -8274,6 +8310,7 @@ function switchTab(tab) {
   if (tab === 'adonai') renderAdonai();
   if (tab.startsWith('custom-')) renderCustomTab(tab);
   if (tab === 'tracker') renderTracker();
+  if (tab === 'fittings') renderFittings();
   if (tab === 'profile') { renderCategorySettings(); renderZonePresets(); initStagedMarkupUI(); _populateAccountPanel(); }
 }
 
@@ -9427,6 +9464,9 @@ function toggleSidebar() {
 
   const collapsed = sb.classList.toggle('collapsed');
   if (layout) layout.classList.toggle('sidebar-collapsed', collapsed);
+
+  // Hide the totals bar when sidebar collapses — keeps pricing private when a client is nearby
+  document.body.classList.toggle('show-totals-bar', !collapsed && _activeTab === 'quote');
 
   // Adjust main content area for each preset
   if (main) {
@@ -11536,6 +11576,59 @@ function _makeStatusChip(type, statusKey, secId, parId) {
       <span class="tsd-arrow">▾</span>
     </button>
   </div>`;
+}
+
+function renderFittings() {
+  syncDOM();
+  const el = document.getElementById('fittings-content');
+  if (!el) return;
+  if (!_activeQuoteId) { el.innerHTML = '<div class="fittings-empty">No active quote.</div>'; return; }
+
+  const q = _quotes.find(q => q.id === _activeQuoteId);
+  const sub = document.getElementById('fittings-subtitle');
+  if (sub && q) {
+    const f = q.fields || {};
+    sub.textContent = [f.quoteRef, f.clientName, f.jobName].filter(Boolean).join(' — ') || 'All named items for the active quote';
+  }
+
+  let itemNum = 0;
+  let rows = '';
+  S.sections.forEach(sec => {
+    const pars = (sec.parents || []).filter(p => p.name && p.name.trim());
+    if (!pars.length) return;
+    if (sec.name && sec.name.trim()) {
+      rows += `<tr class="fittings-zone-row"><td colspan="4">${esc(sec.name)}</td></tr>`;
+    }
+    pars.forEach(par => {
+      itemNum++;
+      const desc = par.description ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(par.description)}</div>` : '';
+      rows += `<tr>
+        <td style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap">${itemNum}</td>
+        <td><span style="font-weight:600;color:var(--text)">${esc(par.name)}</span>${desc}</td>
+        <td><input class="fittings-note-inp" id="ff-note-${par.id}" value="${esc(par.ffNote||'')}" placeholder="Spec / model / note…" oninput="scheduleSave()"></td>
+        <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700;white-space:nowrap">${par.qty||1}</td>
+      </tr>`;
+    });
+  });
+
+  if (!itemNum) {
+    el.innerHTML = '<div class="fittings-empty"><div style="font-size:36px;margin-bottom:12px;opacity:.4">📋</div>No named items in this quote yet.<br><br><button class="btn btn-primary btn-sm" onclick="switchTab(\'quote\')">← Back to Quote</button></div>';
+    return;
+  }
+
+  el.innerHTML = `<table class="fittings-table">
+    <thead><tr>
+      <th style="width:36px">#</th>
+      <th>Description</th>
+      <th>Specification / Notes</th>
+      <th style="width:44px;text-align:center">Qty</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function printFittings() {
+  window.print();
 }
 
 function renderTracker() {
