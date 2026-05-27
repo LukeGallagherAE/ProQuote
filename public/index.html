@@ -1421,6 +1421,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     <button class="tab-btn tab-new-quote" onclick="showNewQuoteMenu(this)" title="New quote" style="margin-left:2px;position:relative">＋</button>
   </div>
   <div class="topbar-right" style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+    <span id="save-status-chip" style="font-size:12px;color:var(--muted);opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap"></span>
     <div id="topbar-quote-actions" style="display:none"></div>
   </div>
 </div>
@@ -1566,7 +1567,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         <div class="field"><label>Project no. <span style="font-size:9px;color:var(--muted)">(Tradify)</span></label><input id="jobNumber" placeholder="e.g. JN00068"></div>
         <div class="field"><label>Job address</label><input id="siteAddr" placeholder="123 Main St, Suburb NSW" oninput="autoFillJobName(this.value);updateQuoteTabLabel()"></div>
         <div class="field"><label>Quote reference</label><input id="quoteRef" oninput="updateQuoteTabLabel()"></div>
-        <div class="field"><label>Date</label><input type="date" id="quoteDate" oninput="clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800)"></div>
+        <div class="field"><label>Date</label><input type="date" id="quoteDate" oninput="scheduleSave()"></div>
         <div class="field">
           <label>Status</label>
           <button id="sidebar-status-btn" onclick="showStatusPicker(this)" style="width:100%;text-align:left;padding:5px 10px;border-radius:var(--rs);border:1px solid var(--border2);background:var(--bg);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--muted)">Draft</button>
@@ -1578,11 +1579,11 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     <div>
       <div class="sh" style="margin-bottom:10px">Pricing</div>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <div class="field"><label>Labour sell rate ($/hr)</label><input type="number" id="labourRate" value="100" min="0" oninput="clearTimeout(window._lrDeb);window._lrDeb=setTimeout(()=>{syncDOM();fullRender();saveActiveQuoteState();},300)"></div>
-        <div class="field"><label>Labour cost rate ($/hr)</label><input type="number" id="labourCostRate" value="75" min="0" oninput="renderTotals();clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800)"></div>
+        <div class="field"><label>Labour sell rate ($/hr)</label><input type="number" id="labourRate" value="100" min="0" oninput="clearTimeout(window._lrDeb);window._lrDeb=setTimeout(()=>{syncDOM();fullRender();},300)"></div>
+        <div class="field"><label>Labour cost rate ($/hr)</label><input type="number" id="labourCostRate" value="75" min="0" oninput="renderTotals();scheduleSave()"></div>
         <div class="field">
           <label>Default markup %</label>
-          <input type="number" id="defaultMarkup" value="100" min="0" oninput="clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800)">
+          <input type="number" id="defaultMarkup" value="100" min="0" oninput="scheduleSave()">
           <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
             <div class="mc" onclick="setMarkup(0)">0%</div>
             <div class="mc" onclick="setMarkup(20)">20%</div>
@@ -1591,7 +1592,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
           </div>
           <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="applyMarkupAll()">Apply to all lines</button>
         </div>
-        <div class="field"><label>Deposit (%)</label><input type="number" id="depositAmount" value="20" placeholder="e.g. 20" min="0" max="100" step="1" oninput="clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800)"></div>
+        <div class="field"><label>Deposit (%)</label><input type="number" id="depositAmount" value="20" placeholder="e.g. 20" min="0" max="100" step="1" oninput="scheduleSave()"></div>
         <div class="field" style="border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
           <label style="display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer">
             <span>Grand total override</span>
@@ -2577,6 +2578,27 @@ function saveActiveQuoteState() {
       _editedAfterPublish: q._editedAfterPublish || false
     });
   }
+  setSaveStatus('saved');
+}
+
+function setSaveStatus(state) {
+  const el = document.getElementById('save-status-chip');
+  if (!el) return;
+  clearTimeout(window._saveStatusFade);
+  if (state === 'pending') {
+    el.textContent = 'Saving…';
+    el.style.opacity = '1';
+  } else if (state === 'saved') {
+    el.textContent = 'Saved';
+    el.style.opacity = '1';
+    window._saveStatusFade = setTimeout(() => { el.style.opacity = '0'; }, 2500);
+  }
+}
+
+function scheduleSave(delay) {
+  setSaveStatus('pending');
+  clearTimeout(window._autoSaveDeb);
+  window._autoSaveDeb = setTimeout(saveActiveQuoteState, delay === undefined ? 800 : delay);
 }
 
 function _persistSession() {
@@ -3533,11 +3555,11 @@ function onGrandTotalToggle(active){
   const wrap=document.getElementById('grand-total-value-wrap');
   if(wrap) wrap.style.display=active?'':'none';
   renderTotals();
-  clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);
+  scheduleSave();
 }
 function onGrandTotalInput(){
   renderTotals();
-  clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);
+  scheduleSave();
 }
 function setMarkup(v){document.getElementById('defaultMarkup').value=v;document.querySelectorAll('.mc').forEach(c=>c.classList.toggle('active',parseInt(c.textContent)===v));}
 function applyMarkupAll(){
@@ -3552,14 +3574,14 @@ function applyMarkupAll(){
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function fullRender(){renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();updateRevisionBanner();setTimeout(()=>{updatePublishBadge();},50);clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);}
+function fullRender(){renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();updateRevisionBanner();setTimeout(()=>{updatePublishBadge();},50);scheduleSave();}
 
 let _pubCheckTimer=null;
 function _schedulePublishCheck(){
   if(_pubCheckTimer)clearTimeout(_pubCheckTimer);
   _pubCheckTimer=setTimeout(()=>{syncDOM();updatePublishBadge();},800);
 }
-function softRender(){renderTotals();renderNav();clearTimeout(window._autoSaveDeb);window._autoSaveDeb=setTimeout(saveActiveQuoteState,800);}
+function softRender(){renderTotals();renderNav();scheduleSave();}
 function initTAs(){document.querySelectorAll('.parent-desc').forEach(t=>{t.style.height='auto';t.style.height=t.scrollHeight+'px';});}
 
 function navJumpToSection(sid) {
@@ -3976,8 +3998,7 @@ function updateQuoteTabLabel() {
   const q = _quotes.find(q => q.id === _activeQuoteId);
   if (q) {
     q.fields = _captureFields();
-    clearTimeout(window._autoSaveDeb);
-    window._autoSaveDeb = setTimeout(_persistSession, 800);
+    scheduleSave();
     if (q._publishedAt) _schedulePublishCheck();
   }
   renderQuoteTabs();
@@ -6218,8 +6239,7 @@ function syncNotesEditor() {
   const editor = document.getElementById('notesEditor');
   const ta = document.getElementById('quoteNotes');
   if (ta && editor) ta.value = editor.innerHTML;
-  clearTimeout(window._autoSaveDeb);
-  window._autoSaveDeb = setTimeout(saveActiveQuoteState, 800);
+  scheduleSave();
 }
 
 function notesInsertLink() {
@@ -9654,9 +9674,15 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => {
   if (!_activeQuoteId) return;
   if (e.target.closest('#sb-sidebar-content') || e.target.closest('#quote-page') || e.target.closest('.main')) {
-    clearTimeout(window._autoSaveDeb);
-    window._autoSaveDeb = setTimeout(saveActiveQuoteState, 800);
+    scheduleSave();
   }
+});
+
+window.addEventListener('beforeunload', () => {
+  if (_activeQuoteId) { clearTimeout(window._autoSaveDeb); saveActiveQuoteState(); }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && _activeQuoteId) { clearTimeout(window._autoSaveDeb); saveActiveQuoteState(); }
 });
 
 function openRolodex() {
