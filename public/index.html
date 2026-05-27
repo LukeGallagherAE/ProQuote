@@ -872,6 +872,10 @@ html.dark .tsd-btn.in-final_fix_tested{background:#082018;border-color:#1a7a4a;c
 .tracker-empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:13px}
 .tracker-empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
 
+/* Item summary bar */
+.par-summary-bar{display:flex;gap:16px;padding:5px 18px;background:var(--surface2);border-top:1px solid var(--border);font-size:11px;color:var(--muted)}
+.par-summary-bar span{display:flex;align-items:center;gap:4px}
+
 /* Fittings & Fixtures Schedule */
 .fittings-page{padding:0 0 80px;max-width:100%}
 .fittings-header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:2px solid var(--border);background:var(--surface);gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:50}
@@ -883,7 +887,10 @@ html.dark .tsd-btn.in-final_fix_tested{background:#082018;border-color:#1a7a4a;c
 .fittings-note-inp:hover{border-bottom-color:var(--border)}
 .fittings-note-inp:focus{border-bottom-color:var(--accent);color:var(--text)}
 .fittings-empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:13px}
-@media print{.fittings-header{position:static}.fittings-note-inp{border-bottom:none!important}}
+.fittings-sug-item{padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.fittings-sug-item:last-child{border-bottom:none}
+.fittings-sug-item:hover{background:var(--blue-bg)}
+@media print{.fittings-header{position:static}.fittings-note-inp{border-bottom:none!important}.fittings-add-wrap{display:none}}
 
 /* BOM supply status */
 .bom-supply-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:6px;border:1.5px solid;font-size:10px;font-weight:700;cursor:pointer;background:transparent;font-family:'IBM Plex Sans',sans-serif;transition:all .1s;white-space:nowrap}
@@ -2970,12 +2977,9 @@ function syncDOM() {
           saveToCustomLib(sub.customName, sub.customPrice, sub.customUnit||'EA');
         }
       }
-      const fn=document.getElementById('ff-note-'+par.id); if(fn) par.ffNote=fn.value;
-      const fc=document.getElementById('ff-code-'+par.id); if(fc) par.ffCode=fc.value;
-      const fr=document.getElementById('ff-rating-'+par.id); if(fr) par.ffRating=fr.value;
-      const fl=document.getElementById('ff-link-'+par.id); if(fl) par.ffLink=fl.value;
     }
   }
+  syncFittings();
 }
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
@@ -5384,7 +5388,7 @@ function renderParent(sid,par,pi,total){
         catPill+
         '<div style="min-width:0;display:flex;flex-direction:column;gap:2px">'+
           '<div style="position:relative;width:100%"><input class="parent-name-inp" id="pn-'+par.id+'" value="'+esc(par.name)+'" placeholder="Item name…" style="width:100%" oninput="onParentNameInput('+sid+','+par.id+',this.value)" onblur="setTimeout(closeTemplateDrop,200)"></div>'+
-          (par.description ? '<div style="font-size:11px;color:var(--muted);padding:0 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(par.description)+'</div>' : '')+
+          '<textarea class="parent-desc" id="pd-'+par.id+'" placeholder="Add a description…" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'" rows="1" style="width:100%">'+esc(par.description||'')+'</textarea>'+
         '</div>'+
         swiHtml+
         '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncDOM();fullRender()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
@@ -5396,6 +5400,23 @@ function renderParent(sid,par,pi,total){
     '</div>';
   }
 
+  // Labour time summary
+  let _labMins = 0;
+  (par.subitems||[]).forEach(sub => {
+    if (sub.cat==='wire' && ac.wire) _labMins += (sub.wireMin||0)*(sub.qty||1);
+    if (sub.cat==='install' && ac.install) _labMins += (sub.instMin||0)*(sub.qty||1);
+    if (sub.cat==='supply' && ac.install) _labMins += (sub.instMin||0)*(sub.qty||1);
+  });
+  _labMins *= (par.qty||1);
+  const _labH = Math.floor(_labMins/60), _labM = Math.round(_labMins%60);
+  const _labStr = _labMins>0 ? (_labH>0 ? _labH+'h'+(_labM>0?' '+_labM+'m':'') : _labM+'m') : null;
+  const _summaryBar = !par.lumpSum && (_labStr || c.matCost>0)
+    ? '<div class="par-summary-bar">'
+      +(_labStr ? '<span>⏱ '+_labStr+' labour</span>' : '')
+      +(c.matCost>0 ? '<span>📦 '+fmt(c.matCost)+' mat cost</span>' : '')
+      +'</div>'
+    : '';
+
   const subitemsHtml=par.subitems.map(sub=>renderSubitem(sid,par.id,par,sub)).join('');
   return '<div class="parent-item" id="par-'+par.id+'" ondragover="_dragParId!=null?_onParDragOver(event,'+sid+','+par.id+'):(event.preventDefault(),event.stopPropagation(),this.classList.add(\'drag-over\'))" ondragleave="this.classList.remove(\'drag-over\');this.classList.remove(\'item-drag-over\')" ondrop="_dragParId!=null?_onParDrop(event,'+sid+','+par.id+'):(dropParentPhoto(event,'+sid+','+par.id+'),this.classList.remove(\'drag-over\'))">'+
   (par.optional ? '<div style="position:absolute;inset:0;border:2px dashed rgba(255,165,0,.35);border-radius:10px;pointer-events:none"></div>' : '')+
@@ -5405,7 +5426,7 @@ function renderParent(sid,par,pi,total){
       catPill+
       '<div style="min-width:0;display:flex;flex-direction:column;gap:2px">'+
         '<div style="position:relative;width:100%"><input class="parent-name-inp" id="pn-'+par.id+'" value="'+esc(par.name)+'" placeholder="Item name…" style="width:100%" oninput="onParentNameInput('+sid+','+par.id+',this.value)" onblur="setTimeout(closeTemplateDrop,200)"></div>'+
-        '<textarea class="parent-desc" id="pd-'+par.id+'" placeholder="Add a description…" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';syncDOM()" rows="1" style="width:100%">'+esc(par.description||'')+'</textarea>'+
+        '<textarea class="parent-desc" id="pd-'+par.id+'" placeholder="Add a description…" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'" rows="1" style="width:100%">'+esc(par.description||'')+'</textarea>'+
       '</div>'+
       swiHtml+
       '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncDOM();fullRender()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
@@ -5435,6 +5456,7 @@ function renderParent(sid,par,pi,total){
             '</div>'+
           '</div>'+
         '</div>')+
+  _summaryBar+
   '</div>';
 }
 
@@ -11617,74 +11639,152 @@ function _makeStatusChip(type, statusKey, secId, parId) {
   </div>`;
 }
 
+function _getFittingsSchedule() {
+  const q = _quotes.find(q => q.id === _activeQuoteId);
+  if (!q) return [];
+  if (!Array.isArray(q.fittingsSchedule)) q.fittingsSchedule = [];
+  return q.fittingsSchedule;
+}
+
+function syncFittings() {
+  const q = _quotes.find(q => q.id === _activeQuoteId);
+  if (!q || !Array.isArray(q.fittingsSchedule)) return;
+  q.fittingsSchedule.forEach(row => {
+    const fc = document.getElementById('ff-code-'+row.id);   if(fc) row.ffCode=fc.value;
+    const fr = document.getElementById('ff-rating-'+row.id); if(fr) row.ffRating=fr.value;
+    const fn = document.getElementById('ff-note-'+row.id);   if(fn) row.ffNote=fn.value;
+    const fl = document.getElementById('ff-link-'+row.id);   if(fl) row.ffLink=fl.value;
+  });
+}
+
+function addFittingsRow(parId) {
+  syncFittings();
+  const sched = _getFittingsSchedule();
+  if (!sched.find(r => r.parId === parId)) {
+    sched.push({id: uid(), parId, ffCode:'', ffRating:'', ffNote:'', ffLink:''});
+  }
+  const inp = document.getElementById('fittings-search');
+  if (inp) inp.value = '';
+  closeFittingsSugs();
+  renderFittings();
+  scheduleSave();
+}
+
+function removeFittingsRow(rowId) {
+  syncFittings();
+  const q = _quotes.find(q => q.id === _activeQuoteId);
+  if (!q || !Array.isArray(q.fittingsSchedule)) return;
+  q.fittingsSchedule = q.fittingsSchedule.filter(r => r.id !== rowId);
+  renderFittings();
+  scheduleSave();
+}
+
+function closeFittingsSugs() {
+  const el = document.getElementById('fittings-sugs');
+  if (el) el.style.display = 'none';
+}
+
+function renderFittingsSugs(query) {
+  const el = document.getElementById('fittings-sugs');
+  if (!el) return;
+  const sched = _getFittingsSchedule();
+  const usedIds = new Set(sched.map(r => r.parId));
+  const q = (query || '').toLowerCase();
+  const matches = [];
+  S.sections.forEach(sec => {
+    (sec.parents || []).forEach(par => {
+      if (!par.name || !par.name.trim()) return;
+      if (q && !par.name.toLowerCase().includes(q)) return;
+      matches.push({sec, par});
+    });
+  });
+  if (!matches.length) { el.style.display = 'none'; return; }
+  el.innerHTML = matches.map(({sec, par}) => {
+    const added = usedIds.has(par.id);
+    return `<div class="fittings-sug-item" onclick="addFittingsRow('${par.id}')">
+      <span style="font-weight:600;flex:1">${esc(par.name)}</span>
+      ${sec.name ? `<span style="color:var(--muted);font-size:11px">${esc(sec.name)}</span>` : ''}
+      ${added ? '<span style="color:var(--green,#34c759);font-size:11px;font-weight:700">✓ Added</span>' : ''}
+    </div>`;
+  }).join('');
+  el.style.display = '';
+}
+
 function renderFittings() {
-  syncDOM();
+  syncFittings();
   const el = document.getElementById('fittings-content');
   if (!el) return;
   if (!_activeQuoteId) { el.innerHTML = '<div class="fittings-empty">No active quote.</div>'; return; }
 
   const q = _quotes.find(q => q.id === _activeQuoteId);
-  const sub = document.getElementById('fittings-subtitle');
-  if (sub && q) {
+  const subEl = document.getElementById('fittings-subtitle');
+  if (subEl && q) {
     const f = q.fields || {};
-    sub.textContent = [f.quoteRef, f.clientName, f.jobName].filter(Boolean).join(' — ') || 'All named items for the active quote';
+    subEl.textContent = [f.quoteRef, f.clientName, f.jobName].filter(Boolean).join(' — ') || 'Fittings & Fixtures Schedule';
   }
 
-  let itemNum = 0;
-  let rows = '';
-  S.sections.forEach(sec => {
-    const pars = (sec.parents || []).filter(p => p.name && p.name.trim());
-    if (!pars.length) return;
-    if (sec.name && sec.name.trim()) {
-      rows += `<tr class="fittings-zone-row"><td colspan="7">${esc(sec.name)}</td></tr>`;
-    }
-    pars.forEach(par => {
-      itemNum++;
-      const desc = par.description ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(par.description)}</div>` : '';
-      const linkVal = par.ffLink || '';
-      const linkIcon = linkVal
-        ? `<a href="${esc(linkVal)}" target="_blank" rel="noopener" title="${esc(linkVal)}" style="color:var(--accent);text-decoration:none;font-size:14px;flex-shrink:0">↗</a>`
-        : '';
-      rows += `<tr>
-        <td style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap">${itemNum}</td>
-        <td><span style="font-weight:600;color:var(--text)">${esc(par.name)}</span>${desc}</td>
-        <td style="width:44px;text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700">${par.qty||1}</td>
-        <td><input class="fittings-note-inp" id="ff-code-${par.id}" value="${esc(par.ffCode||'')}" placeholder="e.g. MX-240-B" oninput="scheduleSave()"></td>
-        <td><input class="fittings-note-inp" id="ff-rating-${par.id}" value="${esc(par.ffRating||'')}" placeholder="e.g. 10A" oninput="scheduleSave()"></td>
-        <td><input class="fittings-note-inp" id="ff-note-${par.id}" value="${esc(par.ffNote||'')}" placeholder="Spec / notes…" oninput="scheduleSave()"></td>
-        <td style="white-space:nowrap;display:flex;align-items:center;gap:4px;padding:9px 12px">
-          <input class="fittings-note-inp" id="ff-link-${par.id}" value="${esc(linkVal)}" placeholder="https://…" oninput="scheduleSave();_ffUpdateLink(this)" style="min-width:80px">
-          <span id="ff-link-icon-${par.id}">${linkIcon}</span>
-        </td>
-      </tr>`;
-    });
-  });
+  // Build parId → {sec, par} lookup
+  const parMap = {};
+  S.sections.forEach(sec => (sec.parents||[]).forEach(par => { parMap[par.id] = {sec, par}; }));
 
-  if (!itemNum) {
-    el.innerHTML = '<div class="fittings-empty"><div style="font-size:36px;margin-bottom:12px;opacity:.4">📋</div>No named items in this quote yet.<br><br><button class="btn btn-primary btn-sm" onclick="switchTab(\'quote\')">← Back to Quote</button></div>';
+  const sched = _getFittingsSchedule();
+
+  const searchHtml = `<div class="fittings-add-wrap" style="padding:16px 0 20px;display:flex;align-items:center;gap:10px">
+    <div style="position:relative;flex:1;max-width:480px">
+      <input id="fittings-search" placeholder="Search quote items to add to schedule…"
+        style="width:100%;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border2);background:var(--bg);font-size:13px;font-family:inherit;color:var(--text);outline:none"
+        oninput="renderFittingsSugs(this.value)" onfocus="renderFittingsSugs(this.value)" onblur="setTimeout(closeFittingsSugs,200)">
+      <div id="fittings-sugs" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:260px;overflow-y:auto"></div>
+    </div>
+  </div>`;
+
+  if (!sched.length) {
+    el.innerHTML = searchHtml + '<div class="fittings-empty"><div style="font-size:36px;margin-bottom:10px;opacity:.4">📋</div>No items yet — search above to add items from your quote.</div>';
     return;
   }
 
-  el.innerHTML = `<table class="fittings-table">
+  let rows = '';
+  sched.forEach((row, idx) => {
+    const entry = parMap[row.parId];
+    const nm = entry ? `<span style="font-weight:600">${esc(entry.par.name)}</span>` : `<span style="color:var(--muted);font-style:italic">Item removed</span>`;
+    const desc = entry?.par.description ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(entry.par.description)}</div>` : '';
+    const zone = entry?.sec.name ? `<div style="font-size:10px;color:var(--muted);margin-top:1px">${esc(entry.sec.name)}</div>` : '';
+    const qty = entry ? (entry.par.qty||1) : '—';
+    const lv = row.ffLink||'';
+    const linkIcon = lv ? `<a href="${esc(lv)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-size:14px;flex-shrink:0">↗</a>` : '';
+    rows += `<tr>
+      <td style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:11px">${idx+1}</td>
+      <td>${nm}${desc}${zone}</td>
+      <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700">${qty}</td>
+      <td><input class="fittings-note-inp" id="ff-code-${row.id}" value="${esc(row.ffCode||'')}" placeholder="e.g. MX-240-B" oninput="scheduleSave()"></td>
+      <td><input class="fittings-note-inp" id="ff-rating-${row.id}" value="${esc(row.ffRating||'')}" placeholder="e.g. 10A" oninput="scheduleSave()"></td>
+      <td><input class="fittings-note-inp" id="ff-note-${row.id}" value="${esc(row.ffNote||'')}" placeholder="Spec / notes…" oninput="scheduleSave()"></td>
+      <td style="display:flex;align-items:center;gap:4px;padding:9px 12px">
+        <input class="fittings-note-inp" id="ff-link-${row.id}" value="${esc(lv)}" placeholder="https://…" oninput="scheduleSave();_ffUpdateLink('${row.id}',this.value)" style="min-width:80px">
+        <span id="ff-link-icon-${row.id}">${linkIcon}</span>
+      </td>
+      <td><button onclick="removeFittingsRow('${row.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;line-height:1" title="Remove">×</button></td>
+    </tr>`;
+  });
+
+  el.innerHTML = searchHtml + `<table class="fittings-table">
     <thead><tr>
-      <th style="width:36px">#</th>
-      <th>Description</th>
-      <th style="width:44px;text-align:center">Qty</th>
+      <th style="width:32px">#</th><th>Description</th>
+      <th style="width:40px;text-align:center">Qty</th>
       <th style="width:120px">Item Code</th>
       <th style="width:90px">Rating</th>
       <th>Spec / Notes</th>
-      <th style="width:200px">Link to Unit</th>
+      <th style="width:190px">Link to Unit</th>
+      <th style="width:28px"></th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
 
-function _ffUpdateLink(inp) {
-  const pid = inp.id.replace('ff-link-', '');
-  const icon = document.getElementById('ff-link-icon-' + pid);
+function _ffUpdateLink(rowId, val) {
+  const icon = document.getElementById('ff-link-icon-'+rowId);
   if (!icon) return;
-  const v = inp.value.trim();
-  icon.innerHTML = v ? `<a href="${esc(v)}" target="_blank" rel="noopener" title="${esc(v)}" style="color:var(--accent);text-decoration:none;font-size:14px">↗</a>` : '';
+  icon.innerHTML = val.trim() ? `<a href="${esc(val.trim())}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-size:14px">↗</a>` : '';
 }
 
 function printFittings() {
