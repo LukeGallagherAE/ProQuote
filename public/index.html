@@ -2630,9 +2630,8 @@ function setSaveStatus(state) {
 }
 
 function scheduleSave(delay) {
-  setSaveStatus('pending');
   clearTimeout(window._autoSaveDeb);
-  window._autoSaveDeb = setTimeout(saveActiveQuoteState, delay === undefined ? 800 : delay);
+  window._autoSaveDeb = setTimeout(saveActiveQuoteState, delay === undefined ? 60000 : delay);
 }
 
 function _persistSession() {
@@ -2963,6 +2962,9 @@ function syncDOM() {
         }
       }
       const fn=document.getElementById('ff-note-'+par.id); if(fn) par.ffNote=fn.value;
+      const fc=document.getElementById('ff-code-'+par.id); if(fc) par.ffCode=fc.value;
+      const fr=document.getElementById('ff-rating-'+par.id); if(fr) par.ffRating=fr.value;
+      const fl=document.getElementById('ff-link-'+par.id); if(fl) par.ffLink=fl.value;
     }
   }
 }
@@ -11597,16 +11599,26 @@ function renderFittings() {
     const pars = (sec.parents || []).filter(p => p.name && p.name.trim());
     if (!pars.length) return;
     if (sec.name && sec.name.trim()) {
-      rows += `<tr class="fittings-zone-row"><td colspan="4">${esc(sec.name)}</td></tr>`;
+      rows += `<tr class="fittings-zone-row"><td colspan="7">${esc(sec.name)}</td></tr>`;
     }
     pars.forEach(par => {
       itemNum++;
       const desc = par.description ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(par.description)}</div>` : '';
+      const linkVal = par.ffLink || '';
+      const linkIcon = linkVal
+        ? `<a href="${esc(linkVal)}" target="_blank" rel="noopener" title="${esc(linkVal)}" style="color:var(--accent);text-decoration:none;font-size:14px;flex-shrink:0">↗</a>`
+        : '';
       rows += `<tr>
         <td style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap">${itemNum}</td>
         <td><span style="font-weight:600;color:var(--text)">${esc(par.name)}</span>${desc}</td>
-        <td><input class="fittings-note-inp" id="ff-note-${par.id}" value="${esc(par.ffNote||'')}" placeholder="Spec / model / note…" oninput="scheduleSave()"></td>
-        <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700;white-space:nowrap">${par.qty||1}</td>
+        <td style="width:44px;text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700">${par.qty||1}</td>
+        <td><input class="fittings-note-inp" id="ff-code-${par.id}" value="${esc(par.ffCode||'')}" placeholder="e.g. MX-240-B" oninput="scheduleSave()"></td>
+        <td><input class="fittings-note-inp" id="ff-rating-${par.id}" value="${esc(par.ffRating||'')}" placeholder="e.g. 10A" oninput="scheduleSave()"></td>
+        <td><input class="fittings-note-inp" id="ff-note-${par.id}" value="${esc(par.ffNote||'')}" placeholder="Spec / notes…" oninput="scheduleSave()"></td>
+        <td style="white-space:nowrap;display:flex;align-items:center;gap:4px;padding:9px 12px">
+          <input class="fittings-note-inp" id="ff-link-${par.id}" value="${esc(linkVal)}" placeholder="https://…" oninput="scheduleSave();_ffUpdateLink(this)" style="min-width:80px">
+          <span id="ff-link-icon-${par.id}">${linkIcon}</span>
+        </td>
       </tr>`;
     });
   });
@@ -11620,11 +11632,22 @@ function renderFittings() {
     <thead><tr>
       <th style="width:36px">#</th>
       <th>Description</th>
-      <th>Specification / Notes</th>
       <th style="width:44px;text-align:center">Qty</th>
+      <th style="width:120px">Item Code</th>
+      <th style="width:90px">Rating</th>
+      <th>Spec / Notes</th>
+      <th style="width:200px">Link to Unit</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
+}
+
+function _ffUpdateLink(inp) {
+  const pid = inp.id.replace('ff-link-', '');
+  const icon = document.getElementById('ff-link-icon-' + pid);
+  if (!icon) return;
+  const v = inp.value.trim();
+  icon.innerHTML = v ? `<a href="${esc(v)}" target="_blank" rel="noopener" title="${esc(v)}" style="color:var(--accent);text-decoration:none;font-size:14px">↗</a>` : '';
 }
 
 function printFittings() {
