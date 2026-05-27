@@ -2401,14 +2401,17 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     },
     setItem(key, value) {
       _ls[key] = typeof value === 'string' ? value : JSON.stringify(value);
+      try { window._nativeLS.setItem(key, _ls[key]); } catch(e) {}
       _markDirty();
     },
     removeItem(key) {
       delete _ls[key];
+      try { window._nativeLS.removeItem(key); } catch(e) {}
       _markDirty();
     },
     clear() {
       Object.keys(_ls).forEach((k) => delete _ls[k]);
+      try { window._nativeLS.clear(); } catch(e) {}
       _markDirty();
     },
     key(i) { return Object.keys(_ls)[i] ?? null; },
@@ -2423,7 +2426,16 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   // Fetches all persisted data from the server before init() runs
   window._initStorage = async function () {
     const token = getToken();
-    if (!token) return; // no token — showLandingLogin handles auth
+    if (!token) {
+      // No auth — restore from native localStorage so data survives reloads offline
+      try {
+        for (let i = 0; i < window._nativeLS.length; i++) {
+          const k = window._nativeLS.key(i);
+          if (k && k !== 'pq_jwt') _ls[k] = window._nativeLS.getItem(k);
+        }
+      } catch(e) {}
+      return;
+    }
     try {
       const res = await fetch('/api/storage', {
         headers: { 'Authorization': 'Bearer ' + token }
