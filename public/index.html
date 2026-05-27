@@ -3631,14 +3631,14 @@ function applyMarkupAll(){
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function fullRender(){syncDOM();renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();if(_activeTab==='fittings')renderFittings();updateRevisionBanner();setTimeout(()=>{updatePublishBadge();},50);scheduleSave();}
+function fullRender(){syncDOM();renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();if(_activeTab==='fittings')renderFittings();clearTimeout(window._revBannerDeb);window._revBannerDeb=setTimeout(updateRevisionBanner,500);setTimeout(()=>{updatePublishBadge();},50);scheduleSave();}
 
 let _pubCheckTimer=null;
 function _schedulePublishCheck(){
   if(_pubCheckTimer)clearTimeout(_pubCheckTimer);
   _pubCheckTimer=setTimeout(()=>{syncDOM();updatePublishBadge();},800);
 }
-function softRender(){syncDOM();renderTotals();renderNav();scheduleSave();}
+function softRender(){renderTotals();renderNav();scheduleSave();}
 function initTAs(){document.querySelectorAll('.parent-desc').forEach(t=>{t.style.height='auto';t.style.height=t.scrollHeight+'px';});}
 
 function navJumpToSection(sid) {
@@ -4783,13 +4783,30 @@ function updateRevisionBanner() {
   const liveNew = { sections: S.sections };
   const changes = diffQuotes(prevQ, liveNew);
 
-  if (changes.length === 0) {
-    diffEl.innerHTML = '<div style="font-size:12px;color:var(--muted);font-style:italic">No changes from Rev ' + preLet + ' yet</div>';
+  const dismissed = new Set(aq._dismissedChanges || []);
+  const visible = changes.filter(c => !dismissed.has(c));
+
+  if (visible.length === 0) {
+    diffEl.innerHTML = '<div style="font-size:12px;color:var(--muted);font-style:italic">' + (changes.length ? 'All changes dismissed — ' : 'No changes from Rev ' + preLet + ' yet') + '</div>';
   } else {
-    diffEl.innerHTML = changes.map(c =>
-      '<div class="rev-diff-item">· ' + escHtml(c) + '</div>'
+    diffEl.innerHTML = visible.map(c =>
+      '<div class="rev-diff-item" style="display:flex;align-items:center;gap:6px">'
+      + '<span style="flex:1">· ' + escHtml(c) + '</span>'
+      + '<button onclick="dismissRevChange(\'' + escHtml(c).replace(/'/g, "\\'") + '\')" title="Remove from log" '
+      + 'style="flex-shrink:0;background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:0 2px;opacity:.5" '
+      + 'onmouseover="this.style.opacity=1;this.style.color=\'#e03\'" onmouseout="this.style.opacity=.5;this.style.color=\'var(--muted)\'">×</button>'
+      + '</div>'
     ).join('');
   }
+}
+
+function dismissRevChange(changeStr) {
+  const aq = _quotes.find(q => q.id === _activeQuoteId);
+  if (!aq) return;
+  if (!Array.isArray(aq._dismissedChanges)) aq._dismissedChanges = [];
+  if (!aq._dismissedChanges.includes(changeStr)) aq._dismissedChanges.push(changeStr);
+  _persistSession();
+  updateRevisionBanner();
 }
 
 function _autoCreateRevisionOnEdit(aq) {
@@ -11663,9 +11680,7 @@ function syncFittings() {
 function addFittingsRow(parId) {
   syncFittings();
   const sched = _getFittingsSchedule();
-  if (!sched.find(r => r.parId === parId)) {
-    sched.push({id: uid(), parId, ffCode:'', ffRating:'', ffNote:'', ffLink:''});
-  }
+  sched.push({id: uid(), parId, ffCode:'', ffRating:'', ffNote:'', ffLink:''});
   const inp = document.getElementById('fittings-search');
   if (inp) inp.value = '';
   closeFittingsSugs();
@@ -11690,8 +11705,6 @@ function closeFittingsSugs() {
 function renderFittingsSugs(query) {
   const el = document.getElementById('fittings-sugs');
   if (!el) return;
-  const sched = _getFittingsSchedule();
-  const usedIds = new Set(sched.map(r => r.parId));
   const q = (query || '').toLowerCase();
   const matches = [];
   S.sections.forEach(sec => {
@@ -11702,14 +11715,12 @@ function renderFittingsSugs(query) {
     });
   });
   if (!matches.length) { el.style.display = 'none'; return; }
-  el.innerHTML = matches.map(({sec, par}) => {
-    const added = usedIds.has(par.id);
-    return `<div class="fittings-sug-item" onclick="addFittingsRow('${par.id}')">
+  el.innerHTML = matches.map(({sec, par}) =>
+    `<div class="fittings-sug-item" onclick="addFittingsRow('${par.id}')">
       <span style="font-weight:600;flex:1">${esc(par.name)}</span>
       ${sec.name ? `<span style="color:var(--muted);font-size:11px">${esc(sec.name)}</span>` : ''}
-      ${added ? '<span style="color:var(--green,#34c759);font-size:11px;font-weight:700">✓ Added</span>' : ''}
-    </div>`;
-  }).join('');
+    </div>`
+  ).join('');
   el.style.display = '';
 }
 
@@ -11752,13 +11763,11 @@ function renderFittings() {
     const nm = entry ? `<span style="font-weight:600">${esc(entry.par.name)}</span>` : `<span style="color:var(--muted);font-style:italic">Item removed</span>`;
     const desc = entry?.par.description ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(entry.par.description)}</div>` : '';
     const zone = entry?.sec.name ? `<div style="font-size:10px;color:var(--muted);margin-top:1px">${esc(entry.sec.name)}</div>` : '';
-    const qty = entry ? (entry.par.qty||1) : '—';
     const lv = row.ffLink||'';
     const linkIcon = lv ? `<a href="${esc(lv)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-size:14px;flex-shrink:0">↗</a>` : '';
     rows += `<tr>
       <td style="color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:11px">${idx+1}</td>
       <td>${nm}${desc}${zone}</td>
-      <td style="text-align:center;font-family:'IBM Plex Mono',monospace;font-weight:700">${qty}</td>
       <td><input class="fittings-note-inp" id="ff-code-${row.id}" value="${esc(row.ffCode||'')}" placeholder="e.g. MX-240-B" oninput="scheduleSave()"></td>
       <td><input class="fittings-note-inp" id="ff-rating-${row.id}" value="${esc(row.ffRating||'')}" placeholder="e.g. 10A" oninput="scheduleSave()"></td>
       <td><input class="fittings-note-inp" id="ff-note-${row.id}" value="${esc(row.ffNote||'')}" placeholder="Spec / notes…" oninput="scheduleSave()"></td>
@@ -11773,7 +11782,6 @@ function renderFittings() {
   el.innerHTML = searchHtml + `<table class="fittings-table">
     <thead><tr>
       <th style="width:32px">#</th><th>Description</th>
-      <th style="width:40px;text-align:center">Qty</th>
       <th style="width:120px">Item Code</th>
       <th style="width:90px">Rating</th>
       <th>Spec / Notes</th>
