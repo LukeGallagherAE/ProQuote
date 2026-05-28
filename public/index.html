@@ -12411,13 +12411,26 @@ function init(){
       const restored = JSON.parse(_sqRaw);
       if (restored && restored.length) {
         _quotes = restored;
+        // Advance _id counter past all IDs already used in restored quotes
+        // so new sections/items/subitems never get duplicate IDs.
+        let _maxId = 0;
+        for (const rq of _quotes) {
+          for (const s of (rq.sections || [])) {
+            if (s.id > _maxId) _maxId = s.id;
+            for (const p of (s.parents || [])) {
+              if (p.id > _maxId) _maxId = p.id;
+              for (const sub of (p.subitems || [])) { if (sub.id > _maxId) _maxId = sub.id; }
+            }
+          }
+        }
+        if (_maxId >= _id) _id = _maxId + 1;
         const _savedId = localStorage.getItem('proquote_active_id');
         const _savedQ = _savedId && restored.find(q => q.id === _savedId);
         _activeQuoteId = _savedQ ? _savedId : restored[0].id;
-        // Restore fields + sections from active quote
+        // Restore fields + sections from active quote (deep clone to avoid shared reference)
         const aq = _savedQ || restored[0];
         if (aq.fields) Object.entries(aq.fields).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val||''; });
-        if (aq.sections) { S.sections = aq.sections; fullRender(); }
+        if (aq.sections) { S.sections = JSON.parse(JSON.stringify(aq.sections)); fullRender(); }
         renderQuoteTabs();
         updateQuoteTabLabel();
         renderCustomTabButtons();
@@ -12428,7 +12441,7 @@ function init(){
       }
     } catch(e) {}
   }
-  const firstQ = _newQuoteState({ fields: _captureFields(), sections: S.sections });
+  const firstQ = _newQuoteState({ fields: _captureFields(), sections: [] });
   _quotes.push(firstQ);
   _activeQuoteId = firstQ.id;
   renderQuoteTabs();
@@ -12497,10 +12510,22 @@ function wsHandleFile(e) {
       // Restore quotes into session
       if (ws['_quotes'] && ws['_quotes'].length) {
         _quotes = ws['_quotes'];
+        // Advance _id past all IDs in imported quotes
+        let _maxId = 0;
+        for (const rq of _quotes) {
+          for (const s of (rq.sections || [])) {
+            if (s.id > _maxId) _maxId = s.id;
+            for (const p of (s.parents || [])) {
+              if (p.id > _maxId) _maxId = p.id;
+              for (const sub of (p.subitems || [])) { if (sub.id > _maxId) _maxId = sub.id; }
+            }
+          }
+        }
+        if (_maxId >= _id) _id = _maxId + 1;
         _activeQuoteId = _quotes[0].id;
         const aq = _quotes[0];
         if (aq.fields) _restoreFields(aq.fields);
-        if (aq.sections) { S.sections = aq.sections; fullRender(); }
+        if (aq.sections) { S.sections = JSON.parse(JSON.stringify(aq.sections)); fullRender(); }
         renderQuoteTabs();
         updateQuoteTabLabel();
       }
