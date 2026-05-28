@@ -954,6 +954,13 @@ html.dark .clientModal-inner,html.dark .jobModal-inner{background:var(--surface)
 .rev-tile-status{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--muted);flex-shrink:0}
 .rev-tile-open{padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:transparent;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;flex-shrink:0;font-family:inherit;transition:all .12s}
 .rev-tile-open:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.rev-tile-cb{width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:var(--accent)}
+.rev-tile.rev-tile-checked{border-color:#e03;background:rgba(220,50,50,.06)}
+.rev-batch-bar{display:none;align-items:center;gap:10px;padding:8px 20px;background:rgba(220,50,50,.07);border-bottom:1px solid rgba(220,50,50,.2);font-size:12px;font-weight:600;color:#e03}
+.rev-batch-bar.visible{display:flex}
+.rev-batch-del{padding:5px 14px;background:#e03;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.rev-batch-del:hover{background:#c00}
+.rev-batch-cancel{padding:5px 12px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit}
 .rev-notes-banner{background:var(--blue-bg,#e8f0ff);border:1.5px solid var(--blue-border,#b3d0ff);border-radius:8px;padding:10px 12px;margin-bottom:12px}
 .rev-notes-banner.rev-auto{background:rgba(255,159,10,.12);border-color:rgba(255,159,10,.5)}
 .rev-notes-banner.rev-auto .rev-notes-label{color:#ff9f0a}
@@ -2000,6 +2007,11 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 <!-- ── REVISIONS TAB ── -->
 <div id="page-revisions" class="tab-page" style="display:none">
   <div class="rev-page">
+    <div class="rev-batch-bar" id="rev-batch-bar">
+      <span id="rev-batch-count"></span>
+      <button class="rev-batch-del" onclick="deleteSelectedRevisions()">Delete selected</button>
+      <button class="rev-batch-cancel" onclick="clearRevSelections()">Cancel</button>
+    </div>
     <div class="rev-list" id="rev-list"></div>
   </div>
 </div>
@@ -3920,9 +3932,81 @@ function deleteRevision(qid) {
     const remaining = family.filter(x => x.id !== qid);
     loadQuoteState(remaining[0].id);
   }
+  if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(qid);
   _persistSession();
   renderQuoteTabs();
   updateRevLabel();
+  fullRender();
+  if (_activeTab === 'revisions') renderRevisions();
+}
+
+// ── Batch-delete revisions ────────────────────────────────────────────────────
+let _revSelections = new Set();
+
+function toggleRevSelection(qid, checked) {
+  if (checked) _revSelections.add(qid);
+  else _revSelections.delete(qid);
+  const tile = document.getElementById('rev-tile-' + qid);
+  if (tile) tile.classList.toggle('rev-tile-checked', checked);
+  _updateRevBatchBar();
+}
+
+function _updateRevBatchBar() {
+  const bar = document.getElementById('rev-batch-bar');
+  const cnt = document.getElementById('rev-batch-count');
+  if (!bar) return;
+  if (_revSelections.size === 0) {
+    bar.classList.remove('visible');
+  } else {
+    bar.classList.add('visible');
+    cnt.textContent = _revSelections.size + ' revision' + (_revSelections.size > 1 ? 's' : '') + ' selected';
+  }
+}
+
+function clearRevSelections() {
+  _revSelections.clear();
+  document.querySelectorAll('.rev-tile-cb').forEach(cb => { cb.checked = false; });
+  document.querySelectorAll('.rev-tile').forEach(t => t.classList.remove('rev-tile-checked'));
+  _updateRevBatchBar();
+}
+
+function deleteSelectedRevisions() {
+  if (_revSelections.size === 0) return;
+  const aq = _quotes.find(q => q.id === _activeQuoteId);
+  if (!aq) return;
+  const family = _getRevisionFamily(aq);
+
+  // Safety: prevent deleting all revisions
+  const remaining = family.filter(q => !_revSelections.has(q.id));
+  if (remaining.length === 0) {
+    showToast('Cannot delete all revisions — keep at least one', 2500);
+    return;
+  }
+
+  const names = family
+    .filter(q => _revSelections.has(q.id))
+    .map((q, _) => 'Rev ' + _revLetter(family.findIndex(x => x.id === q.id)))
+    .join(', ');
+  if (!confirm('Delete ' + names + '? This cannot be undone.')) return;
+
+  saveActiveQuoteState();
+
+  _revSelections.forEach(qid => {
+    if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(qid);
+    _quotes = _quotes.filter(x => x.id !== qid);
+  });
+
+  // If active quote was deleted, switch to first remaining
+  if (_revSelections.has(_activeQuoteId)) {
+    loadQuoteState(remaining[0].id);
+  }
+
+  _revSelections.clear();
+  _persistSession();
+  renderQuoteTabs();
+  updateRevLabel();
+  renderRevisions();
+  _updateRevBatchBar();
   fullRender();
 }
 
@@ -5001,6 +5085,8 @@ function createRevisionFromCurrentQuote() {
 
 function renderRevisions() {
   saveActiveQuoteState();
+  _revSelections.clear();
+  _updateRevBatchBar();
   const aq = _quotes.find(q => q.id === _activeQuoteId);
   if (!aq) return;
 
@@ -5021,7 +5107,8 @@ function renderRevisions() {
       changesText = changes.length ? changes.slice(0, 2).map(c => escHtml(c)).join(' · ') + (changes.length > 2 ? ' +' + (changes.length - 2) + ' more' : '') : 'No recorded changes';
     }
 
-    return `<div class="rev-tile${isActive ? ' rev-tile-active' : ''}" onclick="loadRevisionCard('${q.id}')">
+    return `<div class="rev-tile${isActive ? ' rev-tile-active' : ''}" id="rev-tile-${q.id}" onclick="loadRevisionCard('${q.id}')">
+      <input type="checkbox" class="rev-tile-cb" data-qid="${q.id}" onclick="event.stopPropagation();toggleRevSelection('${q.id}',this.checked)" title="Select for batch delete">
       <span class="rev-tile-badge${isActive ? ' rev-current' : ''}">Rev ${letter}</span>
       <span class="rev-tile-ref">${escHtml(q.fields?.quoteRef || '')}</span>
       <span class="rev-tile-date">${date}</span>
