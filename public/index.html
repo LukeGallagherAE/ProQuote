@@ -1459,6 +1459,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   <div class="topbar-right" style="display:flex;gap:8px;align-items:center;flex-shrink:0">
     <span id="save-status-chip" style="font-size:12px;color:var(--green,#34c759);opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap"></span>
     <button id="manual-save-btn" onclick="saveActiveQuoteState()" title="Save now" style="display:none;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit;transition:all .12s" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--border2)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">Save</button>
+    <button id="save-close-all-btn" onclick="saveAndCloseAllQuotes()" title="Save &amp; close all open quotes" style="display:none;font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .12s" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--border2)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">Save &amp; close all</button>
     <div id="topbar-quote-actions" style="display:none"></div>
   </div>
 </div>
@@ -2873,6 +2874,10 @@ function applyTemplate(sid, pid, template) {
   const p = getP(sid, pid);
   if (!p) return;
   p.name = template.name;
+  // Patch the DOM input immediately so fullRender()'s leading syncDOM()
+  // doesn't overwrite p.name with the stale typed value.
+  const nameInp = document.getElementById('pn-' + pid);
+  if (nameInp) nameInp.value = template.name;
   p.description = template.description || '';
   p.category = template.category || '';
   p.activeCats = { ...template.activeCats };
@@ -4321,6 +4326,29 @@ function cqwCloseOnly() {
 function cqwCancel() {
   document.getElementById('closeQuoteModal').style.display = 'none';
   _cqwTargetId = null;
+}
+
+function saveAndCloseAllQuotes() {
+  if (!_quotes.length) return;
+  if (!confirm('Save and close all ' + _quotes.length + ' open quote' + (_quotes.length > 1 ? 's' : '') + '?')) return;
+  saveActiveQuoteState();
+  // Save each quote to client book if it has a client name
+  _quotes.forEach(q => {
+    if (q.fields?.clientName) {
+      saveQuoteToClientBook({ ...q.fields, sections: q.sections || [],
+        _publishedAt: q._publishedAt || null, _emailSentAt: q._emailSentAt || null,
+        _approvedAt: q._approvedAt || null, _editedAfterPublish: q._editedAfterPublish || false
+      });
+    }
+    if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(q.id);
+  });
+  _quotes = [];
+  _activeQuoteId = null;
+  S.sections = [];
+  _persistSession();
+  renderQuoteTabs();
+  switchTab('dashboard');
+  showToast('All quotes saved and closed ✓');
 }
 
 function _streetFromAddress(addr) {
@@ -8622,6 +8650,8 @@ function switchTab(tab) {
   if (sidebarToggle) sidebarToggle.style.display = isQuote ? '' : 'none';
   const saveBtn = document.getElementById('manual-save-btn');
   if (saveBtn) saveBtn.style.display = isQuoteTool ? '' : 'none';
+  const saveCloseAllBtn = document.getElementById('save-close-all-btn');
+  if (saveCloseAllBtn) saveCloseAllBtn.style.display = (isQuoteTool && _quotes.length > 0) ? '' : 'none';
   // Restore correct margins based on sidebar preset (don't let CSS default 248px right-margin bleed in)
   if (mainEl) {
     const _sbl = _loadSbLayout();
