@@ -2399,13 +2399,16 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = 'Bearer ' + token;
-      await fetch('/api/storage', {
+      const res = await fetch('/api/storage', {
         method: 'PUT',
         headers,
         body: JSON.stringify(_ls),
       });
+      if (!res.ok) { console.error('[ProQuote] Storage flush HTTP error:', res.status); return false; }
+      return true;
     } catch (e) {
       console.warn('[ProQuote] Storage flush failed:', e);
+      return false;
     }
   }
 
@@ -2525,6 +2528,16 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       _loadFromNativeLS();
     }
   };
+
+  // Extra guarantee: mirror critical keys to native LS right before page unloads
+  // so native LS always has the latest data even if the async server flush is still in flight
+  window.addEventListener('beforeunload', function() {
+    try {
+      ['proquote_session_quotes', 'proquote_active_id', 'proquote_saved_at'].forEach(function(k) {
+        if (Object.prototype.hasOwnProperty.call(_ls, k)) window._nativeLS.setItem(k, _ls[k]);
+      });
+    } catch(e) {}
+  });
 })();
 </script>
 <script>
@@ -2653,9 +2666,12 @@ function saveActiveQuoteState() {
   q.sections = JSON.parse(JSON.stringify(S.sections));
   q.fields = _captureFields();
   _persistSession();
-  // Flush to server immediately (don't wait for the 1.5s debounce)
-  if (window._flushStorage) window._flushStorage();
-  setSaveStatus('saved');
+  // Flush to server — update chip when done; 'localonly' if server unreachable
+  if (window._flushStorage) {
+    window._flushStorage().then(ok => setSaveStatus(ok ? 'saved' : 'localonly'));
+  } else {
+    setSaveStatus('localonly');
+  }
   updatePublishBadge();
   // Auto-sync to client book whenever state is saved (keeps totals/profit current)
   if (q.fields?.clientName) {
@@ -2674,14 +2690,15 @@ function scheduleSave(delay) {
 }
 
 function _persistSession() {
+  let quotesJson;
+  try { quotesJson = JSON.stringify(_quotes); }
+  catch(e) { console.error('[ProQuote] quotes not serializable:', e); return; }
   try {
-    localStorage.setItem('proquote_session_quotes', JSON.stringify(_quotes));
+    localStorage.setItem('proquote_session_quotes', quotesJson);
     if (_activeQuoteId) localStorage.setItem('proquote_active_id', _activeQuoteId);
     localStorage.setItem('proquote_saved_at', Date.now().toString());
-    if (window._saveQuoteToServer) {
-      _quotes.forEach(q => window._saveQuoteToServer(q));
-    }
-  } catch(e) {}
+    if (window._saveQuoteToServer) { _quotes.forEach(q => window._saveQuoteToServer(q)); }
+  } catch(e) { console.error('[ProQuote] localStorage write failed:', e); }
 }
 
 function setSaveStatus(state) {
@@ -2690,8 +2707,14 @@ function setSaveStatus(state) {
   clearTimeout(window._saveStatusFade);
   if (state === 'saved') {
     el.textContent = 'Saved ✓';
+    el.style.color = 'var(--green, #34c759)';
     el.style.opacity = '1';
     window._saveStatusFade = setTimeout(() => { el.style.opacity = '0'; }, 2500);
+  } else if (state === 'localonly') {
+    el.textContent = 'Sync failed — reload at risk';
+    el.style.color = '#ff9f0a';
+    el.style.opacity = '1';
+    window._saveStatusFade = setTimeout(() => { el.style.opacity = '0'; }, 6000);
   }
 }
 
@@ -4047,6 +4070,7 @@ function _doCloseQuote(qid) {
   if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(qid);
   _quotes = _quotes.filter(q => q.id !== qid);
   if (!_quotes.length) {
+    _persistSession();
     renderQuoteTabs();
     switchTab('dashboard');
     return;
@@ -4054,6 +4078,7 @@ function _doCloseQuote(qid) {
   if (_activeQuoteId === qid) {
     loadQuoteState(_quotes[_quotes.length - 1].id);
   }
+  _persistSession();
   renderQuoteTabs();
 }
 
