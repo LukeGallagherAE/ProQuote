@@ -3912,7 +3912,7 @@ function renderQuoteTabs() {
     const wrap = document.createElement('div');
     wrap.className = 'quote-tab-wrap';
     wrap.innerHTML =
-      '<button class="quote-tab-main' + (isActive?' active':'') + '" onclick="switchToQuote(\'' + q.id + '\')" title="' + label + (q._emailSentAt ? ' · Email sent' : q._publishedAt ? ' · Published' : '') + (!q._publishedAt && q._plPricesUpdated ? ' · Prices updated' : '') + '">' + label + pubDot + emailDot + plDot + '</button>' +
+      '<button class="quote-tab-main' + (isActive?' active':'') + '" onclick="openRevPickerFromTab(event,\'' + q.id + '\')" title="' + label + (q._emailSentAt ? ' · Email sent' : q._publishedAt ? ' · Published' : '') + (!q._publishedAt && q._plPricesUpdated ? ' · Prices updated' : '') + '">' + label + pubDot + emailDot + plDot + '</button>' +
       '<button class="quote-tab-arrow' + (isActive?' active':'') + '" onclick="openQuoteTabDropdown(event,\'' + q.id + '\')" title="BOM & options">▾</button>';
 
     bar.insertBefore(wrap, addBtn);
@@ -4020,6 +4020,115 @@ function updateRevLabel() {
   lbl.textContent = 'Rev ' + (idx >= 0 ? _revLetter(idx) : 'A');
 }
 
+function _buildRevDropdown(family, anchorRect, ddId, activeQuoteId) {
+  const dd = document.createElement('div');
+  dd.id = ddId;
+  dd.style.cssText = 'position:fixed;top:'+(anchorRect.bottom+5)+'px;left:'+anchorRect.left+'px;min-width:270px;max-width:340px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);z-index:900;overflow:hidden';
+
+  // Rows with checkboxes
+  const list = document.createElement('div');
+  list.style.cssText = 'padding:4px 0';
+  family.forEach((q, i) => {
+    const isCurrent = q.id === activeQuoteId;
+    const letter = _revLetter(i);
+    const total = _calcQuoteTotal(q);
+    const status = q._approvedAt ? 'Approved' : q._emailSentAt ? 'Sent' : q._publishedAt ? 'Published' : 'Draft';
+    const statusColor = q._approvedAt ? '#30d158' : q._publishedAt ? '#007aff' : 'var(--muted)';
+
+    const row = document.createElement('div');
+    row.dataset.qid = q.id;
+    row.style.cssText = 'display:flex;align-items:center;gap:7px;padding:7px 10px;'+(isCurrent?'background:var(--blue-bg)':'');
+    row.onmouseover = () => { if (!row.classList.contains('_checked')) row.style.background = 'var(--surface2)'; };
+    row.onmouseout  = () => { if (!row.classList.contains('_checked')) row.style.background = isCurrent ? 'var(--blue-bg)' : ''; };
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.style.cssText = 'width:14px;height:14px;cursor:pointer;flex-shrink:0;accent-color:#e03';
+    cb.onclick = (ev) => {
+      ev.stopPropagation();
+      row.classList.toggle('_checked', cb.checked);
+      row.style.background = cb.checked ? 'rgba(220,50,50,.06)' : (isCurrent ? 'var(--blue-bg)' : '');
+      // Show/hide delete bar
+      const anyChecked = [...dd.querySelectorAll('input[type=checkbox]')].some(c => c.checked);
+      batchBar.style.display = anyChecked ? 'flex' : 'none';
+      if (anyChecked) {
+        const n = [...dd.querySelectorAll('input[type=checkbox]')].filter(c => c.checked).length;
+        batchCount.textContent = n + ' selected';
+      }
+    };
+
+    const badge = document.createElement('span');
+    badge.textContent = 'Rev ' + letter;
+    badge.style.cssText = 'font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;flex-shrink:0;'+(isCurrent?'background:var(--accent);color:#fff':'background:var(--surface2);color:var(--muted)');
+
+    const ref = document.createElement('span');
+    ref.textContent = q.fields?.quoteRef || '—';
+    ref.style.cssText = 'font-size:12px;font-weight:'+(isCurrent?'700':'500')+';color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer';
+    ref.onclick = (ev) => { ev.stopPropagation(); dd.remove(); loadRevisionCard(q.id); };
+
+    const amt = document.createElement('span');
+    amt.textContent = fmt(total);
+    amt.style.cssText = 'font-size:11px;font-weight:600;color:'+statusColor+';white-space:nowrap;flex-shrink:0';
+
+    const stat = document.createElement('span');
+    stat.textContent = status;
+    stat.style.cssText = 'font-size:10px;color:'+statusColor+';white-space:nowrap;flex-shrink:0';
+
+    row.append(cb, badge, ref, amt, stat);
+    // Clicking the row (not checkbox/ref) also opens the revision
+    row.onclick = (ev) => { if (ev.target !== cb) { dd.remove(); loadRevisionCard(q.id); } };
+    list.appendChild(row);
+  });
+
+  // Batch delete bar (hidden until a checkbox is ticked)
+  const batchBar = document.createElement('div');
+  const batchCount = document.createElement('span');
+  batchCount.style.cssText = 'flex:1;font-size:12px;font-weight:600;color:#e03';
+  const delBtn = document.createElement('button');
+  delBtn.textContent = 'Delete selected';
+  delBtn.style.cssText = 'padding:4px 12px;background:#e03;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit';
+  delBtn.onclick = (ev) => {
+    ev.stopPropagation();
+    const toDelete = [...dd.querySelectorAll('input[type=checkbox]')]
+      .filter(c => c.checked)
+      .map(c => c.closest('[data-qid]')?.dataset.qid)
+      .filter(Boolean);
+    if (!toDelete.length) return;
+    const remaining = family.filter(q => !toDelete.includes(q.id));
+    if (remaining.length === 0) { showToast('Cannot delete all revisions', 2000); return; }
+    const names = toDelete.map(id => { const i = family.findIndex(q=>q.id===id); return 'Rev '+_revLetter(i); }).join(', ');
+    if (!confirm('Delete ' + names + '? This cannot be undone.')) return;
+    dd.remove();
+    saveActiveQuoteState();
+    toDelete.forEach(qid => {
+      if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(qid);
+      _quotes = _quotes.filter(x => x.id !== qid);
+    });
+    if (toDelete.includes(_activeQuoteId)) loadQuoteState(remaining[0].id);
+    _persistSession();
+    renderQuoteTabs();
+    updateRevLabel();
+    renderRevisions();
+    fullRender();
+  };
+  batchBar.style.cssText = 'display:none;align-items:center;gap:8px;padding:6px 10px;border-top:1px solid rgba(220,50,50,.25);background:rgba(220,50,50,.05)';
+  batchBar.append(batchCount, delBtn);
+
+  // New revision button
+  const footer = document.createElement('div');
+  footer.style.cssText = 'border-top:1px solid var(--border);padding:6px 8px';
+  const newBtn = document.createElement('button');
+  newBtn.innerHTML = '<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink:0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> '+(family.length<=1?'Create first revision':'New revision');
+  newBtn.style.cssText = 'width:100%;padding:8px 12px;border-radius:7px;border:1.5px solid var(--border);background:transparent;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text);display:flex;align-items:center;gap:6px;transition:all .15s';
+  newBtn.onmouseover = () => { newBtn.style.background='var(--accent)'; newBtn.style.color='#fff'; newBtn.style.borderColor='var(--accent)'; };
+  newBtn.onmouseout  = () => { newBtn.style.background='transparent'; newBtn.style.color='var(--text)'; newBtn.style.borderColor='var(--border)'; };
+  newBtn.onclick = (ev) => { ev.stopPropagation(); dd.remove(); createRevisionFromCurrentQuote(); };
+  footer.appendChild(newBtn);
+
+  dd.append(list, batchBar, footer);
+  return dd;
+}
+
 function openRevDropdown(e) {
   e.stopPropagation();
   const existing = document.getElementById('qsub-rev-dd');
@@ -4029,34 +4138,25 @@ function openRevDropdown(e) {
   const family = _getRevisionFamily(aq);
   const wrap = document.getElementById('qsub-rev-wrap');
   const rect = (wrap || e.target).getBoundingClientRect();
-  const dd = document.createElement('div');
-  dd.id = 'qsub-rev-dd';
-  dd.style.cssText = 'position:fixed;top:'+(rect.bottom+5)+'px;left:'+rect.left+'px;min-width:260px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);z-index:900;overflow:hidden';
-  const canDelete = family.length > 1;
-  const rowHtml = family.map((q, i) => {
-    const isCurrent = q.id === _activeQuoteId;
-    const letter = _revLetter(i);
-    const total = _calcQuoteTotal(q);
-    const status = q._approvedAt ? 'Approved' : q._emailSentAt ? 'Sent' : q._publishedAt ? 'Published' : 'Draft';
-    const statusColor = q._approvedAt ? '#30d158' : q._publishedAt ? '#007aff' : 'var(--muted)';
-    return '<div style="display:flex;align-items:center;gap:7px;padding:7px 8px 7px 10px;'+(isCurrent?'background:var(--blue-bg)':'')+';" '
-      + 'onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\''+(isCurrent?'var(--blue-bg)':'')+'\';">'
-      + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;flex-shrink:0;cursor:'+(isCurrent?'default':'pointer')+';'+(isCurrent?'background:var(--accent);color:#fff':'background:var(--surface2);color:var(--muted)')+'" '+(isCurrent?'':' onclick="loadRevisionCard(\''+q.id+'\');document.getElementById(\'qsub-rev-dd\')?.remove()"')+'>Rev '+letter+'</span>'
-      + '<span style="font-size:12px;font-weight:'+(isCurrent?'700':'500')+';color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:'+(isCurrent?'default':'pointer')+'" '+(isCurrent?'':' onclick="loadRevisionCard(\''+q.id+'\');document.getElementById(\'qsub-rev-dd\')?.remove()"')+'>'+escHtml(q.fields?.quoteRef||'—')+'</span>'
-      + '<span style="font-size:11px;font-weight:600;color:'+statusColor+';white-space:nowrap;flex-shrink:0">'+fmt(total)+'</span>'
-      + '<span style="font-size:10px;color:'+statusColor+';white-space:nowrap;flex-shrink:0">'+escHtml(status)+'</span>'
-      + (canDelete ? '<button onclick="event.stopPropagation();document.getElementById(\'qsub-rev-dd\')?.remove();deleteRevision(\''+q.id+'\')" title="Delete this revision" style="flex-shrink:0;width:18px;height:18px;border-radius:4px;border:none;background:transparent;color:var(--muted);font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-family:inherit" onmouseover="this.style.background=\'rgba(220,50,50,.1)\';this.style.color=\'#e03\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--muted)\'">×</button>' : '')
-      + '</div>';
-  }).join('');
-  dd.innerHTML = '<div style="padding:4px 0">'+(rowHtml||'')+'</div>'
-    +'<div style="border-top:1px solid var(--border);padding:6px 8px">'
-    +'<button onclick="createRevisionFromCurrentQuote();document.getElementById(\'qsub-rev-dd\')?.remove()" '
-    +'style="width:100%;padding:8px 12px;border-radius:7px;border:1.5px solid var(--border);background:transparent;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text);transition:all .15s;text-align:left;display:flex;align-items:center;gap:6px" '
-    +'onmouseover="this.style.background=\'var(--accent)\';this.style.color=\'#fff\';this.style.borderColor=\'var(--accent)\'" '
-    +'onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--text)\';this.style.borderColor=\'var(--border)\'">'
-    +'<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
-    +(family.length <= 1 ? 'Create first revision' : 'New revision')
-    +'</button></div>';
+  const dd = _buildRevDropdown(family, rect, 'qsub-rev-dd', _activeQuoteId);
+  document.body.appendChild(dd);
+  setTimeout(() => document.addEventListener('click', () => dd.remove(), {once:true}), 10);
+}
+
+function openRevPickerFromTab(e, qid) {
+  e.stopPropagation();
+  // Close any open tab-rev picker
+  document.querySelectorAll('.tab-rev-picker').forEach(d => d.remove());
+  const rootQ = _quotes.find(q => q.id === qid);
+  if (!rootQ) return;
+  const family = _getRevisionFamily(rootQ);
+  // If only one revision (no actual revisions yet), just switch directly
+  if (family.length <= 1) { switchToQuote(qid); return; }
+  const btn = e.currentTarget || e.target;
+  const rect = btn.getBoundingClientRect();
+  const dd = _buildRevDropdown(family, rect, '', _activeQuoteId);
+  dd.classList.add('tab-rev-picker');
+  dd.id = 'tab-rev-picker-' + qid;
   document.body.appendChild(dd);
   setTimeout(() => document.addEventListener('click', () => dd.remove(), {once:true}), 10);
 }
