@@ -2396,9 +2396,11 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 
   async function _flushStorage() {
     const token = getToken();
+    if (!token) return true; // not authenticated — skip silently
+    // Cancel any pending debounced flush (we're running now)
+    if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null; }
     try {
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = 'Bearer ' + token;
+      const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
       const res = await fetch('/api/storage', {
         method: 'PUT',
         headers,
@@ -2413,28 +2415,28 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   }
 
   function _markDirty() {
+    if (!getToken()) return; // don't schedule flush when not logged in
     if (_flushTimer) clearTimeout(_flushTimer);
     _flushTimer = setTimeout(_flushStorage, 1500);
   }
+
+  async function _putQuote(quote) {
+    if (!quote || !quote.id) return;
+    const token = getToken();
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      await fetch('/api/quotes/' + quote.id, { method: 'PUT', headers, body: JSON.stringify(quote) });
+    } catch (e) { console.warn('[ProQuote] Quote save failed:', e); }
+  }
+
+  window._flushQuoteNow = function(quote) { return _putQuote(quote); };
 
   window._saveQuoteToServer = function (quote) {
     if (!quote || !quote.id) return;
     const id = quote.id;
     if (_quoteSaveTimers[id]) clearTimeout(_quoteSaveTimers[id]);
-    _quoteSaveTimers[id] = setTimeout(async () => {
-      const token = getToken();
-      try {
-        const headers = { 'Content-Type': 'application/json' };
-        if (token) headers['Authorization'] = 'Bearer ' + token;
-        await fetch('/api/quotes/' + id, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify(quote),
-        });
-      } catch (e) {
-        console.warn('[ProQuote] Quote save failed:', e);
-      }
-    }, 1500);
+    _quoteSaveTimers[id] = setTimeout(() => _putQuote(quote), 1500);
   };
 
   window._deleteQuoteFromServer = async function (id) {
@@ -2490,32 +2492,45 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 
   window._initStorage = async function () {
     const token = getToken();
-    if (!token) {
-      // No auth — restore from native localStorage so data survives reloads offline
-      _loadFromNativeLS();
-      return;
-    }
+    if (!token) { _loadFromNativeLS(); return; }
     try {
-      const res = await fetch('/api/storage', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
-      if (res.status === 401) {
-        window._nativeClearToken();
-        return; // token expired — login screen will show
-      }
-      if (!res.ok) {
-        // Server error — fall back to native localStorage so local data isn't lost
+      // Fetch settings metadata and individual quotes in parallel
+      const [settingsRes, quotesRes] = await Promise.all([
+        fetch('/api/storage', { headers: { 'Authorization': 'Bearer ' + token } }),
+        fetch('/api/quotes',  { headers: { 'Authorization': 'Bearer ' + token } }),
+      ]);
+
+      if (settingsRes.status === 401) { window._nativeClearToken(); return; }
+
+      // Load settings (colors, templates, active_id, etc.)
+      if (settingsRes.ok) {
+        const data = await settingsRes.json();
+        Object.assign(_ls, data);
+      } else {
         _loadFromNativeLS();
-        return;
       }
-      const data = await res.json();
-      // Server data wins by default
-      Object.assign(_ls, data);
-      // But if native localStorage was saved MORE RECENTLY than server, use native
-      // quotes (handles the case where server flush failed or was still in flight)
+
+      // Primary quotes source: /api/quotes (individual rows, survives blob failures)
+      if (quotesRes.ok) {
+        const qRows = await quotesRes.json();
+        if (Array.isArray(qRows) && qRows.length > 0) {
+          const quotes = qRows.map(r => {
+            try { return typeof r.data === 'string' ? JSON.parse(r.data) : r.data; } catch(e) { return null; }
+          }).filter(Boolean);
+          if (quotes.length > 0) {
+            _ls['proquote_session_quotes'] = JSON.stringify(quotes);
+            // Validate active ID still exists
+            const aid = _ls['proquote_active_id'];
+            if (!quotes.find(q => q.id === aid)) _ls['proquote_active_id'] = quotes[quotes.length - 1].id;
+            return;
+          }
+        }
+      }
+
+      // Quotes table empty or failed — fall back to settings blob with native LS comparison
       try {
         const nativeSavedAt = parseInt(window._nativeLS.getItem('proquote_saved_at') || '0');
-        const serverSavedAt = parseInt(data['proquote_saved_at'] || '0');
+        const serverSavedAt = parseInt(_ls['proquote_saved_at'] || '0');
         if (nativeSavedAt > serverSavedAt) {
           const nq = window._nativeLS.getItem('proquote_session_quotes');
           if (nq) _ls['proquote_session_quotes'] = nq;
@@ -2531,6 +2546,14 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 
   // Extra guarantee: mirror critical keys to native LS right before page unloads
   // so native LS always has the latest data even if the async server flush is still in flight
+  // Cancel a specific quote's pending debounced save (used after an immediate _flushQuoteNow)
+  window._cancelQuoteSaveTimer = function(quoteId) {
+    if (quoteId && _quoteSaveTimers[quoteId]) {
+      clearTimeout(_quoteSaveTimers[quoteId]);
+      delete _quoteSaveTimers[quoteId];
+    }
+  };
+
   window.addEventListener('beforeunload', function() {
     try {
       ['proquote_session_quotes', 'proquote_active_id', 'proquote_saved_at'].forEach(function(k) {
@@ -2666,7 +2689,11 @@ function saveActiveQuoteState() {
   q.sections = JSON.parse(JSON.stringify(S.sections));
   q.fields = _captureFields();
   _persistSession();
-  // Flush to server — update chip when done; 'localonly' if server unreachable
+  // Immediately save the active quote to /api/quotes (no debounce) so
+  // reload always finds it even if the settings blob flush is still in flight
+  if (window._flushQuoteNow) window._flushQuoteNow(q);
+  if (window._cancelQuoteSaveTimer) window._cancelQuoteSaveTimer(q.id);
+  // Flush settings blob — this also cancels any pending _markDirty timer.
   if (window._flushStorage) {
     window._flushStorage().then(ok => setSaveStatus(ok ? 'saved' : 'localonly'));
   } else {
