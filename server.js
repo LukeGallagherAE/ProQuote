@@ -125,8 +125,29 @@ async function migrateAuth() {
   }
 }
 
+// Optional: upsert a user from env vars — useful for account recovery.
+// Set SEED_USERNAME + SEED_PASSWORD in Railway env, redeploy once, then remove them.
+async function seedUser() {
+  const seedUser = process.env.SEED_USERNAME;
+  const seedPass = process.env.SEED_PASSWORD;
+  if (!seedUser || !seedPass) return;
+  try {
+    const hash = await bcrypt.hash(seedPass, 12);
+    await db.query(
+      `INSERT INTO users (username, password_hash, biz_name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (username) DO UPDATE
+         SET password_hash = EXCLUDED.password_hash`,
+      [seedUser, hash, seedUser]
+    );
+    console.log(`[ProQuote] Seeded/updated user "${seedUser}" from SEED_USERNAME env var.`);
+  } catch (err) {
+    console.error('[ProQuote] seedUser failed:', err);
+  }
+}
+
 // Run migration then start listening
-migrateAuth().then(() => {
+migrateAuth().then(() => seedUser()).then(() => {
   app.listen(PORT, () => {
     console.log(`ProQuote 2.1 running at http://localhost:${PORT}`);
   });

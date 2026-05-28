@@ -26,15 +26,20 @@ router.get('/status', async (req, res) => {
   }
 });
 
-// POST /api/auth/login
+// POST /api/auth/login — accepts username OR email (biz_name field)
 router.post('/login', async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
   try {
+    // Match by username, or by email stored in biz_name, or case-insensitively
     const { rows } = await db.query(
-      'SELECT id, username, password_hash, biz_name FROM users WHERE username = $1',
+      `SELECT id, username, password_hash, biz_name FROM users
+       WHERE username = $1
+          OR lower(username) = lower($1)
+          OR lower(biz_name) = lower($1)
+       LIMIT 1`,
       [username]
     );
     if (!rows.length) return res.status(401).json({ error: 'Invalid credentials' });
