@@ -2506,9 +2506,19 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         return;
       }
       const data = await res.json();
-      // Server data wins, but seed any keys the server doesn't have from native LS
+      // Load native LS first, then let server data win key-by-key
+      // EXCEPT proquote_session_quotes: pick whichever has more quotes (local save
+      // may be ahead of server if flush hadn't fired before last reload)
       _loadFromNativeLS();
+      const nativeQuotes = _ls['proquote_session_quotes'];
       Object.assign(_ls, data);
+      if (nativeQuotes && data['proquote_session_quotes']) {
+        try {
+          const nq = JSON.parse(nativeQuotes);
+          const sq = JSON.parse(data['proquote_session_quotes']);
+          if (nq.length > sq.length) _ls['proquote_session_quotes'] = nativeQuotes;
+        } catch(e) {}
+      }
     } catch (e) {
       console.warn('[ProQuote] _initStorage failed:', e);
       _loadFromNativeLS();
@@ -2642,6 +2652,8 @@ function saveActiveQuoteState() {
   q.sections = JSON.parse(JSON.stringify(S.sections));
   q.fields = _captureFields();
   _persistSession();
+  // Flush to server immediately (don't wait for the 1.5s debounce)
+  if (window._flushStorage) window._flushStorage();
   setSaveStatus('saved');
   updatePublishBadge();
   // Auto-sync to client book whenever state is saved (keeps totals/profit current)
@@ -2653,7 +2665,6 @@ function saveActiveQuoteState() {
       _editedAfterPublish: q._editedAfterPublish || false
     });
   }
-  setSaveStatus('saved');
 }
 
 function scheduleSave(delay) {
