@@ -2456,9 +2456,20 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         return;
       }
       const data = await res.json();
-      // Server data wins, but seed any keys the server doesn't have from native LS
-      _loadFromNativeLS();
+      // Server data wins by default
       Object.assign(_ls, data);
+      // But if native localStorage was saved MORE RECENTLY than server, use native
+      // quotes (handles the case where server flush failed or was still in flight)
+      try {
+        const nativeSavedAt = parseInt(window._nativeLS.getItem('proquote_saved_at') || '0');
+        const serverSavedAt = parseInt(data['proquote_saved_at'] || '0');
+        if (nativeSavedAt > serverSavedAt) {
+          const nq = window._nativeLS.getItem('proquote_session_quotes');
+          if (nq) _ls['proquote_session_quotes'] = nq;
+          const na = window._nativeLS.getItem('proquote_active_id');
+          if (na) _ls['proquote_active_id'] = na;
+        }
+      } catch(e) {}
     } catch (e) {
       console.warn('[ProQuote] _initStorage failed:', e);
       _loadFromNativeLS();
@@ -2600,6 +2611,7 @@ function _persistSession() {
   try {
     localStorage.setItem('proquote_session_quotes', JSON.stringify(_quotes));
     if (_activeQuoteId) localStorage.setItem('proquote_active_id', _activeQuoteId);
+    localStorage.setItem('proquote_saved_at', Date.now().toString());
     if (window._saveQuoteToServer) {
       _quotes.forEach(q => window._saveQuoteToServer(q));
     }
