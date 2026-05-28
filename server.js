@@ -60,6 +60,7 @@ async function migrateAuth() {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_settings_user ON settings(user_id)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_quotes_user   ON quotes(user_id)`);
 
+
     // 2. Check if users table is empty
     const { rows: countRows } = await db.query('SELECT COUNT(*)::int AS count FROM users');
     if (countRows[0].count > 0) {

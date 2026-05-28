@@ -32,14 +32,14 @@ router.put('/', async (req, res) => {
     const vals   = entries.map(([, v]) => (typeof v === 'string' ? v : JSON.stringify(v)));
     const userId = req.user.userId;
 
-    // Batch upsert — include user_id in insert, conflict on (key, user_id)
-    // Since key is currently the PRIMARY KEY we do individual upserts to support user scoping
+    // Batch upsert — conflict on key (original PK). user_id is also updated
+    // so rows are correctly owned after a schema migration.
     for (let i = 0; i < keys.length; i++) {
       await db.query(
         `INSERT INTO settings (key, value, user_id, updated_at)
          VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (key, user_id) DO UPDATE
-           SET value = EXCLUDED.value, updated_at = NOW()`,
+         ON CONFLICT (key) DO UPDATE
+           SET value = EXCLUDED.value, user_id = EXCLUDED.user_id, updated_at = NOW()`,
         [keys[i], vals[i], userId]
       );
     }
