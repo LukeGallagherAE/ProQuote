@@ -1441,6 +1441,8 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   <!-- quote label + badge + publish — right -->
   <span id="qsub-label" style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;font-family:inherit;margin-right:10px;"></span>
   <span id="publish-badge" style="display:none;font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap;letter-spacing:.3px;cursor:default;margin-right:6px;"></span>
+  <span id="save-status-chip" style="font-size:11px;font-weight:600;color:var(--green,#34c759);opacity:0;transition:opacity .3s;margin-right:6px;"></span>
+  <button onclick="saveActiveQuoteState()" title="Save now" style="padding:4px 11px;background:none;color:var(--muted);border:1px solid var(--border);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;margin-right:6px;font-family:inherit">Save</button>
   <button class="btn btn-secondary btn-sm" id="pdf-btn" onclick="openModal()">📤 Publish</button>
   <button onclick="openWizard()" title="New Quote" style="display:flex;align-items:center;gap:5px;padding:4px 11px;background:#007aff;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;margin-left:6px;font-family:inherit">
     <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -2570,6 +2572,7 @@ function saveActiveQuoteState() {
   q.sections = JSON.parse(JSON.stringify(S.sections));
   q.fields = _captureFields();
   _persistSession();
+  setSaveStatus('saved');
   updatePublishBadge();
   // Auto-sync to client book whenever state is saved (keeps totals/profit current)
   if (q.fields?.clientName) {
@@ -2585,10 +2588,22 @@ function saveActiveQuoteState() {
 function _persistSession() {
   try {
     localStorage.setItem('proquote_session_quotes', JSON.stringify(_quotes));
+    if (_activeQuoteId) localStorage.setItem('proquote_active_id', _activeQuoteId);
     if (window._saveQuoteToServer) {
       _quotes.forEach(q => window._saveQuoteToServer(q));
     }
   } catch(e) {}
+}
+
+function setSaveStatus(state) {
+  const el = document.getElementById('save-status-chip');
+  if (!el) return;
+  clearTimeout(window._saveStatusFade);
+  if (state === 'saved') {
+    el.textContent = 'Saved ✓';
+    el.style.opacity = '1';
+    window._saveStatusFade = setTimeout(() => { el.style.opacity = '0'; }, 2500);
+  }
 }
 
 function loadQuoteState(id) {
@@ -11863,9 +11878,11 @@ function init(){
       const restored = JSON.parse(_sqRaw);
       if (restored && restored.length) {
         _quotes = restored;
-        _activeQuoteId = restored[0].id;
+        const _savedId = localStorage.getItem('proquote_active_id');
+        const _savedQ = _savedId && restored.find(q => q.id === _savedId);
+        _activeQuoteId = _savedQ ? _savedId : restored[0].id;
         // Restore fields + sections from active quote
-        const aq = restored[0];
+        const aq = _savedQ || restored[0];
         if (aq.fields) Object.entries(aq.fields).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val||''; });
         if (aq.sections) { S.sections = aq.sections; fullRender(); }
         renderQuoteTabs();
