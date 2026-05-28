@@ -2396,9 +2396,11 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 
   async function _flushStorage() {
     const token = getToken();
+    if (!token) return true; // not authenticated — skip silently
+    // Cancel any pending debounced flush (we're running now)
+    if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null; }
     try {
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = 'Bearer ' + token;
+      const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
       const res = await fetch('/api/storage', {
         method: 'PUT',
         headers,
@@ -2413,6 +2415,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   }
 
   function _markDirty() {
+    if (!getToken()) return; // don't schedule flush when not logged in
     if (_flushTimer) clearTimeout(_flushTimer);
     _flushTimer = setTimeout(_flushStorage, 1500);
   }
@@ -2543,6 +2546,14 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 
   // Extra guarantee: mirror critical keys to native LS right before page unloads
   // so native LS always has the latest data even if the async server flush is still in flight
+  // Cancel a specific quote's pending debounced save (used after an immediate _flushQuoteNow)
+  window._cancelQuoteSaveTimer = function(quoteId) {
+    if (quoteId && _quoteSaveTimers[quoteId]) {
+      clearTimeout(_quoteSaveTimers[quoteId]);
+      delete _quoteSaveTimers[quoteId];
+    }
+  };
+
   window.addEventListener('beforeunload', function() {
     try {
       ['proquote_session_quotes', 'proquote_active_id', 'proquote_saved_at'].forEach(function(k) {
@@ -2681,7 +2692,8 @@ function saveActiveQuoteState() {
   // Immediately save the active quote to /api/quotes (no debounce) so
   // reload always finds it even if the settings blob flush is still in flight
   if (window._flushQuoteNow) window._flushQuoteNow(q);
-  // Flush settings blob — update chip when done
+  if (window._cancelQuoteSaveTimer) window._cancelQuoteSaveTimer(q.id);
+  // Flush settings blob — this also cancels any pending _markDirty timer.
   if (window._flushStorage) {
     window._flushStorage().then(ok => setSaveStatus(ok ? 'saved' : 'localonly'));
   } else {
