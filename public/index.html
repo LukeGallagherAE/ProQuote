@@ -2506,19 +2506,20 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         return;
       }
       const data = await res.json();
-      // Load native LS first, then let server data win key-by-key
-      // EXCEPT proquote_session_quotes: pick whichever has more quotes (local save
-      // may be ahead of server if flush hadn't fired before last reload)
-      _loadFromNativeLS();
-      const nativeQuotes = _ls['proquote_session_quotes'];
+      // Server data wins by default
       Object.assign(_ls, data);
-      if (nativeQuotes && data['proquote_session_quotes']) {
-        try {
-          const nq = JSON.parse(nativeQuotes);
-          const sq = JSON.parse(data['proquote_session_quotes']);
-          if (nq.length > sq.length) _ls['proquote_session_quotes'] = nativeQuotes;
-        } catch(e) {}
-      }
+      // But if native localStorage was saved MORE RECENTLY than server, use native
+      // quotes (handles the case where server flush failed or was still in flight)
+      try {
+        const nativeSavedAt = parseInt(window._nativeLS.getItem('proquote_saved_at') || '0');
+        const serverSavedAt = parseInt(data['proquote_saved_at'] || '0');
+        if (nativeSavedAt > serverSavedAt) {
+          const nq = window._nativeLS.getItem('proquote_session_quotes');
+          if (nq) _ls['proquote_session_quotes'] = nq;
+          const na = window._nativeLS.getItem('proquote_active_id');
+          if (na) _ls['proquote_active_id'] = na;
+        }
+      } catch(e) {}
     } catch (e) {
       console.warn('[ProQuote] _initStorage failed:', e);
       _loadFromNativeLS();
@@ -2676,6 +2677,7 @@ function _persistSession() {
   try {
     localStorage.setItem('proquote_session_quotes', JSON.stringify(_quotes));
     if (_activeQuoteId) localStorage.setItem('proquote_active_id', _activeQuoteId);
+    localStorage.setItem('proquote_saved_at', Date.now().toString());
     if (window._saveQuoteToServer) {
       _quotes.forEach(q => window._saveQuoteToServer(q));
     }
