@@ -3997,6 +3997,14 @@ function renderQuoteTabs() {
     // Mark active if this IS the active quote, or if active quote is a revision under this root
     const isActive = q.id === _activeQuoteId || _revBaseName(q.fields?.quoteRef || '') === _activeBaseRef;
 
+    // If a revision of this quote is currently active, show a "Rev X" badge on the tab
+    let revBadge = '';
+    if (isActive && _aqForTabs && _aqForTabs.id !== q.id) {
+      const _fam = _getRevisionFamily(q);
+      const _ri  = _fam.findIndex(m => m.id === _activeQuoteId);
+      if (_ri > 0) revBadge = ' <span style="font-size:9px;font-weight:800;padding:1px 5px;border-radius:5px;background:var(--accent);color:#fff;letter-spacing:.3px;vertical-align:middle">Rev '+_revLetter(_ri)+'</span>';
+    }
+
     const _pdotEdited = q._editedAfterPublish;
     const _pdotColor = _pdotEdited ? '#ff3b30' : '#30d158';
     const _pdotTitle = q._publishedAt ? (_pdotEdited ? 'Edited after publish' : 'Published ' + new Date(q._publishedAt).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) + ' ' + new Date(q._publishedAt).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})) : '';
@@ -4008,7 +4016,7 @@ function renderQuoteTabs() {
     const wrap = document.createElement('div');
     wrap.className = 'quote-tab-wrap';
     wrap.innerHTML =
-      '<button class="quote-tab-main' + (isActive?' active':'') + '" onclick="openRevPickerFromTab(event,\'' + q.id + '\')" title="' + label + (q._emailSentAt ? ' · Email sent' : q._publishedAt ? ' · Published' : '') + (!q._publishedAt && q._plPricesUpdated ? ' · Prices updated' : '') + '">' + label + pubDot + emailDot + plDot + lockDot + '</button>' +
+      '<button class="quote-tab-main' + (isActive?' active':'') + '" onclick="openRevPickerFromTab(event,\'' + q.id + '\')" title="' + label + (q._emailSentAt ? ' · Email sent' : q._publishedAt ? ' · Published' : '') + (!q._publishedAt && q._plPricesUpdated ? ' · Prices updated' : '') + '">' + label + revBadge + pubDot + emailDot + plDot + lockDot + '</button>' +
       '<button class="quote-tab-arrow' + (isActive?' active':'') + '" onclick="openQuoteTabDropdown(event,\'' + q.id + '\')" title="BOM & options">▾</button>';
 
     bar.insertBefore(wrap, addBtn);
@@ -4119,11 +4127,11 @@ function updateRevLabel() {
 function _buildRevDropdown(family, anchorRect, ddId, activeQuoteId) {
   const dd = document.createElement('div');
   dd.id = ddId;
-  dd.style.cssText = 'position:fixed;top:'+(anchorRect.bottom+5)+'px;left:'+anchorRect.left+'px;min-width:270px;max-width:340px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);z-index:900;overflow:hidden';
+  dd.style.cssText = 'position:fixed;top:'+(anchorRect.bottom+5)+'px;left:'+anchorRect.left+'px;min-width:270px;max-width:340px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);z-index:900;overflow:hidden;max-height:70vh;display:flex;flex-direction:column';
 
   // Rows with checkboxes
   const list = document.createElement('div');
-  list.style.cssText = 'padding:4px 0';
+  list.style.cssText = 'padding:4px 0;overflow-y:auto;flex:1;overscroll-behavior:contain';
   family.forEach((q, i) => {
     const isCurrent = q.id === activeQuoteId;
     const letter = _revLetter(i);
