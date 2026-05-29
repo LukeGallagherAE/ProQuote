@@ -6095,10 +6095,10 @@ function saveQuote(){
 }
 
 function saveQuoteToClientBook(d) {
-  // Revisions always save under the root quote ref so they don't create extra rows
-  const baseRef = _revBaseName(d.quoteRef || '');
-  const storeRef = baseRef || d.quoteRef || '';
-  const storeData = { ...d, quoteRef: storeRef };
+  // Store each revision under its full quoteRef so revisions appear as separate entries
+  const storeRef = d.quoteRef || '';
+  if (!storeRef) return;
+  const storeData = { ...d };
 
   const clients = loadClients();
   let client = clients.find(c => c.name.toLowerCase() === (storeData.clientName||'').toLowerCase());
@@ -10159,6 +10159,10 @@ function loadJobQuote(client, jobIdx, quoteIdx) {
   if (q._publishedAt) nq._publishedAt = q._publishedAt;
   if (q._emailSentAt) nq._emailSentAt = q._emailSentAt;
   if (q._approvedAt) nq._approvedAt = q._approvedAt;
+  if (q._locked) nq._locked = q._locked;
+  // Restore _parentRef so revision system works correctly for reopened revisions
+  const _openedBaseRef = _revBaseName(fields.quoteRef || '');
+  if (_openedBaseRef && _openedBaseRef !== (fields.quoteRef || '')) nq._parentRef = _openedBaseRef;
   _quotes.push(nq);
   _activeQuoteId = nq.id;
   _restoreFields(fields);
@@ -10534,17 +10538,27 @@ function renderQuotesAll() {
   else if (sort === 'client') rows.sort((a,b) => a.clientName.localeCompare(b.clientName));
   else if (sort === 'value') rows.sort((a,b) => b.total - a.total);
 
-  // Deduplicate: group revisions under a single row per base ref within same client+job
-  const _seenKeys = {};
-  rows = rows.filter(r => {
-    const baseRef = _revBaseName(r.ref);
-    const key = r.clientIdx + ':' + r.jobIdx + ':' + (baseRef || r.ref);
-    if (_seenKeys[key]) return false;
-    _seenKeys[key] = true;
-    return true;
-  });
+  // Sort revisions so they appear immediately after their base quote (grouped by family)
+  if (sort === 'recent' || sort === 'pending') {
+    // Group by family: sort base quotes by saved desc, then place each family's revisions after it
+    const _baseOrder = {};
+    rows.forEach(r => {
+      const bRef = _revBaseName(r.ref) || r.ref;
+      if (!_baseOrder[bRef] || r.saved > _baseOrder[bRef]) _baseOrder[bRef] = r.saved;
+    });
+    rows.sort((a, b) => {
+      const aBase = _revBaseName(a.ref) || a.ref;
+      const bBase = _revBaseName(b.ref) || b.ref;
+      const byFamily = (_baseOrder[bBase] || 0) - (_baseOrder[aBase] || 0);
+      if (byFamily !== 0) return byFamily;
+      // Same family — sort by createdAt asc so Rev A first
+      return (a.createdAt || 0) - (b.createdAt || 0);
+    });
+  }
 
-  countEl.textContent = rows.length + ' quote' + (rows.length !== 1 ? 's' : '');
+  // Count unique quote families (not raw rows) for the header
+  const _famCount = new Set(rows.map(r => (r.clientIdx + ':' + r.jobIdx + ':' + (_revBaseName(r.ref) || r.ref)))).size;
+  countEl.textContent = _famCount + ' quote' + (_famCount !== 1 ? 's' : '') + (rows.length > _famCount ? ' (' + rows.length + ' versions)' : '');
 
   if (!rows.length) {
     el.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">📋</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No quotes yet</div><div style="font-size:13px">Quotes auto-save once you fill in the client name and start adding items.</div></div>';
@@ -10582,18 +10596,10 @@ function renderQuotesAll() {
     '</tr></thead><tbody>' +
     rows.map((r, i) => {
       const baseRef = _revBaseName(r.ref) || r.ref;
-      const family = _getInMemFamily(baseRef);
-      const hasRevs = family.length > 1;
-
-      // Rev selector — shown when multiple revisions are loaded in memory
-      let revSelHtml = '';
-      if (hasRevs) {
-        const curSelId = window._qaRevSel[i] || family[family.length - 1]?.id || '';
-        const opts = family.map((fq, fi) =>
-          '<option value="' + fq.id + '"' + (fq.id === curSelId ? ' selected' : '') + '>Rev ' + _revLetter(fi) + '</option>'
-        ).join('');
-        revSelHtml = '<select onchange="window._qaRevSel[' + i + ']=this.value" onclick="event.stopPropagation()" style="font-size:10px;padding:1px 4px;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:inherit;margin-left:7px;cursor:pointer;vertical-align:middle">' + opts + '</select>';
-      }
+      // Determine if this row is a revision (has " Rev X" suffix)
+      const isRevision = baseRef !== r.ref;
+      // Count siblings in same family from client book
+      const revSelHtml = '';
 
       const ss = STATUS_STYLES[r.status] || STATUS_STYLES.draft;
       const statusDot = '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:'+ss.color+'"><span style="width:7px;height:7px;border-radius:50%;background:'+ss.color+';display:inline-block"></span>'+ss.label+'</span>';
@@ -10609,10 +10615,15 @@ function renderQuotesAll() {
           '<button class="btn btn-secondary btn-sm" onclick="deleteStoredQuote('+r.clientIdx+','+r.jobIdx+','+r.quoteIdx+',\''+esc(r.ref)+'\')" style="color:#ff3b30" title="Delete quote">✕</button>' +
         '</td>';
       const rowClick = _qaSelectMode ? 'onclick="qaToggleRow(\''+rowKey+'\')"' : 'onclick="openQuoteFromAll('+i+')"';
-      const rowBg = isSelected ? 'background:var(--blue-bg)' : '';
-      return '<tr style="border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer;'+rowBg+'" '+rowClick+' onmouseover="this.style.background=\''+(isSelected?'var(--blue-bg)':'var(--surface2)')+'\';" onmouseout="this.style.background=\''+(isSelected?'var(--blue-bg)':'')+'\';">' +
+      const rowBg = isSelected ? 'background:var(--blue-bg)' : (isRevision ? 'background:var(--surface2)' : '');
+      // Show full ref for revisions, base ref for originals; add revision badge for revisions
+      const revSuffix = isRevision ? r.ref.slice(baseRef.length).trim() : '';
+      const refCell = isRevision
+        ? '<span style="color:var(--muted);font-weight:400">↳ </span>' + esc(baseRef) + ' <span style="font-size:11px;font-weight:600;color:var(--accent);background:rgba(0,122,255,.12);padding:1px 6px;border-radius:4px">' + esc(revSuffix) + '</span>'
+        : esc(r.ref);
+      return '<tr style="border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer;'+rowBg+'" '+rowClick+' onmouseover="this.style.background=\''+(isSelected?'var(--blue-bg)':isRevision?'var(--surface2)':'var(--surface2)')+'\';" onmouseout="this.style.background=\''+(isSelected?'var(--blue-bg)':isRevision?'var(--surface2)':'')+'\';">' +
         cbCell +
-        '<td style="padding:12px 16px;font-size:13px;font-weight:700;font-family:monospace">' + esc(baseRef) + revSelHtml + '</td>' +
+        '<td style="padding:12px 16px;font-size:13px;font-weight:700;font-family:monospace">' + refCell + '</td>' +
         '<td style="padding:12px 16px;font-size:13px">' + esc(r.clientName) + '</td>' +
         '<td style="padding:12px 16px;font-size:13px;color:var(--muted)">' + esc(r.jobName) + (r.jobNumber ? ' <span style="font-size:11px">#'+esc(r.jobNumber)+'</span>' : '') + '</td>' +
         '<td style="padding:12px 16px;font-size:12px;color:var(--muted)">' + savedStr + '</td>' +
@@ -12508,9 +12519,7 @@ function init(){
   // Load custom company logo if set
   loadCompanyLogo();
   // Initialise quote tab system — always start fresh on reload.
-  // Open quotes are saved to /api/quotes and can be reopened from the rolodex.
-  localStorage.removeItem('proquote_session_quotes');
-  localStorage.removeItem('proquote_active_id');
+  // Don't auto-reopen previous tabs, but keep server-loaded data for Open Existing.
   const firstQ = _newQuoteState({ fields: _captureFields(), sections: [] });
   _quotes.push(firstQ);
   _activeQuoteId = firstQ.id;
