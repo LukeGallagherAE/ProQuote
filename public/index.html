@@ -2764,8 +2764,26 @@ function _persistSession() {
     localStorage.setItem('proquote_session_quotes', quotesJson);
     if (_activeQuoteId) localStorage.setItem('proquote_active_id', _activeQuoteId);
     localStorage.setItem('proquote_saved_at', Date.now().toString());
-    if (window._saveQuoteToServer) { _quotes.forEach(q => window._saveQuoteToServer(q)); }
+    // Only debounce-save quotes that are actively open in tabs; hidden quotes are
+    // already on the server and don't need to be re-queued on every scheduleSave.
+    if (window._saveQuoteToServer) { _quotes.filter(q => !q._hiddenTab).forEach(q => window._saveQuoteToServer(q)); }
   } catch(e) { console.error('[ProQuote] localStorage write failed:', e); }
+}
+
+// Open a quote that's already in _quotes (possibly hidden) by its internal ID
+function loadQuoteFromMemory(sqId) {
+  const sq = _quotes.find(q => q.id === sqId);
+  if (!sq) return;
+  saveActiveQuoteState();
+  sq._hiddenTab = false;
+  _activeQuoteId = sq.id;
+  S.sections = JSON.parse(JSON.stringify(sq.sections || []));
+  _restoreFields(sq.fields || {});
+  fullRender();
+  renderQuoteTabs();
+  updateQuoteTabLabel();
+  setTimeout(updatePublishBadge, 60);
+  if (_activeTab !== 'quote') switchTab('quote');
 }
 
 function setSaveStatus(state) {
@@ -3962,7 +3980,7 @@ function renderQuoteTabs() {
   const _aqForTabs = _quotes.find(q => q.id === _activeQuoteId);
   const _activeBaseRef = _aqForTabs?._parentRef || _revBaseName(_aqForTabs?.fields?.quoteRef || '');
 
-  _quotes.filter(q => !q._parentRef).forEach(q => {
+  _quotes.filter(q => !q._parentRef && !q._hiddenTab).forEach(q => {
     const client = q.fields?.clientName?.trim() || '';
     const job    = q.fields?.jobName?.trim() || '';
     const ref    = q.fields?.quoteRef?.trim() || '';
@@ -6191,16 +6209,39 @@ function showOpenQuoteDropdown(anchorEl) {
     'overflow:hidden',
   ].join(';');
 
-  // Flatten & sort all quotes by _createdAt desc (fall back to _saved)
+  // Build rows from _quotes (server data, always complete) with client book as fallback
   function buildRows() {
-    const clients = loadClients();
     const lsm = _liveStatusMap();
     const rows = [];
+    const _seenRefs = new Set();
+
+    // Primary: in-memory quotes (loaded from server, includes all revisions)
+    (_quotes || []).slice().sort((a,b) => (b._createdAt||0)-(a._createdAt||0)).forEach(sq => {
+      const ref = sq.fields?.quoteRef || '';
+      if (!ref) return;
+      _seenRefs.add(ref);
+      const liveStatus = lsm[ref] || {};
+      rows.push({
+        ref,
+        clientName: sq.fields?.clientName || '',
+        jobName: sq.fields?.jobName || '',
+        total: _calcQuoteTotal(sq),
+        createdAt: sq._createdAt || 0,
+        status: (liveStatus._approvedAt || sq._approvedAt) ? 'approved'
+              : (liveStatus._emailSentAt || sq._emailSentAt) ? 'emailed'
+              : (liveStatus._publishedAt || sq._publishedAt) ? 'published' : 'draft',
+        _sqId: sq.id,
+      });
+    });
+
+    // Fallback: client book entries not already covered by _quotes
+    const clients = loadClients();
     clients.forEach((cl, ci) => {
       (cl.jobs||[]).forEach((job, ji) => {
         (job.quotes||[]).forEach((qq, qi) => {
           const ref = qq.quoteRef || qq.fields?.quoteRef || '';
-          if (ref && lsm[ref]) Object.assign(qq, lsm[ref]);
+          if (!ref || _seenRefs.has(ref)) return;
+          if (lsm[ref]) Object.assign(qq, lsm[ref]);
           rows.push({ ci, ji, qi, ref, clientName: cl.name||cl.company||'', jobName: job.name||'',
             total: parseFloat(qq._total)||0,
             createdAt: qq._createdAt || qq._saved || 0,
@@ -6209,6 +6250,7 @@ function showOpenQuoteDropdown(anchorEl) {
         });
       });
     });
+
     rows.sort((a,b) => b.createdAt - a.createdAt);
     return rows;
   }
@@ -6229,7 +6271,10 @@ function showOpenQuoteDropdown(anchorEl) {
       const dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : '';
       const valStr  = r.total ? '$'+r.total.toLocaleString('en-AU',{minimumFractionDigits:0,maximumFractionDigits:0}) : '';
       const dot = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${statusColour[r.status]||'var(--muted)'};flex-shrink:0;margin-top:1px"></span>`;
-      return `<div class="oq-row" onclick="document.getElementById('oq-drop').remove();loadAndSwitchQuote(${r.ci},${r.ji},${r.qi})"
+      const _oqClick = r._sqId
+        ? `document.getElementById('oq-drop').remove();loadQuoteFromMemory('${r._sqId}')`
+        : `document.getElementById('oq-drop').remove();loadAndSwitchQuote(${r.ci},${r.ji},${r.qi})`;
+      return `<div class="oq-row" onclick="${_oqClick}"
         style="display:flex;align-items:flex-start;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border)"
         onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
         ${dot}
@@ -10136,12 +10181,13 @@ function loadJobQuote(client, jobIdx, quoteIdx) {
   }
   _id = mx + 1;
 
-  // Check if this quote ref is already open in a tab — if so, just switch to it
+  // Check if this quote ref is already in _quotes (open or hidden) — reuse it
   const openRef = q.quoteRef || '';
   if (openRef) {
     const existing = _quotes.find(oq => (oq.fields?.quoteRef || '') === openRef);
     if (existing) {
       saveActiveQuoteState();
+      existing._hiddenTab = false; // unhide: make it a visible tab
       _activeQuoteId = existing.id;
       S.sections = JSON.parse(JSON.stringify(existing.sections));
       _restoreFields(existing.fields);
@@ -10480,9 +10526,12 @@ function renderQuotesAll() {
 
   // Flatten all quotes across all clients/jobs
   let rows = [];
+  const _seenRefsAll = new Set();
   clients.forEach((client, ci) => {
     (client.jobs || []).forEach((job, ji) => {
       (job.quotes || []).forEach((qq, qi) => {
+        const _ref = qq.quoteRef || qq.fields?.quoteRef || '—';
+        _seenRefsAll.add(_ref);
         // Fill in missing total from sections if available
         let total = parseFloat(qq._total) || 0;
         if (!total && qq.sections?.length) {
@@ -10490,7 +10539,7 @@ function renderQuotesAll() {
           if (computed.total > 0) { total = computed.total; qq._total = total; }
         }
         rows.push({
-          ref:        qq.quoteRef || qq.fields?.quoteRef || '—',
+          ref:        _ref,
           clientName: client.name || '—',
           clientId:   client.id,
           jobName:    job.name || qq.jobName || '—',
@@ -10505,6 +10554,30 @@ function renderQuotesAll() {
           qq, job, client
         });
       });
+    });
+  });
+
+  // Also include quotes that exist in memory (server-loaded) but aren't in client book
+  // This covers revisions that were never saved to the client book
+  (_quotes || []).forEach(sq => {
+    const _ref = sq.fields?.quoteRef || '';
+    if (!_ref || _seenRefsAll.has(_ref)) return;
+    const total = _calcQuoteTotal(sq);
+    rows.push({
+      ref: _ref,
+      clientName: sq.fields?.clientName || '—',
+      clientId: null,
+      jobName: sq.fields?.jobName || '—',
+      jobNumber: sq.fields?.jobNumber || '',
+      date: sq.fields?.quoteDate || '',
+      total,
+      saved: sq._createdAt || 0,
+      createdAt: sq._createdAt || 0,
+      published: !!(sq._publishedAt || sq._emailSentAt || sq._approvedAt),
+      status: sq._approvedAt ? 'approved' : sq._emailSentAt ? 'emailed' : sq._publishedAt ? 'published' : 'draft',
+      clientIdx: -1, jobIdx: -1, quoteIdx: -1,
+      _sqId: sq.id,
+      qq: sq, job: null, client: null,
     });
   });
 
@@ -10642,20 +10715,13 @@ function openQuoteFromAll(i) {
   const r = window._quotesAllRows?.[i];
   if (!r) return;
 
-  // If the user picked a specific revision via the dropdown, open it directly
-  const selRevId = window._qaRevSel?.[i];
-  if (selRevId) {
-    const selQ = _quotes.find(q => q.id === selRevId);
-    if (selQ) {
-      saveActiveQuoteState();
-      loadQuoteState(selQ.id);
-      renderQuoteTabs();
-      switchTab('quote');
-      return;
-    }
+  // Memory-only row (e.g. revision not in client book) — open directly from _quotes
+  if (r._sqId) {
+    loadQuoteFromMemory(r._sqId);
+    return;
   }
 
-  // If any revision of this quote is already loaded in memory, open the most recent one
+  // Find the most recent unlocked revision in this family (all are in _quotes now)
   const baseRef = _revBaseName(r.ref) || r.ref;
   if (baseRef && baseRef !== '—') {
     const escaped = baseRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -10664,8 +10730,10 @@ function openQuoteFromAll(i) {
       .filter(x => pat.test(x.fields?.quoteRef || ''))
       .sort((a, b) => (a._createdAt || 0) - (b._createdAt || 0));
     if (family.length > 0) {
-      const target = family[family.length - 1];
+      // Open the most recent unlocked version
+      const target = family.slice().reverse().find(x => !x._locked) || family[family.length - 1];
       saveActiveQuoteState();
+      target._hiddenTab = false;
       loadQuoteState(target.id);
       renderQuoteTabs();
       switchTab('quote');
@@ -10673,7 +10741,7 @@ function openQuoteFromAll(i) {
     }
   }
 
-  // Load from stored data
+  // Fallback: build from stored client book data (for old quotes not in _quotes)
   const fields = {};
   ['clientName','clientPhone','clientEmail','jobName','jobNumber','siteAddr','quoteRef','quoteDate',
    'labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes'].forEach(k => {
@@ -12518,8 +12586,32 @@ function init(){
   initStagedMarkupUI();
   // Load custom company logo if set
   loadCompanyLogo();
-  // Initialise quote tab system — always start fresh on reload.
-  // Don't auto-reopen previous tabs, but keep server-loaded data for Open Existing.
+  // Initialise quote tab system.
+  // Load ALL saved quotes from server into memory (marked _hiddenTab=true so they
+  // don't appear as open tabs). This keeps the full revision graph in memory so
+  // the revision system, Open Existing dropdown, and Quotes page all work correctly.
+  // Then add one fresh blank quote as the only visible tab.
+  const _sqRaw = localStorage.getItem('proquote_session_quotes');
+  if (_sqRaw) {
+    try {
+      const restored = JSON.parse(_sqRaw);
+      if (Array.isArray(restored) && restored.length) {
+        _quotes = restored.map(q => ({ ...q, _hiddenTab: true }));
+        // Advance _id counter past every ID used in restored quotes
+        let _maxId = 0;
+        for (const rq of _quotes) {
+          for (const s of (rq.sections || [])) {
+            if (s.id > _maxId) _maxId = s.id;
+            for (const p of (s.parents || [])) {
+              if (p.id > _maxId) _maxId = p.id;
+              for (const sub of (p.subitems || [])) { if (sub.id > _maxId) _maxId = sub.id; }
+            }
+          }
+        }
+        if (_maxId >= _id) _id = _maxId + 1;
+      }
+    } catch(e) {}
+  }
   const firstQ = _newQuoteState({ fields: _captureFields(), sections: [] });
   _quotes.push(firstQ);
   _activeQuoteId = firstQ.id;
