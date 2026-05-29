@@ -2407,19 +2407,24 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   let _flushTimer = null;
   const _quoteSaveTimers = {};
 
+  // Keys that belong to /api/quotes, not the settings blob
+  const _QUOTE_KEYS = new Set(['proquote_session_quotes', 'proquote_active_id', 'proquote_saved_at']);
+
   async function _flushStorage() {
     const token = getToken();
-    if (!token) return true; // not authenticated — skip silently
-    // Cancel any pending debounced flush (we're running now)
+    if (!token) return true;
     if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null; }
+    // Only send non-quote keys — quote data goes via /api/quotes
+    const payload = Object.fromEntries(Object.entries(_ls).filter(([k]) => !_QUOTE_KEYS.has(k)));
+    if (!Object.keys(payload).length) return true;
     try {
-      const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
       const res = await fetch('/api/storage', {
         method: 'PUT',
-        headers,
-        body: JSON.stringify(_ls),
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) { console.error('[ProQuote] Storage flush HTTP error:', res.status); return false; }
+      if (res.status === 401) { window._nativeClearToken(); return false; }
+      if (!res.ok) { console.warn('[ProQuote] Storage flush HTTP error:', res.status); return false; }
       return true;
     } catch (e) {
       console.warn('[ProQuote] Storage flush failed:', e);
@@ -2428,19 +2433,25 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   }
 
   function _markDirty() {
-    if (!getToken()) return; // don't schedule flush when not logged in
+    if (!getToken()) return;
     if (_flushTimer) clearTimeout(_flushTimer);
-    _flushTimer = setTimeout(_flushStorage, 1500);
+    _flushTimer = setTimeout(_flushStorage, 2000);
   }
 
+  // Returns true if the quote was saved successfully
   async function _putQuote(quote) {
-    if (!quote || !quote.id) return;
+    if (!quote || !quote.id) return false;
     const token = getToken();
+    if (!token) return false;
     try {
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = 'Bearer ' + token;
-      await fetch('/api/quotes/' + quote.id, { method: 'PUT', headers, body: JSON.stringify(quote) });
-    } catch (e) { console.warn('[ProQuote] Quote save failed:', e); }
+      const res = await fetch('/api/quotes/' + quote.id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(quote),
+      });
+      if (res.status === 401) { window._nativeClearToken(); return false; }
+      return res.ok;
+    } catch (e) { return false; }
   }
 
   window._flushQuoteNow = function(quote) { return _putQuote(quote); };
@@ -2449,18 +2460,18 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     if (!quote || !quote.id) return;
     const id = quote.id;
     if (_quoteSaveTimers[id]) clearTimeout(_quoteSaveTimers[id]);
-    _quoteSaveTimers[id] = setTimeout(() => _putQuote(quote), 1500);
+    _quoteSaveTimers[id] = setTimeout(() => _putQuote(quote), 2000);
   };
 
   window._deleteQuoteFromServer = async function (id) {
     const token = getToken();
+    if (!token) return;
     try {
-      const headers = {};
-      if (token) headers['Authorization'] = 'Bearer ' + token;
-      await fetch('/api/quotes/' + id, { method: 'DELETE', headers });
-    } catch (e) {
-      console.warn('[ProQuote] Quote delete failed:', e);
-    }
+      await fetch('/api/quotes/' + id, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+    } catch (e) { console.warn('[ProQuote] Quote delete failed:', e); }
   };
 
   window._flushStorage = _flushStorage;
@@ -2702,18 +2713,22 @@ function saveActiveQuoteState() {
   q.sections = JSON.parse(JSON.stringify(S.sections));
   q.fields = _captureFields();
   _persistSession();
-  // Immediately save the active quote to /api/quotes (no debounce) so
-  // reload always finds it even if the settings blob flush is still in flight
-  if (window._flushQuoteNow) window._flushQuoteNow(q);
-  if (window._cancelQuoteSaveTimer) window._cancelQuoteSaveTimer(q.id);
-  // Flush settings blob — this also cancels any pending _markDirty timer.
-  if (window._flushStorage) {
-    window._flushStorage().then(ok => setSaveStatus(ok ? 'saved' : 'localonly'));
-  } else {
-    setSaveStatus('localonly');
+  // Save to /api/quotes — this is the authoritative store for quote data
+  if (window._flushQuoteNow) {
+    window._flushQuoteNow(q).then(ok => {
+      if (ok) {
+        setSaveStatus('saved');
+      } else if (ok === false) {
+        // Hard failure (e.g. 401, network down) — retry via debounce and show subtle indicator
+        setSaveStatus('retrying');
+        if (window._saveQuoteToServer) window._saveQuoteToServer(q);
+      }
+    });
   }
+  // Settings (profile, colors, etc.) are flushed separately via _markDirty.
+  // We do NOT call _flushStorage here — that caused false "Sync failed" messages
+  // any time a settings write failed, even when the quote saved fine.
   updatePublishBadge();
-  // Auto-sync to client book whenever state is saved (keeps totals/profit current)
   if (q.fields?.clientName) {
     saveQuoteToClientBook({ ...q.fields, sections: S.sections || [],
       _publishedAt: q._publishedAt || null,
@@ -2724,9 +2739,15 @@ function saveActiveQuoteState() {
   }
 }
 
-function scheduleSave(delay) {
-  clearTimeout(window._autoSaveDeb);
-  window._autoSaveDeb = setTimeout(saveActiveQuoteState, delay === undefined ? 60000 : delay);
+// scheduleSave: arms a 60-second timer from the FIRST mutation, not from every keypress.
+// Calling it again while a timer is already pending does nothing — this ensures
+// the save fires at most once per minute even during continuous editing.
+function scheduleSave() {
+  if (window._autoSaveDeb) return; // timer already armed — don't reset
+  window._autoSaveDeb = setTimeout(() => {
+    window._autoSaveDeb = null;
+    saveActiveQuoteState();
+  }, 60000);
 }
 
 function _persistSession() {
@@ -2750,12 +2771,11 @@ function setSaveStatus(state) {
     el.style.color = 'var(--green, #34c759)';
     el.style.opacity = '1';
     window._saveStatusFade = setTimeout(() => { el.style.opacity = '0'; }, 2500);
-  } else if (state === 'localonly') {
-    el.textContent = 'Sync failed — reload at risk';
-    el.style.color = '#ff9f0a';
-    el.style.opacity = '1';
-    window._saveStatusFade = setTimeout(() => { el.style.opacity = '0'; }, 6000);
+  } else if (state === 'retrying') {
+    // Silently retry — show nothing to the user
+    el.style.opacity = '0';
   }
+  // No 'localonly' / 'Sync failed' state — saves either succeed or retry silently
 }
 
 function loadQuoteState(id) {

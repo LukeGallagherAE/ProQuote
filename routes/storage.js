@@ -32,16 +32,29 @@ router.put('/', async (req, res) => {
     const vals   = entries.map(([, v]) => (typeof v === 'string' ? v : JSON.stringify(v)));
     const userId = req.user.userId;
 
-    // Batch upsert — conflict on key (original PK). user_id is also updated
-    // so rows are correctly owned after a schema migration.
+    // Schema-agnostic upsert: UPDATE first, INSERT on miss.
+    // Works regardless of whether the settings table has a PK on (key)
+    // or a composite unique constraint on (key, user_id).
     for (let i = 0; i < keys.length; i++) {
-      await db.query(
-        `INSERT INTO settings (key, value, user_id, updated_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (key) DO UPDATE
-           SET value = EXCLUDED.value, user_id = EXCLUDED.user_id, updated_at = NOW()`,
-        [keys[i], vals[i], userId]
+      const { rowCount } = await db.query(
+        `UPDATE settings SET value = $1, user_id = $2, updated_at = NOW()
+         WHERE key = $3 AND (user_id = $2 OR user_id IS NULL)`,
+        [vals[i], userId, keys[i]]
       );
+      if (rowCount === 0) {
+        try {
+          await db.query(
+            `INSERT INTO settings (key, value, user_id, updated_at) VALUES ($1, $2, $3, NOW())`,
+            [keys[i], vals[i], userId]
+          );
+        } catch (insertErr) {
+          // Another row with this key already exists (race or schema constraint) — force update
+          await db.query(
+            `UPDATE settings SET value = $1, user_id = $2, updated_at = NOW() WHERE key = $3`,
+            [vals[i], userId, keys[i]]
+          );
+        }
+      }
     }
 
     res.json({ ok: true });
