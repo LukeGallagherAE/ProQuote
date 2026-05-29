@@ -3094,14 +3094,17 @@ function calcLabourMins() {
 }
 
 function syncDOM() {
+  // Learning ops (saveTemplate, saveToCustomLib, recordLabourTime) parse+write localStorage
+  // for every item on every render. Rate-limit to at most once every 4 seconds.
+  const _canLearn = !window._lastLearnAt || (Date.now() - window._lastLearnAt > 4000);
+  if (_canLearn) window._lastLearnAt = Date.now();
   for (const sec of S.sections) {
     const n=document.getElementById('sn-'+sec.id); if(n) sec.name=n.value;
     for (const par of sec.parents) {
       const pn=document.getElementById('pn-'+par.id); if(pn) par.name=pn.value;
       const pd=document.getElementById('pd-'+par.id); if(pd) par.description=pd.value;
       const pc=document.getElementById('pc-'+par.id); if(pc) par.category=pc.value||par.category||'';
-      // Auto-save as template when item has a real name and filled sub-items
-      saveTemplate(par);
+      if (_canLearn) saveTemplate(par);
       const pq=document.getElementById('pq-'+par.id); if(pq) par.qty=parseFloat(pq.value)||1;
       const pdisc=document.getElementById('pdisc-'+par.id); if(pdisc) par.discount=parseFloat(pdisc.value)||0;
       const plump=document.getElementById('plump-'+par.id); if(plump) par.lumpPrice=parseFloat(plump.value)||0;
@@ -3113,13 +3116,13 @@ function syncDOM() {
         const scp=document.getElementById('scp-'+sub.id); if(scp) sub.customPrice=parseFloat(scp.value)||0;
         const scu=document.getElementById('scu-'+sub.id); if(scu) sub.customUnit=scu.value;
         const ss=document.getElementById('ss-'+sub.id); if(ss&&!sub.item) sub.customName=ss.value;
-        // Record labour times for learning
-        const subLabel = sub.item ? sub.item.d1 : sub.customName;
-        if (subLabel && sub.cat==='wire' && sub.wireMin>0) recordLabourTime(subLabel,'wire',sub.wireMin);
-        if (subLabel && (sub.cat==='install'||(sub.cat==='supply'&&sub.instMin>0))) recordLabourTime(subLabel,'install',sub.instMin);
-        // Auto-save custom items to library when they have both a name and price
-        if (!sub.item && sub.customName && sub.customName.length>=2 && sub.customPrice>0) {
-          saveToCustomLib(sub.customName, sub.customPrice, sub.customUnit||'EA');
+        if (_canLearn) {
+          const subLabel = sub.item ? sub.item.d1 : sub.customName;
+          if (subLabel && sub.cat==='wire' && sub.wireMin>0) recordLabourTime(subLabel,'wire',sub.wireMin);
+          if (subLabel && (sub.cat==='install'||(sub.cat==='supply'&&sub.instMin>0))) recordLabourTime(subLabel,'install',sub.instMin);
+          if (!sub.item && sub.customName && sub.customName.length>=2 && sub.customPrice>0) {
+            saveToCustomLib(sub.customName, sub.customPrice, sub.customUnit||'EA');
+          }
         }
       }
     }
@@ -3789,7 +3792,25 @@ function applyMarkupAll(){
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function fullRender(){syncDOM();renderSections();renderTotals();renderNav();setTimeout(initTAs,0);if(_activeTab==='tracker')renderTracker();if(_activeTab==='revisions')renderRevisions();if(_activeTab==='fittings')renderFittings();clearTimeout(window._revBannerDeb);window._revBannerDeb=setTimeout(updateRevisionBanner,500);setTimeout(()=>{updatePublishBadge();},50);scheduleSave();}
+// Batch rapid fullRender calls via rAF — multiple synchronous calls in the same
+// task (e.g. drag reorder, createRevision) collapse into one DOM rebuild per frame.
+let _renderPending=false;
+function fullRender(){
+  if(_renderPending)return;
+  _renderPending=true;
+  requestAnimationFrame(function(){
+    _renderPending=false;
+    syncDOM();renderSections();renderTotals();renderNav();
+    setTimeout(initTAs,0);
+    if(_activeTab==='tracker')renderTracker();
+    if(_activeTab==='revisions')renderRevisions();
+    if(_activeTab==='fittings')renderFittings();
+    clearTimeout(window._revBannerDeb);
+    window._revBannerDeb=setTimeout(updateRevisionBanner,500);
+    setTimeout(()=>{updatePublishBadge();},50);
+    scheduleSave();
+  });
+}
 
 let _pubCheckTimer=null;
 function _schedulePublishCheck(){
@@ -3956,9 +3977,8 @@ function renderQuoteTabs() {
     const pubDot = q._publishedAt ? '<span title="'+_pdotTitle+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+_pdotColor+';margin-left:5px;vertical-align:middle;flex-shrink:0"></span>' : '';
     const plDot = (!q._publishedAt && q._plPricesUpdated) ? '<span title="Prices updated: '+q._plPricesUpdated+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff9f0a;margin-left:5px;vertical-align:middle;flex-shrink:0"></span>' : '';
     const emailDot = q._emailSentAt ? '<span title="Email sent ' + new Date(q._emailSentAt).toLocaleDateString('en-AU',{day:'numeric',month:'short'}) + '" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#007aff;margin-left:5px;vertical-align:middle;flex-shrink:0"></span>' : '';
-    // Show lock icon if any version in this quote family is locked
-    const familyHasLocked = _getRevisionFamily(q).some(r => r._locked);
-    const lockDot = familyHasLocked ? '<span title="Has locked revision(s)" style="margin-left:4px;font-size:10px;opacity:.65">🔒</span>' : '';
+    // Root quote gets _locked=true when a revision is created from it — no family scan needed
+    const lockDot = q._locked ? '<span title="Has locked revision(s)" style="margin-left:4px;font-size:10px;opacity:.65">🔒</span>' : '';
     const wrap = document.createElement('div');
     wrap.className = 'quote-tab-wrap';
     wrap.innerHTML =
@@ -5252,7 +5272,9 @@ function createRevisionFromQuote(qid) {
   renderQuoteTabs();
   updateRevLabel();
   switchTab('quote');
-  saveActiveQuoteState();
+  // Persist nq directly — no need to re-run syncDOM since nq was just cloned from src
+  _persistSession();
+  if (window._flushQuoteNow) window._flushQuoteNow(nq);
   showToast('↪ Rev ' + newLetter + ' created', 2000);
 }
 
