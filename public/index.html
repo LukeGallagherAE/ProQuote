@@ -2775,7 +2775,8 @@ function loadQuoteFromMemory(sqId) {
   const sq = _quotes.find(q => q.id === sqId);
   if (!sq) return;
   saveActiveQuoteState();
-  sq._hiddenTab = false;
+  // Unhide the whole revision family so the base tab appears in the tab bar
+  _getRevisionFamily(sq).forEach(m => { m._hiddenTab = false; });
   _activeQuoteId = sq.id;
   S.sections = JSON.parse(JSON.stringify(sq.sections || []));
   _restoreFields(sq.fields || {});
@@ -2827,6 +2828,10 @@ function loadQuoteState(id) {
       notice.style.display = 'none'; // reset; showAutoRevisionNotice re-shows if needed
     }
   }
+  // Skip syncDOM in the next rAF frame — S.sections was just set from q.sections
+  // and must not be overwritten by stale DOM reads (revisions share section IDs
+  // with their parent, so the old DOM would corrupt the newly loaded sections).
+  _skipNextSync = true;
   fullRender();
   updateQuoteTabLabel();
   setTimeout(updatePublishBadge, 60);
@@ -3813,12 +3818,15 @@ function applyMarkupAll(){
 // Batch rapid fullRender calls via rAF — multiple synchronous calls in the same
 // task (e.g. drag reorder, createRevision) collapse into one DOM rebuild per frame.
 let _renderPending=false;
+let _skipNextSync=false; // set before fullRender to skip syncDOM for the next frame
 function fullRender(){
   if(_renderPending)return;
   _renderPending=true;
   requestAnimationFrame(function(){
     _renderPending=false;
-    syncDOM();renderSections();renderTotals();renderNav();
+    if(!_skipNextSync)syncDOM();
+    _skipNextSync=false;
+    renderSections();renderTotals();renderNav();
     setTimeout(initTAs,0);
     if(_activeTab==='tracker')renderTracker();
     if(_activeTab==='revisions')renderRevisions();
@@ -5341,6 +5349,9 @@ function renderRevisions() {
 
 function loadRevisionCard(id) {
   saveActiveQuoteState();
+  // Unhide the whole revision family so the base tab appears in the tab bar
+  const _revQ = _quotes.find(x => x.id === id);
+  if (_revQ) _getRevisionFamily(_revQ).forEach(m => { m._hiddenTab = false; });
   loadQuoteState(id);
   renderQuoteTabs();
   updateRevLabel();
