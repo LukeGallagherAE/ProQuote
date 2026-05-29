@@ -905,7 +905,7 @@ html.dark .bom-supply-btn.delivered{background:#082018;border-color:#1a7a4a;colo
 
 
 .parent-item.drag-over{outline:2px dashed var(--blue)!important;background:var(--blue-bg)!important;transition:none}
-.drag-handle{cursor:grab;color:var(--muted);opacity:.4;font-size:16px;padding:0 3px;line-height:1;transition:opacity .12s;flex-shrink:0;user-select:none;-webkit-user-drag:none}
+.drag-handle{cursor:grab;color:var(--muted);opacity:.4;font-size:16px;padding:0 3px;line-height:1;transition:opacity .12s;flex-shrink:0;user-select:none;-webkit-user-drag:element}
 .drag-handle:hover{opacity:.85}
 .drag-handle:active{cursor:grabbing}
 .item-drag-over,.item-drag-over.parent-item{outline:2px solid #007aff!important;outline-offset:-1px;background:rgba(0,122,255,.05)!important}
@@ -945,6 +945,8 @@ html.dark .clientModal-inner,html.dark .jobModal-inner{background:var(--surface)
 .rev-tile{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;transition:border-color .15s,box-shadow .15s}
 .rev-tile:hover{border-color:var(--accent);box-shadow:0 1px 6px rgba(0,122,255,.08)}
 .rev-tile.rev-tile-active{border-color:var(--accent);background:var(--blue-bg,#e8f0ff)}
+.rev-tile.rev-tile-locked{opacity:.75;cursor:default}
+.rev-tile.rev-tile-locked:hover{border-color:var(--border);box-shadow:none}
 .rev-tile-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;background:var(--surface2);color:var(--muted);white-space:nowrap;flex-shrink:0}
 .rev-tile-badge.rev-current{background:var(--accent);color:#fff}
 .rev-tile-ref{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;flex-shrink:0}
@@ -2709,6 +2711,10 @@ function _restoreFields(fields) {
 function saveActiveQuoteState() {
   const q = _quotes.find(q => q.id === _activeQuoteId);
   if (!q) return;
+  if (q._locked) {
+    showToast('🔒 This version is locked — switch to the latest revision to edit', 3000);
+    return;
+  }
   syncDOM();
   q.sections = JSON.parse(JSON.stringify(S.sections));
   q.fields = _captureFields();
@@ -2781,12 +2787,28 @@ function setSaveStatus(state) {
 function loadQuoteState(id) {
   const q = _quotes.find(q => q.id === id);
   if (!q) return;
+  // Cancel any pending auto-save for the previous quote before switching
+  if (window._autoSaveDeb) { clearTimeout(window._autoSaveDeb); window._autoSaveDeb = null; }
   _activeQuoteId = id;
   S.sections = JSON.parse(JSON.stringify(q.sections));
   _restoreFields(q.fields);
-  // Show/hide auto-revision notice
+  // Show/hide auto-revision notice / lock banner
   const notice = document.getElementById('auto-rev-notice');
-  if (notice) notice.style.display = 'none'; // reset; showAutoRevisionNotice re-shows if needed
+  if (notice) {
+    if (q._locked) {
+      notice.style.cssText = 'display:flex;margin:0;padding:12px 18px;background:#636366;color:#fff;border-radius:0 0 10px 10px;align-items:center;gap:10px;font-size:13px;font-weight:600;flex-wrap:wrap';
+      notice.innerHTML =
+        '<span style="font-size:18px;flex-shrink:0">🔒</span>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:14px;font-weight:800;margin-bottom:2px">Read-only — locked revision</div>' +
+          '<div style="font-size:12px;font-weight:500;opacity:.9">This version is permanently locked. Switch to the latest revision to make edits.</div>' +
+        '</div>' +
+        '<button onclick="switchTab(\'revisions\')" style="flex-shrink:0;padding:6px 14px;background:rgba(255,255,255,.25);border:1.5px solid rgba(255,255,255,.6);border-radius:8px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">View revisions →</button>' +
+        '<button onclick="document.getElementById(\'auto-rev-notice\').style.display=\'none\'" style="flex-shrink:0;margin-left:6px;background:none;border:none;color:#fff;font-size:20px;line-height:1;cursor:pointer;opacity:.8;padding:0 4px">×</button>';
+    } else {
+      notice.style.display = 'none'; // reset; showAutoRevisionNotice re-shows if needed
+    }
+  }
   fullRender();
   updateQuoteTabLabel();
   setTimeout(updatePublishBadge, 60);
@@ -3934,10 +3956,13 @@ function renderQuoteTabs() {
     const pubDot = q._publishedAt ? '<span title="'+_pdotTitle+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+_pdotColor+';margin-left:5px;vertical-align:middle;flex-shrink:0"></span>' : '';
     const plDot = (!q._publishedAt && q._plPricesUpdated) ? '<span title="Prices updated: '+q._plPricesUpdated+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff9f0a;margin-left:5px;vertical-align:middle;flex-shrink:0"></span>' : '';
     const emailDot = q._emailSentAt ? '<span title="Email sent ' + new Date(q._emailSentAt).toLocaleDateString('en-AU',{day:'numeric',month:'short'}) + '" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#007aff;margin-left:5px;vertical-align:middle;flex-shrink:0"></span>' : '';
+    // Show lock icon if any version in this quote family is locked
+    const familyHasLocked = _getRevisionFamily(q).some(r => r._locked);
+    const lockDot = familyHasLocked ? '<span title="Has locked revision(s)" style="margin-left:4px;font-size:10px;opacity:.65">🔒</span>' : '';
     const wrap = document.createElement('div');
     wrap.className = 'quote-tab-wrap';
     wrap.innerHTML =
-      '<button class="quote-tab-main' + (isActive?' active':'') + '" onclick="openRevPickerFromTab(event,\'' + q.id + '\')" title="' + label + (q._emailSentAt ? ' · Email sent' : q._publishedAt ? ' · Published' : '') + (!q._publishedAt && q._plPricesUpdated ? ' · Prices updated' : '') + '">' + label + pubDot + emailDot + plDot + '</button>' +
+      '<button class="quote-tab-main' + (isActive?' active':'') + '" onclick="openRevPickerFromTab(event,\'' + q.id + '\')" title="' + label + (q._emailSentAt ? ' · Email sent' : q._publishedAt ? ' · Published' : '') + (!q._publishedAt && q._plPricesUpdated ? ' · Prices updated' : '') + '">' + label + pubDot + emailDot + plDot + lockDot + '</button>' +
       '<button class="quote-tab-arrow' + (isActive?' active':'') + '" onclick="openQuoteTabDropdown(event,\'' + q.id + '\')" title="BOM & options">▾</button>';
 
     bar.insertBefore(wrap, addBtn);
@@ -5211,6 +5236,11 @@ function createRevisionFromQuote(qid) {
   const newLetter = _revLetter(siblingCount);
   const newRef = baseRef + ' Rev ' + newLetter;
 
+  // Lock the source quote permanently before creating the revision —
+  // it must never be edited or overwritten after this point.
+  src._locked = true;
+  if (window._flushQuoteNow) window._flushQuoteNow(src);
+
   const nq = _newQuoteState({
     fields: { ...src.fields, quoteRef: newRef, quoteDate: new Date().toISOString().slice(0, 10) },
     sections: JSON.parse(JSON.stringify(src.sections || [])),
@@ -5255,9 +5285,10 @@ function renderRevisions() {
       changesText = changes.length ? changes.slice(0, 2).map(c => escHtml(c)).join(' · ') + (changes.length > 2 ? ' +' + (changes.length - 2) + ' more' : '') : 'No recorded changes';
     }
 
-    return `<div class="rev-tile${isActive ? ' rev-tile-active' : ''}" id="rev-tile-${q.id}" onclick="loadRevisionCard('${q.id}')">
+    const lockBadge = q._locked ? '<span title="Locked — read only" style="margin-left:5px;font-size:11px;opacity:.7">🔒</span>' : '';
+    return `<div class="rev-tile${isActive ? ' rev-tile-active' : ''}${q._locked ? ' rev-tile-locked' : ''}" id="rev-tile-${q.id}" onclick="loadRevisionCard('${q.id}')">
       <input type="checkbox" class="rev-tile-cb" data-qid="${q.id}" onclick="event.stopPropagation();toggleRevSelection('${q.id}',this.checked)" title="Select for batch delete">
-      <span class="rev-tile-badge${isActive ? ' rev-current' : ''}">Rev ${letter}</span>
+      <span class="rev-tile-badge${isActive ? ' rev-current' : ''}">Rev ${letter}${lockBadge}</span>
       <span class="rev-tile-ref">${escHtml(q.fields?.quoteRef || '')}</span>
       <span class="rev-tile-date">${date}</span>
       <span class="rev-tile-changes">${changesText}</span>
@@ -12454,43 +12485,10 @@ function init(){
   initStagedMarkupUI();
   // Load custom company logo if set
   loadCompanyLogo();
-  // Initialise quote tab system — restore from workspace load if available
-  const _sqRaw = localStorage.getItem('proquote_session_quotes');
-  if (_sqRaw) {
-    try {
-      const restored = JSON.parse(_sqRaw);
-      if (restored && restored.length) {
-        _quotes = restored;
-        // Advance _id counter past all IDs already used in restored quotes
-        // so new sections/items/subitems never get duplicate IDs.
-        let _maxId = 0;
-        for (const rq of _quotes) {
-          for (const s of (rq.sections || [])) {
-            if (s.id > _maxId) _maxId = s.id;
-            for (const p of (s.parents || [])) {
-              if (p.id > _maxId) _maxId = p.id;
-              for (const sub of (p.subitems || [])) { if (sub.id > _maxId) _maxId = sub.id; }
-            }
-          }
-        }
-        if (_maxId >= _id) _id = _maxId + 1;
-        const _savedId = localStorage.getItem('proquote_active_id');
-        const _savedQ = _savedId && restored.find(q => q.id === _savedId);
-        _activeQuoteId = _savedQ ? _savedId : restored[0].id;
-        // Restore fields + sections from active quote (deep clone to avoid shared reference)
-        const aq = _savedQ || restored[0];
-        if (aq.fields) Object.entries(aq.fields).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val||''; });
-        if (aq.sections) { S.sections = JSON.parse(JSON.stringify(aq.sections)); fullRender(); }
-        renderQuoteTabs();
-        updateQuoteTabLabel();
-        renderCustomTabButtons();
-        _persistSession(); // keep session alive
-        wsShowScreen();
-        setTimeout(_maybeShowWelcomeBanner, 400);
-        return; // skip normal quote-init flow
-      }
-    } catch(e) {}
-  }
+  // Initialise quote tab system — always start fresh on reload.
+  // Open quotes are saved to /api/quotes and can be reopened from the rolodex.
+  localStorage.removeItem('proquote_session_quotes');
+  localStorage.removeItem('proquote_active_id');
   const firstQ = _newQuoteState({ fields: _captureFields(), sections: [] });
   _quotes.push(firstQ);
   _activeQuoteId = firstQ.id;
