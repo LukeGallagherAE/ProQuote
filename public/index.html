@@ -244,8 +244,11 @@ html.dark ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38)}
 .section-name-inp:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px rgba(0,122,255,.1);outline:none}
 .section-badge{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;background:var(--accent-bg);color:var(--accent);padding:3px 9px;border-radius:4px;white-space:nowrap}
 /* ── FLAT SECTION LIST ── */
-.sec-group{margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,.06)}
-.sec-flat-hdr{display:flex;align-items:center;gap:8px;padding:7px 18px;background:var(--surface2);border-bottom:1px solid var(--border);border-top:3px solid transparent;position:sticky;top:0;z-index:15;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.sec-group{margin-bottom:28px;overflow:visible}
+.sec-flat-hdr{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--surface);border:1px solid var(--border);border-top:3px solid transparent;border-radius:10px;margin-bottom:6px;position:sticky;top:0;z-index:15;box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.sec-body{border-radius:10px;border:1px solid var(--border);overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.05)}
+.sec-cat-hdr{padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:9px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sec-cat-hdr:not(:first-child){border-top:1px solid var(--border)}
 .sfh-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .sfh-name{font-size:13px;font-weight:700;background:transparent;border:1px solid transparent;border-radius:4px;padding:2px 6px;flex:1;color:var(--text);font-family:inherit}
 .sfh-name:hover{border-color:var(--border);background:var(--surface)}
@@ -254,7 +257,7 @@ html.dark ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38)}
 .sfh-total{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--accent);background:var(--accent-bg);padding:2px 8px;border-radius:4px;white-space:nowrap}
 .sfh-add-btn{font-size:11px;padding:3px 9px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;white-space:nowrap;flex-shrink:0}
 .sfh-add-btn:hover{border-color:var(--accent);color:var(--accent)}
-.sec-add-row{padding:8px 18px;border-top:1px dashed var(--border);display:flex;align-items:center;gap:10px;background:var(--surface2)}
+.sec-add-row{padding:8px 18px;border-top:1px dashed var(--border);display:flex;align-items:center;gap:10px;background:var(--bg)}
 .pq-flat-subtitle{padding:7px 18px;font-size:11px;color:var(--muted);border-bottom:2px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:6px;letter-spacing:.2px}
 .pq-flat-subtitle b{color:var(--text);font-weight:700}
 .pq-flat-empty{padding:60px 18px;text-align:center;color:var(--muted);font-size:13px}
@@ -6051,6 +6054,23 @@ function renderSection(sec,si){
     return 0;
   });
 
+  // Group sorted parents by category
+  const catGroups = [];
+  sortedParents.forEach(par => {
+    const cat = par.category || '';
+    if(!catGroups.length || catGroups[catGroups.length-1].cat !== cat) catGroups.push({cat, items:[]});
+    catGroups[catGroups.length-1].items.push(par);
+  });
+  const catColors = {supply:'#007aff',wire:'#34c759',install:'#ff9500'};
+  const bodyHtml = catGroups.map(g => {
+    const catLabel = g.cat ? g.cat.charAt(0).toUpperCase()+g.cat.slice(1) : '';
+    const catDot = g.cat && catColors[g.cat] ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+catColors[g.cat]+'"></span>' : '';
+    const catHdrHtml = catLabel
+      ? '<div class="sec-cat-hdr">'+catDot+'<span>'+esc(catLabel)+'</span></div>'
+      : '';
+    return catHdrHtml + g.items.map((par,pi)=>renderParent(sec.id,par,pi,sortedParents.length)).join('');
+  }).join('');
+
   return '<div class="sec-group" id="sec-'+sec.id+'">'
     +'<div class="sec-flat-hdr" style="border-top:3px solid '+col+'">'
       +'<div class="sfh-dot" style="background:'+col+'"></div>'
@@ -6064,11 +6084,13 @@ function renderSection(sec,si){
       +'</div>'
       +'<button class="btn-icon danger" onclick="syncDOM();removeSection('+sec.id+')">✕</button>'
     +'</div>'
-    +sortedParents.map((par,pi)=>renderParent(sec.id,par,pi,sortedParents.length)).join('')
-    +'<div id="ai-sec-panel-'+sec.id+'"></div>'
-    +'<div class="sec-add-row">'
-      +'<button class="btn btn-ghost btn-sm" onclick="syncDOM();addParent('+sec.id+')">+ Add item</button>'
-      +'<button class="ai-btn" id="ai-sec-btn-'+sec.id+'" onclick="syncDOM();suggestSectionItems('+sec.id+')">✦ AI suggest items</button>'
+    +'<div class="sec-body">'
+      +bodyHtml
+      +'<div id="ai-sec-panel-'+sec.id+'"></div>'
+      +'<div class="sec-add-row">'
+        +'<button class="btn btn-ghost btn-sm" onclick="syncDOM();addParent('+sec.id+')">+ Add item</button>'
+        +'<button class="ai-btn" id="ai-sec-btn-'+sec.id+'" onclick="syncDOM();suggestSectionItems('+sec.id+')">✦ AI suggest items</button>'
+      +'</div>'
     +'</div>'
   +'</div>';
 }
