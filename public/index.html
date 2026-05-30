@@ -201,7 +201,7 @@ html.dark ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38)}
 .sections-scroll-wrap{overflow-x:auto;padding-bottom:4px}
 .sections-scroll-wrap .section-card{min-width:min(760px,100%)}
 .sidebar-collapsed .sections-scroll-wrap .section-card{min-width:0}
-.section-header{display:flex;align-items:center;gap:8px;padding:12px 18px;background:var(--surface2);border-bottom:1px solid var(--border);border-radius:var(--r) var(--r) 0 0}
+.section-header{display:flex;align-items:center;gap:8px;padding:12px 18px;background:var(--surface2);border-bottom:1px solid var(--border);border-radius:0;position:sticky;top:0;z-index:15;box-shadow:0 2px 6px rgba(0,0,0,.06)}
 .section-name-inp{font-size:14px;font-weight:700;background:transparent;border:1px solid transparent;border-radius:4px;padding:2px 6px;flex:1;color:var(--text)}
 .section-name-inp:hover{border-color:var(--border);background:var(--surface2)}
 .section-name-inp:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px rgba(0,122,255,.1);outline:none}
@@ -213,7 +213,7 @@ html.dark ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38)}
 html.dark .parent-item:focus-within{background:var(--blue-bg)}
 @keyframes newItemGlow{0%{box-shadow:0 0 30px 12px rgba(0,122,255,.5),0 0 60px 20px rgba(0,122,255,.25);background:rgba(0,122,255,.07)}80%{box-shadow:0 0 10px 4px rgba(0,122,255,.08);background:rgba(0,122,255,.02)}100%{box-shadow:none;background:transparent}}
 .new-item-glow{animation:newItemGlow 10s ease-out forwards;z-index:2;position:relative}
-.parent-header{display:grid;grid-template-columns:18px 24px auto 1fr 56px 60px 90px auto;align-items:center;gap:8px;padding:11px 18px;background:var(--surface);transition:background .1s}
+.parent-header{display:grid;grid-template-columns:18px 24px auto 1fr 56px 60px 90px auto;align-items:center;gap:8px;padding:11px 18px;background:var(--surface);transition:background .1s;position:sticky;top:44px;z-index:10;box-shadow:0 2px 4px rgba(0,0,0,.04)}
 .ph-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
 .parent-header:hover{background:#fafaf8}
 .parent-name-inp{font-size:13px;font-weight:600;background:transparent;border:1px solid transparent;border-radius:4px;padding:2px 6px;color:var(--text);width:100%}
@@ -754,6 +754,12 @@ html.dark .tab-new-quote:hover{background:rgba(255,255,255,.12)!important;color:
 .quote-tab-arrow.active{background:rgba(60,50,30,.1);border-left-color:var(--border2)}
 .quote-tab-close{background:transparent;border:none;border-left:1px solid var(--border);color:var(--muted);font-size:10px;padding:6px 6px;border-radius:0 6px 6px 0;cursor:pointer;transition:all .15s;font-family:inherit}
 .quote-tab-close:hover{background:rgba(60,50,30,.07);color:rgba(60,50,30,.85)}
+.quote-tab-rev{background:transparent;border:none;border-left:1px solid var(--border);color:var(--muted);font-size:10px;font-weight:700;padding:4px 8px;cursor:pointer;white-space:nowrap;transition:all .15s;font-family:inherit;letter-spacing:.3px}
+.quote-tab-rev:hover{background:rgba(60,50,30,.07);color:rgba(60,50,30,.85)}
+.quote-tab-rev.active{background:var(--accent);color:#fff}
+html.dark .quote-tab-rev{color:rgba(255,255,255,.4);border-left-color:rgba(255,255,255,.12)}
+html.dark .quote-tab-rev:hover{background:rgba(255,255,255,.09);color:#fff}
+html.dark .quote-tab-rev.active{background:var(--accent);color:#fff}
 html.dark .quote-tab-main{color:rgba(255,255,255,.5)}
 html.dark .quote-tab-main:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.85)}
 html.dark .quote-tab-main.active{background:rgba(255,255,255,.13);color:#fff;font-weight:700}
@@ -4042,27 +4048,32 @@ function renderQuoteTabs() {
     // Mark active if this IS the active quote, or if active quote is a revision under this root
     const isActive = q.id === _activeQuoteId || _revBaseName(q.fields?.quoteRef || '') === _activeBaseRef;
 
-    // If a revision of this quote is currently active, show a "Rev X" badge on the tab
-    let revBadge = '';
-    if (isActive && _aqForTabs && _aqForTabs.id !== q.id) {
-      const _fam = _getRevisionFamily(q);
-      const _ri  = _fam.findIndex(m => m.id === _activeQuoteId);
-      if (_ri > 0) revBadge = ' <span style="font-size:9px;font-weight:800;padding:1px 5px;border-radius:5px;background:var(--accent);color:#fff;letter-spacing:.3px;vertical-align:middle">Rev '+_revLetter(_ri)+'</span>';
-    }
-
     const _pdotEdited = q._editedAfterPublish;
     const _pdotColor = _pdotEdited ? '#ff3b30' : '#30d158';
     const _pdotTitle = q._publishedAt ? (_pdotEdited ? 'Edited after publish' : 'Published ' + new Date(q._publishedAt).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) + ' ' + new Date(q._publishedAt).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})) : '';
     const pubDot = q._publishedAt ? '<span title="'+_pdotTitle+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+_pdotColor+';margin-left:5px;vertical-align:middle;flex-shrink:0"></span>' : '';
     const plDot = (!q._publishedAt && q._plPricesUpdated) ? '<span title="Prices updated: '+q._plPricesUpdated+'" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff9f0a;margin-left:5px;vertical-align:middle;flex-shrink:0"></span>' : '';
     const emailDot = q._emailSentAt ? '<span title="Email sent ' + new Date(q._emailSentAt).toLocaleDateString('en-AU',{day:'numeric',month:'short'}) + '" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#007aff;margin-left:5px;vertical-align:middle;flex-shrink:0"></span>' : '';
-    // Root quote gets _locked=true when a revision is created from it — no family scan needed
     const lockDot = q._locked ? '<span title="Has locked revision(s)" style="margin-left:4px;font-size:10px;opacity:.65">🔒</span>' : '';
+
+    // Inline revision sub-tabs: show unhidden revisions as small chips in the same group
+    const family = _getRevisionFamily(q);
+    const visibleRevs = family.filter(r => r.id !== q.id && !r._hiddenTab);
+    const revTabsHtml = visibleRevs.map((r, i) => {
+      const rIdx = family.findIndex(m => m.id === r.id);
+      const rActive = r.id === _activeQuoteId;
+      const rLocked = r._locked ? ' 🔒' : '';
+      return '<button class="quote-tab-rev' + (rActive ? ' active' : '') + '" onclick="loadRevisionCard(\'' + r.id + '\')" title="' + (r.fields?.quoteRef || '') + (r._locked ? ' · Locked' : '') + '">Rev ' + _revLetter(rIdx) + rLocked + '</button>';
+    }).join('');
+
     const wrap = document.createElement('div');
     wrap.className = 'quote-tab-wrap';
+    // Main tab is only "active" at the button level when the base quote itself is active
+    // The wrap-level active styling covers the whole group when any revision is active
     wrap.innerHTML =
-      '<button class="quote-tab-main' + (isActive?' active':'') + '" onclick="openRevPickerFromTab(event,\'' + q.id + '\')" title="' + label + (q._emailSentAt ? ' · Email sent' : q._publishedAt ? ' · Published' : '') + (!q._publishedAt && q._plPricesUpdated ? ' · Prices updated' : '') + '">' + label + revBadge + pubDot + emailDot + plDot + lockDot + '</button>' +
-      '<button class="quote-tab-arrow' + (isActive?' active':'') + '" onclick="openQuoteTabDropdown(event,\'' + q.id + '\')" title="BOM & options">▾</button>';
+      '<button class="quote-tab-main' + (isActive ? ' active' : '') + '" onclick="loadRevisionCard(\'' + q.id + '\')" title="' + label + (q._emailSentAt ? ' · Email sent' : q._publishedAt ? ' · Published' : '') + (!q._publishedAt && q._plPricesUpdated ? ' · Prices updated' : '') + '">' + label + pubDot + emailDot + plDot + lockDot + '</button>' +
+      revTabsHtml +
+      '<button class="quote-tab-arrow' + (isActive ? ' active' : '') + '" onclick="openQuoteTabDropdown(event,\'' + q.id + '\')" title="BOM & options">▾</button>';
 
     bar.insertBefore(wrap, addBtn);
   });
