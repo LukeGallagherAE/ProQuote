@@ -1747,8 +1747,10 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       </div>
     </div>
     <div id="sb-tab-changelog" class="sb-tab-content sb-hidden">
-      <div style="padding:20px 16px">
-        <div id="sb-changelog-list">No changes recorded yet.</div>
+      <div id="sb-changelog-list" style="flex:1;overflow-y:auto;padding:4px 0"></div>
+      <div style="padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:6px">
+        <input id="sb-changelog-input" placeholder="Add a note…" style="flex:1;font-size:11px" onkeydown="if(event.key==='Enter')addChangelogEntry()">
+        <button class="btn btn-primary btn-sm" onclick="addChangelogEntry()">+ Add</button>
       </div>
     </div>
   </div>
@@ -5382,6 +5384,96 @@ function dismissRevChange(changeStr) {
   updateRevisionBanner();
 }
 
+function renderChangelogTab() {
+  const listEl = document.getElementById('sb-changelog-list');
+  if (!listEl) return;
+
+  const aq = _quotes.find(q => q.id === _activeQuoteId);
+  if (!aq) {
+    listEl.innerHTML = '<div style="padding:20px 16px;color:var(--muted);font-size:11px;text-align:center;font-style:italic">No active quote.</div>';
+    return;
+  }
+
+  // Auto-detected changes (revision diff vs previous rev)
+  let autoChanges = [];
+  if (aq._parentRef) {
+    const family = _getRevisionFamily(aq);
+    const myIdx = family.findIndex(q => q.id === _activeQuoteId);
+    if (myIdx > 0) {
+      const prevQ = family[myIdx - 1];
+      autoChanges = diffQuotes(prevQ, {sections: S.sections});
+    }
+  }
+  const dismissed = new Set(aq._dismissedChanges || []);
+  const autoVisible = autoChanges.filter(c => !dismissed.has(c));
+  const manualEntries = aq._manualChangelog || [];
+
+  if (!autoVisible.length && !manualEntries.length) {
+    listEl.innerHTML = '<div style="padding:20px 16px;color:var(--muted);font-size:11px;text-align:center;font-style:italic">No changes yet.<br><span style="font-size:10px">Changes vs previous revision appear here automatically.</span></div>';
+    return;
+  }
+
+  let html = '';
+
+  if (autoVisible.length) {
+    html += '<div style="padding:8px 12px 3px;font-size:9px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--accent)">Auto-detected</div>';
+    html += autoVisible.map((c, i) =>
+      '<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 12px;border-bottom:1px solid var(--border)">'
+      + '<span style="color:var(--muted);font-size:11px;margin-top:1px;flex-shrink:0">·</span>'
+      + '<span style="flex:1;font-size:11px;line-height:1.5">'+escHtml(c)+'</span>'
+      + '<button onclick="dismissRevChange(\''+c.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')+';renderChangelogTab()" title="Dismiss" style="flex-shrink:0;background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 2px;opacity:.5" onmouseover="this.style.opacity=1;this.style.color=\'#e03\'" onmouseout="this.style.opacity=.5;this.style.color=\'var(--muted)\'">×</button>'
+      + '</div>'
+    ).join('');
+  }
+
+  if (manualEntries.length) {
+    html += '<div style="padding:8px 12px 3px;font-size:9px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted)">Notes</div>';
+    html += manualEntries.map((entry, i) =>
+      '<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 12px;border-bottom:1px solid var(--border)">'
+      + '<span style="color:var(--accent);font-size:11px;margin-top:1px;flex-shrink:0">+</span>'
+      + '<span style="flex:1;font-size:11px;line-height:1.5;outline:none;border-radius:3px" contenteditable="true" '
+        + 'onblur="editChangelogEntry('+i+',this.textContent.trim())" '
+        + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}" '
+        + 'title="Click to edit">'+escHtml(entry)+'</span>'
+      + '<button onclick="removeChangelogEntry('+i+')" title="Remove" style="flex-shrink:0;background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 2px;opacity:.5" onmouseover="this.style.opacity=1;this.style.color=\'#e03\'" onmouseout="this.style.opacity=.5;this.style.color=\'var(--muted)\'">×</button>'
+      + '</div>'
+    ).join('');
+  }
+
+  listEl.innerHTML = html;
+}
+
+function addChangelogEntry() {
+  const input = document.getElementById('sb-changelog-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  const aq = _quotes.find(q => q.id === _activeQuoteId);
+  if (!aq) return;
+  if (!Array.isArray(aq._manualChangelog)) aq._manualChangelog = [];
+  aq._manualChangelog.push(text);
+  input.value = '';
+  _persistSession();
+  renderChangelogTab();
+}
+
+function editChangelogEntry(index, newText) {
+  const aq = _quotes.find(q => q.id === _activeQuoteId);
+  if (!aq || !Array.isArray(aq._manualChangelog)) return;
+  if (newText !== undefined && aq._manualChangelog[index] !== undefined) {
+    aq._manualChangelog[index] = newText || aq._manualChangelog[index];
+    _persistSession();
+  }
+}
+
+function removeChangelogEntry(index) {
+  const aq = _quotes.find(q => q.id === _activeQuoteId);
+  if (!aq || !Array.isArray(aq._manualChangelog)) return;
+  aq._manualChangelog.splice(index, 1);
+  _persistSession();
+  renderChangelogTab();
+}
+
 function _autoCreateRevisionOnEdit(aq) {
   if (!aq || aq._autoRevisionCreated) return;
   aq._autoRevisionCreated = true;
@@ -5937,6 +6029,7 @@ function switchSbTab(tab) {
     if(content) content.classList.toggle('sb-hidden', t!==tab);
   });
   if(tab==='sections') renderTreeNav();
+  if(tab==='changelog') renderChangelogTab();
 }
 
 function toggleTreeNavSidebar(){
@@ -7274,6 +7367,14 @@ function doPrint(){
     if (_aq) {
       const _family = _getRevisionFamily(_aq);
       const _idx = _family.findIndex(q => q.id === _activeQuoteId);
+      const _manualBase = (_aq._manualChangelog || []).filter(Boolean);
+      if (_manualBase.length && _idx <= 0) {
+        revChangesHtml = '<div style="background:#f5f9ff;border:1px solid #c0d8ff;border-radius:8px;padding:14px 18px;margin-bottom:20px;page-break-inside:avoid">'
+          +'<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#007aff;margin-bottom:10px">Notes</div>'
+          +'<table style="width:100%;border-collapse:collapse"><tbody>'
+          +_manualBase.map(n=>'<tr><td style="padding:4px 10px 4px 0;width:16px;font-size:14px;color:#888;vertical-align:top">·</td><td style="padding:4px 0;font-size:12px;color:#555;line-height:1.5">'+esc(n)+'</td></tr>').join('')
+          +'</tbody></table></div>';
+      }
       if (_idx > 0) {
         const _prevQ = _family[_idx - 1];
         const _prevRef = _prevQ.fields?.quoteRef || 'previous revision';
@@ -7344,7 +7445,8 @@ function doPrint(){
           });
           if (details.length) _changeRows.push({type:'changed', label:(zone?zone+' · ':'')+esc(np.name||pp.name||'Item'), details});
         });
-        if (_changeRows.length) {
+        const _manualNotes = (_aq._manualChangelog || []).filter(Boolean);
+        if (_changeRows.length || _manualNotes.length) {
           const _icons  = {added:'✚', removed:'−', changed:'≈'};
           const _colors = {added:'#1a7a4a', removed:'#c0392b', changed:'#007aff'};
           const _rowsHtml = _changeRows.map(r =>
@@ -7354,10 +7456,16 @@ function doPrint(){
             +'<td style="padding:4px 0;font-size:12px;color:#555;vertical-align:top;line-height:1.5">'+(r.details.length ? r.details.map(d=>esc(d)).join(' &nbsp;·&nbsp; ') : esc(r.type))+'</td>'
             +'</tr>'
           ).join('');
+          const _notesHtml = _manualNotes.map(n =>
+            '<tr>'
+            +'<td style="padding:4px 10px 4px 0;width:16px;font-size:14px;color:#888;vertical-align:top;font-weight:700;line-height:1.4">·</td>'
+            +'<td colspan="2" style="padding:4px 0;font-size:12px;color:#555;vertical-align:top;line-height:1.5">'+esc(n)+'</td>'
+            +'</tr>'
+          ).join('');
           revChangesHtml =
             '<div style="background:#f5f9ff;border:1px solid #c0d8ff;border-radius:8px;padding:14px 18px;margin-bottom:20px;page-break-inside:avoid">'
             +'<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#007aff;margin-bottom:10px">Changes from '+esc(_prevRef)+'</div>'
-            +'<table style="width:100%;border-collapse:collapse"><tbody>'+_rowsHtml+'</tbody></table>'
+            +'<table style="width:100%;border-collapse:collapse"><tbody>'+_rowsHtml+_notesHtml+'</tbody></table>'
             +'</div>';
         }
       }
