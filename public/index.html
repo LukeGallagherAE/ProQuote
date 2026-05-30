@@ -176,7 +176,7 @@ html.dark .tree-nav{background:var(--surface)}
 .tree-nav-par.active::before{color:var(--accent)}
 @media print{.tree-nav{display:none!important}}
 /* ── SUBITEM PANEL ── */
-#subitem-panel{position:fixed;left:244px;right:0;bottom:62px;height:0;background:var(--surface);border-top:2px solid var(--accent);z-index:150;display:flex;flex-direction:column;transition:height .2s ease;overflow:hidden}
+#subitem-panel{position:fixed;left:64px;right:0;bottom:62px;height:0;background:var(--surface);border-top:2px solid var(--accent);z-index:150;display:flex;flex-direction:column;transition:height .2s ease;overflow:hidden}
 #subitem-panel.open{height:280px}
 .sip-header{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0}
 .sip-title{font-size:13px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -282,9 +282,10 @@ html.dark .parent-item:focus-within{background:var(--blue-bg)}
 .parent-name-inp{font-size:13px;font-weight:600;background:transparent;border:1px solid transparent;border-radius:4px;padding:2px 6px;color:var(--text);width:100%}
 .parent-name-inp:hover{border-color:var(--border);background:var(--surface2)}
 .parent-name-inp:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px rgba(0,122,255,.1);outline:none}
-.parent-desc{width:100%;margin-top:3px;font-size:11px;color:var(--muted);background:transparent;border:none;border-bottom:1px dashed transparent;border-radius:0;padding:1px 6px;min-height:18px;line-height:1.5;font-family:'IBM Plex Sans',sans-serif;outline:none;overflow:hidden;resize:none;display:block}
-.parent-desc:hover{border-bottom-color:var(--border)}
-.parent-desc:focus{border-bottom-color:var(--accent);background:transparent;box-shadow:none}
+.parent-desc{width:100%;margin-top:2px;font-size:10px;color:var(--muted);background:none;border:none;outline:none;resize:none;padding:0;line-height:1.4;min-height:14px;height:auto;font-family:inherit}
+.par-desc-add{font-size:9px;color:transparent;padding:0 6px;cursor:pointer;display:block;height:10px}
+.parent-item:hover .par-desc-add{color:var(--border)}
+.par-desc-add:hover{color:var(--muted)!important}
 
 .swi-wrap{display:flex;gap:4px;align-items:center}
 .swi-btn{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;border:1px solid var(--blue-border);background:var(--blue-bg);color:var(--blue);cursor:pointer;transition:all .12s;line-height:1.4}
@@ -1633,127 +1634,120 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 </nav>
 <div id="rail-flyout" style="display:none"></div>
 <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" style="right:248px" title="Collapse sidebar">▶</button>
-<div class="tree-nav" id="treeNav"></div>
 <div id="tn-expand-tab" onclick="toggleTreeNavSidebar()" title="Show sections panel">▶</div>
 <!-- ── ACTIVE QUOTE TAB ── -->
 <div id="page-quote" class="tab-page active" style="margin-left:0;height:auto;overflow:visible"><div class="layout">
   <div class="sidebar" id="sidebar">
-    <!-- drag handle + preset buttons -->
-    <div class="sb-handle" id="sb-handle">
-      <div class="sb-grip">
-        <div class="sb-grip-icon">
-          <span></span><span></span><span></span><span></span><span></span><span></span>
-        </div>
-      </div>
-      <div class="sb-presets">
-        <button class="sb-preset-btn sbp-active" id="sbp-right" title="Dock right" onclick="applySidebarLayout('right')">
-          <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><rect x="1" y="1" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="8" y="2.5" width="3.5" height="7" rx=".5" fill="currentColor" opacity=".5"/></svg>
-        </button>
-        <button class="sb-preset-btn" id="sbp-left" title="Dock left" onclick="applySidebarLayout('left')">
-          <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><rect x="1" y="1" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="2.5" y="2.5" width="3.5" height="7" rx=".5" fill="currentColor" opacity=".5"/></svg>
-        </button>
-        <button class="sb-preset-btn" id="sbp-top" title="Dock top" onclick="applySidebarLayout('top')">
-          <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><rect x="1" y="1" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="2.5" y="2.5" width="9" height="3" rx=".5" fill="currentColor" opacity=".5"/></svg>
-        </button>
-        <button class="sb-preset-btn" id="sbp-bottom" title="Dock bottom" onclick="applySidebarLayout('bottom')">
-          <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><rect x="1" y="1" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="2.5" y="6.5" width="9" height="3" rx=".5" fill="currentColor" opacity=".5"/></svg>
-        </button>
-      </div>
-    </div>
-    <!-- left-edge width resize handle -->
+    <div class="sb-handle" id="sb-handle" style="display:none"></div>
     <div class="sb-resize-w" id="sb-resize-w"></div>
-    <div id="sb-sidebar-content" style="display:flex;flex-direction:column;gap:16px;padding-bottom:16px">
-    <!-- Revision notes banner — shown only when viewing a revision -->
-    <div id="rev-notes-banner" class="rev-notes-banner" style="display:none">
-      <div class="rev-notes-label" id="rev-banner-label">↪ Rev B — Changes from Rev A</div>
-      <div id="rev-diff-list"></div>
+    <div class="sb-tabs">
+      <button class="sb-tab" id="sbt-sections" onclick="switchSbTab('sections')">Sections</button>
+      <button class="sb-tab" id="sbt-jobdetails" onclick="switchSbTab('jobdetails')">Job Details</button>
+      <button class="sb-tab" id="sbt-changelog" onclick="switchSbTab('changelog')">Changelog</button>
     </div>
-    <div>
-      <div class="sh" style="margin-bottom:10px">Job details</div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div class="field" style="position:relative">
-          <label>Client name</label>
-          <div style="display:flex;gap:4px">
-            <input id="clientName" placeholder="e.g. John Smith" oninput="onClientNameInput(this.value);updateQuoteTabLabel()" style="flex:1">
-            <button onclick="openRolodex()" style="flex-shrink:0;padding:4px 8px;border-radius:var(--rs);border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;font-size:13px" title="Client book">👤</button>
-          </div>
-          <div id="client-suggest-drop" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rs);box-shadow:var(--shadow-lg);z-index:400;max-height:200px;overflow-y:auto"></div>
-        </div>
-        <div class="field"><label>Client phone</label><input id="clientPhone" placeholder="0400 000 000"></div>
-        <div class="field"><label>Client email</label><input id="clientEmail" placeholder="client@example.com"></div>
-        <input type="hidden" id="jobName">
-        <div class="field"><label>Project no. <span style="font-size:9px;color:var(--muted)">(Tradify)</span></label><input id="jobNumber" placeholder="e.g. JN00068"></div>
-        <div class="field"><label>Job address</label><input id="siteAddr" placeholder="123 Main St, Suburb NSW" oninput="autoFillJobName(this.value);updateQuoteTabLabel()"></div>
-        <div class="field"><label>Quote reference</label><input id="quoteRef" oninput="updateQuoteTabLabel()"></div>
-        <div class="field"><label>Date</label><input type="date" id="quoteDate" oninput="scheduleSave()"></div>
-        <div class="field">
-          <label>Status</label>
-          <button id="sidebar-status-btn" onclick="showStatusPicker(this)" style="width:100%;text-align:left;padding:5px 10px;border-radius:var(--rs);border:1px solid var(--border2);background:var(--bg);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--muted)">Draft</button>
-        </div>
+    <div id="sb-tab-sections" class="sb-tab-content sb-hidden">
+      <div class="tree-nav" id="treeNav"></div>
+    </div>
+    <div id="sb-tab-jobdetails" class="sb-tab-content sb-hidden">
+      <div id="sb-sidebar-content">
+      <!-- Revision notes banner — shown only when viewing a revision -->
+      <div id="rev-notes-banner" class="rev-notes-banner" style="display:none">
+        <div class="rev-notes-label" id="rev-banner-label">↪ Rev B — Changes from Rev A</div>
+        <div id="rev-diff-list"></div>
       </div>
-      <div id="rolodex-save-status" style="font-size:10px;color:var(--green,#34c759);text-align:right;min-height:14px;margin-top:6px"></div>
-    </div>
-    <hr class="div">
-    <div>
-      <div class="sh" style="margin-bottom:10px">Pricing</div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div class="field"><label>Labour sell rate ($/hr)</label><input type="number" id="labourRate" value="100" min="0" oninput="clearTimeout(window._lrDeb);window._lrDeb=setTimeout(()=>{syncDOM();fullRender();},300)"></div>
-        <div class="field"><label>Labour cost rate ($/hr)</label><input type="number" id="labourCostRate" value="75" min="0" oninput="renderTotals();scheduleSave()"></div>
-        <div class="field">
-          <label>Default markup %</label>
-          <input type="number" id="defaultMarkup" value="100" min="0" oninput="scheduleSave()">
-          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
-            <div class="mc" onclick="setMarkup(0)">0%</div>
-            <div class="mc" onclick="setMarkup(20)">20%</div>
-            <div class="mc" onclick="setMarkup(50)">50%</div>
-            <div class="mc active" onclick="setMarkup(100)">100%</div>
+      <div>
+        <div class="sh" style="margin-bottom:10px">Job details</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="field" style="position:relative">
+            <label>Client name</label>
+            <div style="display:flex;gap:4px">
+              <input id="clientName" placeholder="e.g. John Smith" oninput="onClientNameInput(this.value);updateQuoteTabLabel()" style="flex:1">
+              <button onclick="openRolodex()" style="flex-shrink:0;padding:4px 8px;border-radius:var(--rs);border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;font-size:13px" title="Client book">👤</button>
+            </div>
+            <div id="client-suggest-drop" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rs);box-shadow:var(--shadow-lg);z-index:400;max-height:200px;overflow-y:auto"></div>
           </div>
-          <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="applyMarkupAll()">Apply to all lines</button>
+          <div class="field"><label>Client phone</label><input id="clientPhone" placeholder="0400 000 000"></div>
+          <div class="field"><label>Client email</label><input id="clientEmail" placeholder="client@example.com"></div>
+          <input type="hidden" id="jobName">
+          <div class="field"><label>Project no. <span style="font-size:9px;color:var(--muted)">(Tradify)</span></label><input id="jobNumber" placeholder="e.g. JN00068"></div>
+          <div class="field"><label>Job address</label><input id="siteAddr" placeholder="123 Main St, Suburb NSW" oninput="autoFillJobName(this.value);updateQuoteTabLabel()"></div>
+          <div class="field"><label>Quote reference</label><input id="quoteRef" oninput="updateQuoteTabLabel()"></div>
+          <div class="field"><label>Date</label><input type="date" id="quoteDate" oninput="scheduleSave()"></div>
+          <div class="field">
+            <label>Status</label>
+            <button id="sidebar-status-btn" onclick="showStatusPicker(this)" style="width:100%;text-align:left;padding:5px 10px;border-radius:var(--rs);border:1px solid var(--border2);background:var(--bg);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--muted)">Draft</button>
+          </div>
         </div>
-        <div class="field"><label>Deposit (%)</label><input type="number" id="depositAmount" value="20" placeholder="e.g. 20" min="0" max="100" step="1" oninput="scheduleSave()"></div>
-        <div class="field" style="border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
-          <label style="display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer">
-            <span>Grand total override</span>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0">
-              <input type="checkbox" id="grandTotalActive" onchange="onGrandTotalToggle(this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:var(--accent)">
+        <div id="rolodex-save-status" style="font-size:10px;color:var(--green,#34c759);text-align:right;min-height:14px;margin-top:6px"></div>
+      </div>
+      <hr class="div">
+      <div>
+        <div class="sh" style="margin-bottom:10px">Pricing</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="field"><label>Labour sell rate ($/hr)</label><input type="number" id="labourRate" value="100" min="0" oninput="clearTimeout(window._lrDeb);window._lrDeb=setTimeout(()=>{syncDOM();fullRender();},300)"></div>
+          <div class="field"><label>Labour cost rate ($/hr)</label><input type="number" id="labourCostRate" value="75" min="0" oninput="renderTotals();scheduleSave()"></div>
+          <div class="field">
+            <label>Default markup %</label>
+            <input type="number" id="defaultMarkup" value="100" min="0" oninput="scheduleSave()">
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
+              <div class="mc" onclick="setMarkup(0)">0%</div>
+              <div class="mc" onclick="setMarkup(20)">20%</div>
+              <div class="mc" onclick="setMarkup(50)">50%</div>
+              <div class="mc active" onclick="setMarkup(100)">100%</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="applyMarkupAll()">Apply to all lines</button>
+          </div>
+          <div class="field"><label>Deposit (%)</label><input type="number" id="depositAmount" value="20" placeholder="e.g. 20" min="0" max="100" step="1" oninput="scheduleSave()"></div>
+          <div class="field" style="border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
+            <label style="display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer">
+              <span>Grand total override</span>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0">
+                <input type="checkbox" id="grandTotalActive" onchange="onGrandTotalToggle(this.checked)" style="cursor:pointer;width:15px;height:15px;accent-color:var(--accent)">
+              </label>
             </label>
-          </label>
-          <div id="grand-total-value-wrap" style="display:none;margin-top:6px">
-            <label style="margin-bottom:3px">Total ex GST ($)</label>
-            <input type="number" id="grandTotalValue" min="0" step="0.01" placeholder="0.00" oninput="onGrandTotalInput(this.value)" style="font-size:15px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--accent);border-color:var(--accent)">
-            <div id="grand-total-inc" style="margin-top:4px;font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;text-align:right"></div>
+            <div id="grand-total-value-wrap" style="display:none;margin-top:6px">
+              <label style="margin-bottom:3px">Total ex GST ($)</label>
+              <input type="number" id="grandTotalValue" min="0" step="0.01" placeholder="0.00" oninput="onGrandTotalInput(this.value)" style="font-size:15px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--accent);border-color:var(--accent)">
+              <div id="grand-total-inc" style="margin-top:4px;font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;text-align:right"></div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    <hr class="div">
-    <div>
-      <div class="sh" style="margin-bottom:8px">Sections</div>
-      <div id="sidebarNav" style="display:flex;flex-direction:column;gap:3px"></div>
-      <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="addSection()">+ Add section</button>
-    </div>
-    <hr class="div">
-    <div class="field">
-      <label style="display:flex;align-items:center;justify-content:space-between">
-        Quote notes
-        <button onclick="openNotesExpand()" title="Expand notes" style="background:none;border:none;cursor:pointer;padding:0;color:var(--muted);font-size:13px;line-height:1" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">⛶</button>
-      </label>
-      <textarea id="quoteNotes" style="display:none"></textarea>
-      <div class="notes-toolbar" id="notes-toolbar-main">
-        <button onmousedown="event.preventDefault()" onclick="document.execCommand('bold')" title="Bold"><strong>B</strong></button>
-        <button onmousedown="event.preventDefault()" onclick="document.execCommand('italic')" title="Italic"><em>I</em></button>
-        <button onmousedown="event.preventDefault()" onclick="document.execCommand('underline')" title="Underline"><span style="text-decoration:underline">U</span></button>
-        <span class="ntb-sep"></span>
-        <button onmousedown="event.preventDefault()" onclick="document.execCommand('insertUnorderedList')" title="Bullet list">• List</button>
-        <span class="ntb-sep"></span>
-        <button onmousedown="event.preventDefault()" onclick="notesInsertLink()" title="Insert link">🔗</button>
-        <span class="ntb-sep"></span>
-        <button onmousedown="event.preventDefault()" onclick="notesSetSize('2')" title="Small"><span style="font-size:9px;font-weight:600">A</span></button>
-        <button onmousedown="event.preventDefault()" onclick="notesSetSize('3')" title="Normal"><span style="font-size:12px;font-weight:600">A</span></button>
-        <button onmousedown="event.preventDefault()" onclick="notesSetSize('5')" title="Large"><span style="font-size:16px;font-weight:600">A</span></button>
+      <hr class="div">
+      <div>
+        <div class="sh" style="margin-bottom:8px">Sections</div>
+        <div id="sidebarNav" style="display:flex;flex-direction:column;gap:3px"></div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="addSection()">+ Add section</button>
       </div>
-      <div id="notesEditor" contenteditable="true" class="notes-editor" style="height:80px" oninput="syncNotesEditor()" data-placeholder="Notes, exclusions, scope clarifications…"></div>
-      <button id="ai-notes-btn" onclick="aiSummariseNotes()" style="margin-top:5px;padding:3px 10px;font-size:11px;font-weight:600;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--muted);cursor:pointer;transition:color .15s,border-color .15s,background .15s" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--accent)';this.style.background='var(--surface)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)';this.style.background='var(--surface2)'">✨ AI</button>
+      <hr class="div">
+      <div class="field">
+        <label style="display:flex;align-items:center;justify-content:space-between">
+          Quote notes
+          <button onclick="openNotesExpand()" title="Expand notes" style="background:none;border:none;cursor:pointer;padding:0;color:var(--muted);font-size:13px;line-height:1" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">⛶</button>
+        </label>
+        <textarea id="quoteNotes" style="display:none"></textarea>
+        <div class="notes-toolbar" id="notes-toolbar-main">
+          <button onmousedown="event.preventDefault()" onclick="document.execCommand('bold')" title="Bold"><strong>B</strong></button>
+          <button onmousedown="event.preventDefault()" onclick="document.execCommand('italic')" title="Italic"><em>I</em></button>
+          <button onmousedown="event.preventDefault()" onclick="document.execCommand('underline')" title="Underline"><span style="text-decoration:underline">U</span></button>
+          <span class="ntb-sep"></span>
+          <button onmousedown="event.preventDefault()" onclick="document.execCommand('insertUnorderedList')" title="Bullet list">• List</button>
+          <span class="ntb-sep"></span>
+          <button onmousedown="event.preventDefault()" onclick="notesInsertLink()" title="Insert link">🔗</button>
+          <span class="ntb-sep"></span>
+          <button onmousedown="event.preventDefault()" onclick="notesSetSize('2')" title="Small"><span style="font-size:9px;font-weight:600">A</span></button>
+          <button onmousedown="event.preventDefault()" onclick="notesSetSize('3')" title="Normal"><span style="font-size:12px;font-weight:600">A</span></button>
+          <button onmousedown="event.preventDefault()" onclick="notesSetSize('5')" title="Large"><span style="font-size:16px;font-weight:600">A</span></button>
+        </div>
+        <div id="notesEditor" contenteditable="true" class="notes-editor" style="height:80px" oninput="syncNotesEditor()" data-placeholder="Notes, exclusions, scope clarifications…"></div>
+        <button id="ai-notes-btn" onclick="aiSummariseNotes()" style="margin-top:5px;padding:3px 10px;font-size:11px;font-weight:600;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--muted);cursor:pointer;transition:color .15s,border-color .15s,background .15s" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--accent)';this.style.background='var(--surface)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)';this.style.background='var(--surface2)'">✨ AI</button>
+      </div>
+      </div>
+    </div>
+    <div id="sb-tab-changelog" class="sb-tab-content sb-hidden">
+      <div style="padding:20px 16px">
+        <div id="sb-changelog-list">No changes recorded yet.</div>
+      </div>
     </div>
   </div>
   </div><!-- /sidebar flex wrapper -->
@@ -2922,6 +2916,14 @@ function loadQuoteState(id) {
       notice.style.display = 'none'; // reset; showAutoRevisionNotice re-shows if needed
     }
   }
+  // Restore active section from localStorage
+  const savedSec = localStorage.getItem('pq_active_section');
+  if(savedSec) { const _sid = Number(savedSec); if(S.sections.find(s=>s.id===_sid)) _activeSectionId = _sid; }
+  // Auto-select first section if none active
+  if(!_activeSectionId || !S.sections.find(s=>s.id==_activeSectionId)){
+    _activeSectionId = S.sections.length ? S.sections[0].id : null;
+  }
+  if(typeof switchSbTab === 'function') switchSbTab('sections');
   // Skip syncDOM in the next rAF frame — S.sections was just set from q.sections
   // and must not be overwritten by stale DOM reads (revisions share section IDs
   // with their parent, so the old DOM would corrupt the newly loaded sections).
@@ -3453,6 +3455,34 @@ function onParentNameInput(sid, pid, val) {
   });
 
   wrap.appendChild(drop);
+}
+
+function addParentDesc(pid) {
+  const sec = S.sections.find(s => s.parents.some(p => p.id == pid));
+  const par = sec?.parents.find(p => p.id == pid);
+  if (!par) return;
+  par.description = ' ';
+  _skipNextSync = true;
+  fullRender();
+  setTimeout(() => { const el = document.getElementById('pd-'+pid); if(el){el.value='';el.focus();} }, 50);
+}
+
+function onParentDescInput(sid, pid, el) {
+  const p = getP(sid, pid);
+  if (!p) return;
+  p.description = el.value;
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+  scheduleSave();
+  if (!el.value.trim()) {
+    p.description = '';
+    clearTimeout(window._descRemoveDeb);
+    window._descRemoveDeb = setTimeout(() => {
+      if (!document.activeElement || document.activeElement !== el) {
+        _skipNextSync = true; fullRender();
+      }
+    }, 1000);
+  }
 }
 
 function toggleSort() {
@@ -5834,6 +5864,7 @@ function selectSection(sid){
     _activeSectionId=_num;
     if(_subPanelPid!==null){ const sec=S.sections.find(s=>s.id==_subPanelSid); if(!sec||!sec.parents.find(p=>p.id==_subPanelPid)){ _subPanelPid=null;_subPanelSid=null; } }
   }
+  localStorage.setItem('pq_active_section', String(_activeSectionId));
   _skipNextSync=true;
   fullRender();
 }
@@ -5841,34 +5872,18 @@ function selectSection(sid){
 function renderTreeNav(){
   const nav = document.getElementById('treeNav');
   if(!nav) return;
-  const isQuoteTab = _activeTab === 'quote';
-  const tab = document.getElementById('tn-expand-tab');
-  if(!isQuoteTab || !S.sections || !S.sections.length){
-    nav.classList.remove('visible');
-    if(tab) tab.style.display='none';
-    const main = document.querySelector('.main');
-    if(main) main.style.marginLeft = '';
+  if(!S.sections || !S.sections.length){
+    nav.innerHTML = '<div style="padding:20px 16px;color:var(--muted);font-size:12px;text-align:center">No sections yet</div>'
+      + '<div style="padding:8px 10px;border-top:1px dashed var(--border);margin-top:4px">'
+      + '<button class="btn btn-secondary btn-sm" style="width:100%" onclick="syncDOM();addSection()">+ Add section</button>'
+      + '</div>';
     return;
   }
-  if(_treeNavHidden){
-    nav.classList.remove('visible');
-    if(tab) tab.style.display='flex';
-    const main = document.querySelector('.main');
-    if(main) main.style.marginLeft='64px';
-    return;
-  }
-  nav.classList.add('visible');
-  if(tab) tab.style.display='none';
-  const main = document.querySelector('.main');
-  if(main) main.style.marginLeft = '244px';
-
   const allCollapsed = S.sections.every(s => !!_treeNavCollapsed[s.id]);
   nav.innerHTML =
     '<div class="tn-header">'
       +'<span class="tn-header-label">Sections</span>'
       +'<button class="tn-hbtn" onclick="collapseAllTreeSections()" title="'+(allCollapsed?'Expand all':'Collapse all')+'">'+(allCollapsed?'⊞':'⊟')+'</button>'
-      +'<button class="tn-hbtn" onclick="syncDOM();addSection()" title="Add section" style="font-size:14px;font-weight:700;padding:1px 7px">+</button>'
-      +'<button class="tn-hbtn" onclick="toggleTreeNavSidebar()" title="Hide panel" style="padding:2px 5px">◀</button>'
     +'</div>'
     + S.sections.map(sec => {
     const collapsed = !!_treeNavCollapsed[sec.id];
@@ -5880,7 +5895,10 @@ function renderTreeNav(){
       return `<div class="tree-nav-par${isActive?' active':''}" onclick="selectSection('${sec.id}');openSubitemPanel('${sec.id}','${par.id}')" title="${label.replace(/'/g,"&#39;")}">${label}</div>`;
     }).join('');
     return `<div class="tn-sec-group"><div class="tree-nav-section${isActiveSection?' tn-sec-active':''}" title="${(sec.name||'').replace(/'/g,"&#39;")}"><span class="tn-sec-label" onclick="selectSection('${sec.id}')">${sec.name||'Untitled section'}</span><span class="tn-toggle" onclick="event.stopPropagation();toggleTreeSection('${sec.id}')" style="padding:4px 6px">${collapsed?'▶':'▾'}</span></div>${parItems}</div>`;
-  }).join('') + '<div style="height:40px"></div>';
+  }).join('')
+    + '<div style="padding:8px 10px;border-top:1px dashed var(--border);margin-top:4px">'
+    + '<button class="btn btn-secondary btn-sm" style="width:100%" onclick="syncDOM();addSection()">+ Add section</button>'
+    + '</div>';
 }
 
 function scrollToSection(sid){
@@ -5908,24 +5926,20 @@ function collapseAllTreeSections(){
   renderTreeNav();
 }
 
+let _activeSbTab = 'sections';
+function switchSbTab(tab) {
+  _activeSbTab = tab;
+  ['sections','jobdetails','changelog'].forEach(t => {
+    const btn = document.getElementById('sbt-'+t);
+    const content = document.getElementById('sb-tab-'+t);
+    if(btn) btn.classList.toggle('sb-tab-active', t===tab);
+    if(content) content.classList.toggle('sb-hidden', t!==tab);
+  });
+  if(tab==='sections') renderTreeNav();
+}
+
 function toggleTreeNavSidebar(){
-  _treeNavHidden = !_treeNavHidden;
-  const nav = document.getElementById('treeNav');
-  const tab = document.getElementById('tn-expand-tab');
-  const main = document.querySelector('.main');
-  if(_treeNavHidden){
-    if(nav) nav.classList.remove('visible');
-    if(tab) tab.style.display='flex';
-    if(main) main.style.marginLeft='64px';
-  } else {
-    if(tab) tab.style.display='none';
-    if(_activeTab==='quote' && S.sections && S.sections.length){
-      if(nav) nav.classList.add('visible');
-      if(main) main.style.marginLeft='244px';
-    }
-    renderTreeNav();
-  }
-  _updatePanelBounds(document.getElementById('subitem-panel'));
+  switchSbTab('sections');
 }
 
 function scrollToParent(pid){
@@ -5963,10 +5977,9 @@ function closeSubitemPanel() {
 
 function _updatePanelBounds(panel) {
   if(!panel) return;
-  const leftPx = _treeNavHidden ? 64 : 244;
   const sb = document.getElementById('sidebar');
-  const rightPx = (!sb || sb.classList.contains('collapsed')) ? 0 : 248;
-  panel.style.left = leftPx + 'px';
+  const rightPx = (!sb || sb.classList.contains('collapsed')) ? 0 : (parseInt(sb.style.width)||248);
+  panel.style.left = '64px';
   panel.style.right = rightPx + 'px';
 }
 
@@ -5987,9 +6000,16 @@ function renderSubitemPanel() {
   const c = calcParent(par);
   const subHtml = par.subitems.map(sub => renderSubitem(_subPanelSid, _subPanelPid, par, sub)).join('');
 
+  const ac = par.activeCats || {supply:true,wire:true,install:true};
   panel.innerHTML =
     '<div class="sip-header">'
       + '<div class="sip-title">' + esc(par.name || 'Untitled') + '<span style="font-weight:400;color:var(--muted);margin-left:8px;font-size:11px">' + esc(sec.name || '') + '</span></div>'
+      + '<div class="swi-pills" style="flex-shrink:0">'
+        + '<button class="swi-pill'+(ac.supply?'':' off')+'" onclick="toggleActiveCat('+_subPanelSid+','+_subPanelPid+',\'supply\')" title="Toggle Supply cost">S</button>'
+        + '<button class="swi-pill'+(ac.wire?'':' off')+'" onclick="toggleActiveCat('+_subPanelSid+','+_subPanelPid+',\'wire\')" title="Toggle Wire cost">W</button>'
+        + '<button class="swi-pill'+(ac.install?'':' off')+'" onclick="toggleActiveCat('+_subPanelSid+','+_subPanelPid+',\'install\')" title="Toggle Install cost">I</button>'
+        + '<button class="swi-pill'+(par.lumpSum?' lump-on':'')+'" onclick="toggleLumpSum('+_subPanelSid+','+_subPanelPid+')" title="Lump sum mode">$</button>'
+      + '</div>'
       + '<div style="display:flex;align-items:center;gap:10px;margin-left:auto;flex-shrink:0">'
         + '<span style="font-size:12px;font-weight:700;font-family:\'IBM Plex Mono\',monospace;color:var(--accent)">' + fmt(c.total) + '</span>'
         + '<button onclick="syncDOM();addSubitem(\'' + _subPanelSid + '\',\'' + _subPanelPid + '\',\'supply\')" style="padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text)">+ Supply</button>'
@@ -5999,7 +6019,7 @@ function renderSubitemPanel() {
       + '</div>'
     + '</div>'
     + '<div class="sip-body">'
-      + '<div class="sub-col-headers"><span>Type</span><span>Sub-item</span><span>Qty</span><span>Markup %</span><span>Wire min</span><span>Inst min</span><span class="r">Materials</span><span class="r">Labour</span><span class="r">Total</span><span></span></div>'
+      + '<div class="sub-col-headers"><span>Type</span><span>Sub-item</span><span>Qty</span><span>Markup</span><span>Wire</span><span>Inst</span><span class="r">Unit $</span><span class="r">Mat</span><span class="r">Lab</span><span class="r">Total</span><span></span></div>'
       + subHtml
       + '<div id="ai-sub-panel-' + _subPanelPid + '"></div>'
     + '</div>';
@@ -6118,37 +6138,53 @@ function renderParent(sid,par,pi,total){
   const _labH = Math.floor(_labMins/60), _labM = Math.round(_labMins%60);
   const _labStr = _labMins>0 ? (_labH>0 ? _labH+'h'+(_labM>0?' '+_labM+'m':'') : _labM+'m') : null;
 
-  // Controls bar: category + SWI + qty + discount (shown below main row)
-  const controlsBar = '<div class="par-controls-bar">'
-    + catPill
-    + '<div style="display:flex;align-items:center;gap:3px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="setParentQty('+par.id+',this.value)" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:11px;padding:2px 4px"></div>'
-    + '<div style="display:flex;align-items:center;gap:2px" title="Discount %"><span style="font-size:9px;color:var(--muted)">%off</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="setParentDiscount('+par.id+',this.value)" onclick="event.stopPropagation()" style="width:36px;text-align:center;font-size:11px;padding:2px 4px" placeholder="0"></div>'
-    + (_labStr ? '<span style="font-size:10px;color:var(--muted);margin-left:4px">⏱ '+_labStr+'</span>' : '')
-    + '<span style="font-size:10px;color:var(--muted);margin-left:auto">'+subCount+' sub-item'+(subCount!==1?'s':'')+'</span>'
-    + (_inPanel
-        ? '<span class="sip-indicator" onclick="closeSubitemPanel()" style="padding:2px 8px;font-size:11px;border-radius:4px">▾ editing in panel · close ✕</span>'
-        : '<span class="par-item-hint" onclick="openSubitemPanel(\''+sid+'\',\''+par.id+'\')" style="padding:2px 8px;font-size:11px;border-radius:4px">▶ Edit sub-items</span>')
+  // Inline category select
+  const catInline = '<select id="pc-'+par.id+'" onchange="handleCatChange('+par.id+',this)" onclick="event.stopPropagation()" style="font-size:10px;height:22px;width:100%;border:1px solid var(--border);border-radius:3px;background:var(--surface2);color:var(--text);padding:0 2px">'+catOptions+'</select>';
+
+  // Inline qty + discount
+  const qtyDisc = '<div style="display:flex;align-items:center;gap:3px;white-space:nowrap" onclick="event.stopPropagation()">'
+    + '<span style="font-size:9px;color:var(--muted)">×</span>'
+    + '<input type="number" id="pq-'+par.id+'" value="'+(par.qty||1)+'" min="1" onchange="setParentQty('+par.id+',this.value)" onclick="event.stopPropagation()" style="width:30px;height:22px;border:1px solid var(--border);border-radius:3px;text-align:center;font-size:10px">'
+    + '<span style="font-size:9px;color:var(--muted)">%</span>'
+    + '<input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" onchange="setParentDiscount('+par.id+',this.value)" onclick="event.stopPropagation()" style="width:28px;height:22px;border:1px solid var(--border);border-radius:3px;text-align:center;font-size:10px">'
     + '</div>';
+
+  // Time badge
+  const timeBadge = _labStr ? '<span style="font-size:9px;color:var(--muted);white-space:nowrap">⏱ '+_labStr+'</span>' : '<span></span>';
+
+  // Sub-item count button
+  const subCountBtn = '<button onclick="event.stopPropagation();openSubitemPanel(\''+sid+'\',\''+par.id+'\')" style="font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid '+(_inPanel?'var(--accent)':'var(--border)')+';background:'+(_inPanel?'rgba(200,160,74,.1)':'var(--surface2)')+';color:'+(_inPanel?'var(--accent)':'var(--muted)')+';cursor:pointer;white-space:nowrap">'+subCount+' item'+(subCount!==1?'s':'')+'</button>';
 
   const totalSpan = par.lumpSum
     ? '<span class="ptotal tot"><span class="ptotal-lbl">Price</span><input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="setParentLumpPrice('+par.id+',this.value)" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)"></span>'
     : '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">Total</span>'+(c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)+'</span>';
+
+  // Description row (below name, only if has content)
+  const descHtml = par.description
+    ? '<textarea class="parent-desc" id="pd-'+par.id+'" rows="1" oninput="onParentDescInput('+sid+','+par.id+',this)" onclick="event.stopPropagation()">'+esc(par.description)+'</textarea>'
+    : '<span class="par-desc-add" onclick="event.stopPropagation();addParentDesc('+par.id+')" title="Add description">+ desc</span>';
 
   return '<div class="parent-item'+(_inPanel?' in-panel':'')+'" id="par-'+par.id+'" ondragover="_dragParId!=null?_onParDragOver(event,'+sid+','+par.id+'):(event.preventDefault(),event.stopPropagation(),this.classList.add(\'drag-over\'))" ondragleave="this.classList.remove(\'drag-over\');this.classList.remove(\'item-drag-over\')" ondrop="_dragParId!=null?_onParDrop(event,'+sid+','+par.id+'):(dropParentPhoto(event,'+sid+','+par.id+'),this.classList.remove(\'drag-over\'))">'+
   (par.optional ? '<div style="position:absolute;inset:0;border:2px dashed rgba(255,165,0,.35);border-radius:4px;pointer-events:none"></div>' : '')+
     '<div class="parent-header" onclick="if(!([\'INPUT\',\'TEXTAREA\',\'BUTTON\',\'SELECT\'].includes(event.target.tagName)||event.target.closest(\'.ph-actions\')))openSubitemPanel(\''+sid+'\',\''+par.id+'\')">'+
       parDragHandle+
       '<span style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;color:'+(_inPanel?'var(--accent)':'var(--muted)')+';flex-shrink:0">'+(_inPanel?'▾':'▸')+'</span>'+
-      '<div style="min-width:0;display:flex;align-items:baseline;gap:0">'+
-        '<input class="parent-name-inp" id="pn-'+par.id+'" value="'+esc(par.name)+'" placeholder="Item name…" style="width:100%;font-size:13px" oninput="onParentNameInput('+sid+','+par.id+',this.value)" onblur="setTimeout(closeTemplateDrop,200)">'+
-        (partRef ? '<span class="par-part-ref">'+esc(partRef)+'</span>' : '')+
+      catInline+
+      '<div style="min-width:0;display:flex;flex-direction:column;justify-content:center">'+
+        '<div style="display:flex;align-items:baseline;gap:0">'+
+          '<input class="parent-name-inp" id="pn-'+par.id+'" value="'+esc(par.name)+'" placeholder="Item name…" style="width:100%;font-size:13px" oninput="onParentNameInput('+sid+','+par.id+',this.value)" onblur="setTimeout(closeTemplateDrop,200)">'+
+          (partRef ? '<span class="par-part-ref">'+esc(partRef)+'</span>' : '')+
+        '</div>'+
+        descHtml+
       '</div>'+
+      qtyDisc+
+      timeBadge+
+      subCountBtn+
       '<div class="par-num mat" title="Materials sell">'+fmt(c.matSell)+'</div>'+
       '<div class="par-num lab" title="Labour sell">'+fmt(c.labSell)+'</div>'+
       totalSpan+
-      '<div class="ph-actions">'+optPill+menuBtn+'</div>'+
+      '<div class="ph-actions">'+photoBtn+optPill+menuBtn+'</div>'+
     '</div>'+
-    controlsBar+
   '</div>';
 }
 
@@ -6163,23 +6199,25 @@ function renderSubitem(sid,pid,par,sub){
   const placeholder=isWire?'Search or type a description…':isInstall?'Search or type a description…':'Search pricelist or type a custom item…';
 
   const itemInfo=hasItem
-    ? '<div class="item-lbl">'+sub.item.c+' · '+sub.item.u+' · cost '+fmt(sub.item.p)+' <span style="color:var(--accent);cursor:pointer;font-size:9px" onclick="clearItem('+sid+','+pid+','+sub.id+')">✕ clear</span></div>'
-    : (sub.customName&&sub.customPrice>0 ? '<div class="item-lbl">Custom · '+esc(sub.customUnit||'EA')+' · $'+Number(sub.customPrice||0).toFixed(2)+'</div>' : '<div class="item-lbl" style="visibility:hidden">·</div>');
+    ? '<div class="item-lbl">'+sub.item.c+' · '+sub.item.u+' <span style="color:var(--accent);cursor:pointer;font-size:9px" onclick="clearItem('+sid+','+pid+','+sub.id+')">✕</span></div>'
+    : (sub.customName ? '<div class="item-lbl">'+esc(sub.customUnit||'EA')+'</div>' : '<div class="item-lbl" style="visibility:hidden">·</div>');
 
-  // Always render a fixed-height wrapper so the .sw cell never changes height
-  const customPriceField=!hasItem
-    ? '<div style="display:flex;align-items:center;gap:4px;margin-top:2px;height:24px">'+
-        '<span style="font-size:10px;color:var(--muted)">$</span>'+
-        '<input type="number" id="scp-'+sub.id+'" value="'+(sub.customPrice||0)+'" min="0" placeholder="0.00" step="0.01" onchange="setSubCustomPrice('+sub.id+',this.value)" style="width:72px;height:22px;font-size:11px;padding:2px 5px" title="Custom unit price">'+
-        '<span style="font-size:10px;color:var(--muted)">/</span>'+
-        '<input type="text" id="scu-'+sub.id+'" value="'+esc(sub.customUnit||'EA')+'" onchange="syncDOM();fullRender()" style="width:38px;height:22px;font-size:11px;padding:2px 4px" title="Unit">'+
-      '</div>'
-    : '<div style="visibility:hidden;height:24px;margin-top:2px">'+
-        '<input type="number" id="scp-'+sub.id+'" value="'+(sub.customPrice||0)+'" style="display:none">'+
-        '<input type="text" id="scu-'+sub.id+'" value="'+esc(sub.customUnit||'EA')+'" style="display:none">'+
-      '</div>';
+  // Hidden inputs kept for compatibility
+  const hiddenPriceInputs=hasItem
+    ? '<input type="number" id="scp-'+sub.id+'" value="'+(sub.customPrice||0)+'" style="display:none">'
+      +'<input type="text" id="scu-'+sub.id+'" value="'+esc(sub.customUnit||'EA')+'" style="display:none">'
+    : '';
 
   const isSupply=sub.cat==='supply';
+
+  // Unit $ column (7th column in 11-col grid)
+  const unitPrice = sub.item ? sub.item.p : (parseFloat(sub.customPrice)||0);
+  const unitPriceCell = !hasItem
+    ? '<div style="display:flex;flex-direction:column;gap:1px">'
+        +'<input type="number" id="scp-'+sub.id+'" value="'+(sub.customPrice||0)+'" min="0" placeholder="0.00" step="0.01" onchange="setSubCustomPrice('+sub.id+',this.value)" style="width:100%;height:22px;font-size:10px;padding:2px 3px;text-align:right" title="Custom unit price">'
+        +'<input type="text" id="scu-'+sub.id+'" value="'+esc(sub.customUnit||'EA')+'" onchange="syncDOM();fullRender()" style="width:100%;height:16px;font-size:9px;padding:1px 3px;text-align:right;color:var(--muted)" title="Unit">'
+      +'</div>'
+    : '<span class="nc mat" style="font-size:10px;text-align:right">'+Number(unitPrice).toFixed(2)+'</span>';
 
   // Labour time suggestions from history
   const subLabel = sub.item ? sub.item.d1 : (sub.customName||'');
@@ -6207,7 +6245,7 @@ function renderSubitem(sid,pid,par,sub){
         ' onblur="lockCustomName('+sid+','+pid+','+sub.id+',this.value)"'+
         ' onfocus="if(this.value.length>=2)onSearch('+sid+','+pid+','+sub.id+',this.value)">'+
       itemInfo+
-      customPriceField+
+      hiddenPriceInputs+
       '<div class="dropdown" id="drop-'+sid+'-'+pid+'-'+sub.id+'" style="display:none"></div>'+
     '</div>'+
     '<input type="number" id="sq-'+sub.id+'" value="'+sub.qty+'" min="0" onchange="setSubQty('+sub.id+',this.value)" style="text-align:center">'+
@@ -6217,6 +6255,7 @@ function renderSubitem(sid,pid,par,sub){
     '</div>'+
     wireField+
     instField+
+    unitPriceCell+
     '<span class="nc mat'+(active?'':' off')+'">'+(c.matSell>0?fmt(c.matSell):'—')+'</span>'+
     '<span class="nc lab'+(active?'':' off')+'">'+(c.labSell>0?fmt(c.labSell):'—')+'</span>'+
     '<span class="nc tot'+(active?'':' off')+'">'+(c.total>0?fmt(c.total):'—')+'</span>'+
@@ -8958,14 +8997,6 @@ function switchTab(tab) {
     _prevTab = null; // clear when navigating away from quote
   }
   _activeTab = tab;
-  // Show/hide tree nav immediately
-  const _tn = document.getElementById('treeNav');
-  const _mn = document.querySelector('.main');
-  if(_tn && _mn){
-    const _isQ = tab === 'quote';
-    _tn.classList.toggle('visible', _isQ);
-    _mn.style.marginLeft = _isQ ? '244px' : '';
-  }
   // Hide all pages
   document.querySelectorAll('.tab-page').forEach(p => { p.style.display = 'none'; p.classList.remove('with-subbar'); });
   document.querySelectorAll('.tab-btn,.tab-custom-btn').forEach(b => b.classList.remove('active'));
@@ -10104,7 +10135,7 @@ function initSidebarControls() {
   const sb      = document.getElementById('sidebar');
   const handle  = document.getElementById('sb-handle');
   const resizeW = document.getElementById('sb-resize-w');
-  if (!sb || !handle || !resizeW) return;
+  if (!sb || !resizeW) return;
 
   // Restore saved width (handled by applySidebarLayout below)
   const saved = _loadSbLayout();
