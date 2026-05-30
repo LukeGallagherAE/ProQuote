@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ProQuote — Option B: Split View + Floating Totals</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--surface2:#f0efeb;--border:#e4e2dc;--border2:#d5d3cc;
+  --text:#1a1916;--muted:#8a8680;--accent:#c8a04a;--r:10px;
+  --icon-nav:52px;--topbar:52px;--subbar:36px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;background:var(--bg);color:var(--text)}
+input,select{font-family:inherit;font-size:inherit}
+
+/* ── TOP BAR ─────────────────────────────────────────────────── */
+.topbar{position:fixed;top:0;left:0;right:0;height:var(--topbar);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;z-index:300;gap:0}
+.topbar-brand{width:var(--icon-nav);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:var(--accent);letter-spacing:-.5px;border-right:1px solid var(--border);height:100%}
+.tab-bar{display:flex;align-items:stretch;height:100%;overflow:hidden;flex:1;padding:0 6px;gap:2px}
+.tab{display:flex;align-items:center;padding:0 12px;font-size:11px;font-weight:600;border-radius:6px 6px 0 0;cursor:pointer;gap:6px;white-space:nowrap;border:1px solid transparent;border-bottom:none;color:var(--muted);margin-top:6px}
+.tab.active{background:var(--bg);border-color:var(--border);color:var(--text)}
+.tab-rev{font-size:10px;font-weight:700;color:var(--muted);padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:var(--surface2)}
+.tab-rev.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.topbar-actions{display:flex;align-items:center;gap:6px;padding:0 12px;border-left:1px solid var(--border);height:100%}
+.btn{padding:5px 12px;border-radius:6px;border:1px solid var(--border2);background:var(--surface);font-size:11px;font-weight:600;cursor:pointer;color:var(--text)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--muted)}
+
+/* ── ICON NAV ─────────────────────────────────────────────────── */
+.icon-nav{position:fixed;top:var(--topbar);left:0;bottom:0;width:var(--icon-nav);background:var(--surface);border-right:1px solid var(--border);z-index:200;display:flex;flex-direction:column;align-items:center;padding-top:8px;gap:2px}
+.nav-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;color:var(--muted)}
+.nav-icon.active{background:rgba(200,160,74,.15);color:var(--accent)}
+
+/* ─── KEY CHANGE B: SPLIT LAYOUT ─────────────────────────────────
+   Instead of fixed right sidebar + main with margin-right:
+   Use a CSS grid with two resizable panes side by side.
+   Left pane = quote sections (scrollable)
+   Right pane = totals + client info + actions (scrollable separately)
+   Both panes share the same top-level scroll container so sticky headers still work.
+─────────────────────────────────────────────────────────────────── */
+.quote-layout{
+  position:fixed;
+  top:calc(var(--topbar) + var(--subbar));
+  left:var(--icon-nav);
+  right:0;
+  bottom:0;
+  display:grid;
+  /* ─── KEY: 1fr takes all remaining space, right pane fixed 280px ─── */
+  grid-template-columns:1fr 280px;
+  grid-template-rows:1fr 56px;
+  overflow:hidden;
+}
+
+/* Left: quote content — full height, own scroll */
+.quote-left{
+  grid-column:1;
+  grid-row:1;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:16px 24px 40px;
+  background:var(--bg);
+}
+
+/* Right: totals panel — full height, own scroll */
+.quote-right{
+  grid-column:2;
+  grid-row:1 / 3; /* spans both rows including the totals strip */
+  overflow-y:auto;
+  background:var(--surface);
+  border-left:1px solid var(--border);
+  padding:0;
+}
+
+/* Bottom totals strip — only under the left pane */
+.quote-totstrip{
+  grid-column:1;
+  grid-row:2;
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  padding:0 16px;
+  gap:0;
+}
+
+/* ── QUOTE SUB-BAR ─────────────────────────────────────────────── */
+.subbar{
+  position:fixed;top:var(--topbar);left:var(--icon-nav);right:0;
+  height:var(--subbar);
+  background:var(--surface2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 14px;gap:8px;z-index:200;
+}
+.subbar-input{border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-size:11px;background:var(--surface);height:24px;color:var(--text)}
+.subbar-sep{width:1px;height:18px;background:var(--border);margin:0 4px}
+.badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;letter-spacing:.3px}
+.badge-green{background:rgba(34,197,94,.15);color:#166534}
+
+/* ── SECTION CARDS ──────────────────────────────────────────────── */
+.section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.section-header{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:15;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+.section-name{font-size:13px;font-weight:700;flex:1}
+.section-meta{font-size:10px;color:var(--muted);display:flex;gap:10px}
+.section-actions{display:flex;gap:4px;margin-left:auto}
+.btn-icon{width:26px;height:26px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+
+/* PARENT HEADER — slightly more padding than option A since we have more width */
+.parent-header{display:grid;grid-template-columns:14px 20px auto 1fr 56px 60px 90px auto;align-items:center;gap:8px;padding:10px 16px;background:var(--surface);position:sticky;top:38px;z-index:10;box-shadow:0 2px 4px rgba(0,0,0,.04);border-bottom:1px solid var(--border)}
+.parent-header:hover{background:#fafaf8}
+.parent-name-wrap{display:flex;flex-direction:column;gap:2px;min-width:0}
+.parent-name{border:none;background:transparent;font-size:12px;font-weight:600;width:100%;outline:none}
+.parent-desc{border:none;background:transparent;font-size:10px;color:var(--muted);width:100%;outline:none}
+.cat-pill{font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;letter-spacing:.3px;white-space:nowrap}
+.cat-pill.supply{background:rgba(59,130,246,.12);color:#1d4ed8}
+.cat-pill.install{background:rgba(34,197,94,.12);color:#166534}
+.cat-pill.both{background:rgba(200,160,74,.12);color:#92400e}
+.num-input{border:1px solid var(--border);border-radius:4px;padding:2px 5px;font-size:11px;text-align:right;background:var(--surface);height:24px;width:100%}
+.parent-total{font-size:12px;font-weight:700;text-align:right;font-family:'SF Mono',monospace}
+.parent-actions{display:flex;gap:3px}
+.drag-handle{font-size:10px;color:var(--muted);opacity:.4;cursor:grab}
+.collapse-btn{font-size:11px;color:var(--muted);cursor:pointer;background:none;border:none;padding:0}
+
+/* SUBITEMS — ─── KEY CHANGE B: full 10-col layout since we have more width ─── */
+.subitems-wrap{background:var(--surface2);border-top:1px solid var(--border)}
+.sub-col-headers{display:grid;grid-template-columns:48px 1fr 40px 58px 50px 50px minmax(72px,1fr) minmax(72px,1fr) minmax(84px,1fr) 28px;gap:6px;padding:5px 12px;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+.subitem-row{display:grid;grid-template-columns:48px 1fr 40px 58px 50px 50px minmax(72px,1fr) minmax(72px,1fr) minmax(84px,1fr) 28px;gap:6px;padding:6px 12px;align-items:center;border-bottom:1px solid var(--border);transition:background .08s}
+.subitem-row:hover{background:#f7f6f2}
+.subitem-row:last-child{border-bottom:none}
+.subitem-row input,.subitem-row select{padding:2px 4px;font-size:11px;border-radius:4px;height:24px;border:1px solid transparent;background:transparent;width:100%}
+.subitem-row input:hover,.subitem-row select:hover{border-color:var(--border);background:var(--surface)}
+.subitem-row input:focus,.subitem-row select:focus{border-color:var(--accent);background:var(--surface);outline:none}
+.item-name-cell{display:flex;flex-direction:column;gap:1px;min-width:0}
+.item-name{font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-code{font-size:9px;color:var(--muted)}
+.sub-total{font-size:11px;font-weight:700;font-family:'SF Mono',monospace;text-align:right}
+.add-sub-row{display:flex;align-items:center;gap:6px;padding:5px 12px;cursor:pointer;color:var(--muted);font-size:11px;border-top:1px dashed var(--border)}
+.add-sub-row:hover{color:var(--accent);background:rgba(200,160,74,.04)}
+
+/* SECTION FOOTER */
+.section-footer{display:grid;grid-template-columns:1fr 84px 84px 90px 36px;gap:6px;align-items:center;padding:8px 16px;background:var(--surface2);border-top:2px solid var(--border);font-size:11px;font-weight:600}
+
+/* ── RIGHT PANEL ────────────────────────────────────────────────── */
+.right-panel-header{padding:12px 14px;border-bottom:1px solid var(--border);background:var(--surface2);position:sticky;top:0;z-index:5}
+.right-panel-title{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;justify-content:space-between}
+.right-section{padding:12px 14px;border-bottom:1px solid var(--border)}
+.right-section-title{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.tot-row{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;font-size:11px}
+.tot-row.total{font-weight:700;font-size:13px;padding-top:6px;margin-top:4px;border-top:2px solid var(--border)}
+.tot-label{color:var(--muted)}
+.tot-val{font-weight:600;font-family:'SF Mono',monospace}
+.tot-val.accent{color:var(--accent);font-size:15px}
+.section-bar{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11px;cursor:pointer;border-radius:4px;padding:4px 6px;margin:0 -6px}
+.section-bar:hover{background:var(--surface2)}
+.section-bar.active{background:rgba(200,160,74,.08);font-weight:600}
+.section-bar-total{font-family:'SF Mono',monospace;font-size:11px}
+
+/* Client info fields in right panel */
+.field-group{margin-bottom:10px}
+.field-label{font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.field-input{width:100%;border:1px solid var(--border);border-radius:5px;padding:5px 8px;font-size:11px;background:var(--surface);color:var(--text)}
+.field-input:focus{border-color:var(--accent);outline:none}
+
+/* TOTALS STRIP */
+.tot-tile{padding:0 14px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:1px}
+.tot-tile:first-child{border-left:none}
+.tl{font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.tv{font-size:15px;font-weight:700;font-family:'SF Mono',monospace;letter-spacing:-.5px}
+.tv.accent{color:var(--accent)}
+
+/* CHANGE NOTES */
+.change-note{background:rgba(200,160,74,.08);border:1px solid rgba(200,160,74,.3);border-radius:6px;padding:8px 12px;font-size:10px;color:#92400e;margin-bottom:12px;line-height:1.6}
+
+/* RESIZE HANDLE visual hint */
+.resize-handle-vis{position:absolute;left:-2px;top:0;bottom:0;width:4px;background:transparent;cursor:col-resize;display:flex;align-items:center;justify-content:center}
+.resize-handle-vis:hover{background:rgba(200,160,74,.3)}
+.resize-handle-vis::after{content:'⋮';font-size:10px;color:var(--muted);opacity:.5}
+
+/* BREADCRUMB SUBBAR DETAIL */
+.subbar-breadcrumb{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.subbar-breadcrumb span{font-weight:600;color:var(--text)}
+.subbar-breadcrumb .sep{opacity:.4}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-brand">PQ</div>
+  <div class="tab-bar">
+    <div class="tab" style="color:var(--muted)">Dashboard</div>
+    <div class="tab active" style="display:flex;align-items:center;gap:4px">
+      <span>Sunrise Retail — Level 2</span>
+      <span class="tab-rev active">Rev A ●</span>
+      <span class="tab-rev">Rev B</span>
+      <span style="font-size:11px;color:var(--muted);padding:2px 4px;cursor:pointer">▾</span>
+    </div>
+    <div class="tab" style="color:var(--muted)">Harding Residence</div>
+    <div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted);cursor:pointer;margin-left:4px">＋</div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn">⎙ Print</button>
+    <button class="btn btn-primary">✉ Email</button>
+  </div>
+</div>
+
+<!-- QUOTE SUB-BAR — ─── KEY CHANGE B: shows breadcrumb context while scrolling ─── -->
+<div class="subbar">
+  <div class="subbar-breadcrumb">
+    <span>Q-2026-047</span>
+    <span class="sep">›</span>
+    <span style="color:var(--muted)">Rev A</span>
+    <span class="sep">›</span>
+    <span style="font-style:italic;font-weight:400">Fit-Out — Level 2</span>
+    <span class="sep">›</span>
+    <span style="font-style:italic;font-weight:400">GPO Ring Main — Area A</span>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:6px">
+    <span class="badge badge-green">● DRAFT</span>
+    <button class="btn" style="height:26px;padding:0 10px;font-size:10px">＋ Section</button>
+    <button class="btn" style="height:26px;padding:0 10px;font-size:10px">⚡ AI</button>
+    <button class="btn" style="height:26px;padding:0 10px;font-size:10px">BOM</button>
+  </div>
+</div>
+
+<!-- ICON NAV -->
+<div class="icon-nav">
+  <div class="nav-icon">🏠</div>
+  <div class="nav-icon active">📋</div>
+  <div class="nav-icon">📦</div>
+  <div class="nav-icon">📊</div>
+  <div class="nav-icon" style="margin-top:auto;margin-bottom:8px">⚙</div>
+</div>
+
+<!-- ─── SPLIT LAYOUT ─────────────────────────────────────────────── -->
+<div class="quote-layout">
+
+  <!-- LEFT PANE: quote sections -->
+  <div class="quote-left">
+
+    <div class="change-note">
+      <strong>Option B — Split View + Persistent Right Panel</strong><br>
+      Key changes: (1) No fixed sidebar overlapping the content — instead a proper CSS grid split.
+      The right panel scrolls independently so client info + totals are always visible.
+      (2) The subbar shows a breadcrumb of where you are as you scroll deep into a quote —
+      "Q-2026-047 › Rev A › Fit-Out Level 2 › GPO Ring Main".
+      (3) Right panel has a resize handle (drag to make it narrower/wider).
+      (4) Actions panel at the bottom of the right panel (Publish, Email) so the bottom totals strip
+      can be slimmer / removed entirely.
+    </div>
+
+    <!-- SECTION CARD -->
+    <div class="section-card">
+      <div class="section-header">
+        <div style="cursor:grab;opacity:.4;font-size:12px">⠿</div>
+        <div class="section-name">Fit-Out — Level 2</div>
+        <div class="section-meta">
+          <span>3 items</span>
+          <span>·</span>
+          <span>$11,640 excl. GST</span>
+        </div>
+        <div class="section-actions">
+          <button class="btn-icon">＋</button>
+          <button class="btn-icon">⋯</button>
+        </div>
+      </div>
+
+      <!-- PARENT 1: expanded -->
+      <div class="parent-header" style="background:#fafaf8">
+        <div class="drag-handle">⠿</div>
+        <button class="collapse-btn">▾</button>
+        <span class="cat-pill both">M+I</span>
+        <div class="parent-name-wrap">
+          <input class="parent-name" value="GPO Ring Main — Area A">
+          <input class="parent-desc" value="20A ring circuit, 6× double GPO">
+        </div>
+        <input class="num-input" value="1">
+        <input class="num-input" value="0%">
+        <div class="parent-total">$3,840</div>
+        <div class="parent-actions"><button class="btn-icon">⋯</button></div>
+      </div>
+
+      <div class="subitems-wrap">
+        <!-- Full 10-col layout — works because we have more width without the 248px sidebar -->
+        <div class="sub-col-headers">
+          <div>Type</div>
+          <div>Item</div>
+          <div>Qty</div>
+          <div>Markup%</div>
+          <div>Wire m</div>
+          <div>Inst m</div>
+          <div>Mat. Price</div>
+          <div>Lab. Price</div>
+          <div>Total</div>
+          <div></div>
+        </div>
+        <div class="subitem-row">
+          <select style="border:1px solid var(--border);border-radius:4px;height:24px;font-size:10px;background:var(--surface)"><option>Supply</option><option>Install</option><option selected>Both</option></select>
+          <div class="item-name-cell">
+            <div class="item-name">Double GPO 20A White</div>
+            <div class="item-code">CAT-GPO-D20W</div>
+          </div>
+          <input type="number" value="6" style="text-align:right">
+          <input type="number" value="25%" style="text-align:right">
+          <input type="number" value="0" style="text-align:right">
+          <input type="number" value="0.5" style="text-align:right">
+          <div class="sub-total" style="font-weight:400;color:var(--muted)">$192</div>
+          <div class="sub-total" style="font-weight:400;color:var(--muted)">$192</div>
+          <div class="sub-total">$480</div>
+          <button class="btn-icon" style="width:22px;height:22px;font-size:10px">⋯</button>
+        </div>
+        <div class="subitem-row">
+          <select style="border:1px solid var(--border);border-radius:4px;height:24px;font-size:10px;background:var(--surface)"><option>Supply</option><option>Install</option><option selected>Both</option></select>
+          <div class="item-name-cell">
+            <div class="item-name">2.5mm TPS Cable</div>
+            <div class="item-code">CAT-CABLE-TPS25</div>
+          </div>
+          <input type="number" value="1" style="text-align:right">
+          <input type="number" value="25%" style="text-align:right">
+          <input type="number" value="45" style="text-align:right">
+          <input type="number" value="2" style="text-align:right">
+          <div class="sub-total" style="font-weight:400;color:var(--muted)">$360</div>
+          <div class="sub-total" style="font-weight:400;color:var(--muted)">$160</div>
+          <div class="sub-total">$650</div>
+          <button class="btn-icon" style="width:22px;height:22px;font-size:10px">⋯</button>
+        </div>
+        <div class="subitem-row">
+          <select style="border:1px solid var(--border);border-radius:4px;height:24px;font-size:10px;background:var(--surface)"><option>Supply</option><option selected>Install</option><option>Both</option></select>
+          <div class="item-name-cell">
+            <div class="item-name">Conduit & Fittings</div>
+            <div class="item-code">CAT-COND-MIX</div>
+          </div>
+          <input type="number" value="1" style="text-align:right">
+          <input type="number" value="20%" style="text-align:right">
+          <input type="number" value="0" style="text-align:right">
+          <input type="number" value="3" style="text-align:right">
+          <div class="sub-total" style="font-weight:400;color:var(--muted)">$32</div>
+          <div class="sub-total" style="font-weight:400;color:var(--muted)">$240</div>
+          <div class="sub-total">$272</div>
+          <button class="btn-icon" style="width:22px;height:22px;font-size:10px">⋯</button>
+        </div>
+        <div class="subitem-row">
+          <select style="border:1px solid var(--border);border-radius:4px;height:24px;font-size:10px;background:var(--surface)"><option selected>Supply</option><option>Install</option><option>Both</option></select>
+          <div class="item-name-cell">
+            <div class="item-name">Cable Management Tray</div>
+            <div class="item-code">CAT-TRAY-100</div>
+          </div>
+          <input type="number" value="3" style="text-align:right">
+          <input type="number" value="30%" style="text-align:right">
+          <input type="number" value="0" style="text-align:right">
+          <input type="number" value="0" style="text-align:right">
+          <div class="sub-total" style="font-weight:400;color:var(--muted)">$585</div>
+          <div class="sub-total" style="font-weight:400;color:var(--muted)">$0</div>
+          <div class="sub-total">$761</div>
+          <button class="btn-icon" style="width:22px;height:22px;font-size:10px">⋯</button>
+        </div>
+        <div class="add-sub-row">＋ Add item</div>
+      </div>
+
+      <!-- PARENT 2: collapsed -->
+      <div class="parent-header">
+        <div class="drag-handle">⠿</div>
+        <button class="collapse-btn" style="transform:rotate(-90deg)">▾</button>
+        <span class="cat-pill both">M+I</span>
+        <div class="parent-name-wrap">
+          <input class="parent-name" value="Lighting Circuit — Area A">
+          <input class="parent-desc" value="2× 20A lighting circuits, 8× LED downlights">
+        </div>
+        <input class="num-input" value="1">
+        <input class="num-input" value="0%">
+        <div class="parent-total">$2,960</div>
+        <div class="parent-actions"><button class="btn-icon">⋯</button></div>
+      </div>
+
+      <!-- PARENT 3: collapsed -->
+      <div class="parent-header">
+        <div class="drag-handle">⠿</div>
+        <button class="collapse-btn" style="transform:rotate(-90deg)">▾</button>
+        <span class="cat-pill install">Install</span>
+        <div class="parent-name-wrap">
+          <input class="parent-name" value="Data & AV Rough-In">
+          <input class="parent-desc" value="Cat6 to 12× outlets, HDMI backbone">
+        </div>
+        <input class="num-input" value="1">
+        <input class="num-input" value="0%">
+        <div class="parent-total">$1,840</div>
+        <div class="parent-actions"><button class="btn-icon">⋯</button></div>
+      </div>
+
+      <!-- SECTION FOOTER -->
+      <div class="section-footer">
+        <div style="color:var(--muted);font-size:10px">3 parent items · 4 subitems shown</div>
+        <div style="text-align:right;color:var(--muted)">Material</div>
+        <div style="text-align:right;font-family:'SF Mono',monospace">$7,160</div>
+        <div style="text-align:right;color:var(--muted)">Labour</div>
+        <div style="text-align:right;font-family:'SF Mono',monospace;color:var(--accent)">$4,480</div>
+      </div>
+
+      <div style="padding:8px 16px">
+        <button style="width:100%;padding:7px;border:1px dashed var(--border2);border-radius:6px;background:transparent;font-size:11px;color:var(--muted);cursor:pointer">＋ Add parent item to this section</button>
+      </div>
+    </div>
+
+    <!-- SECOND SECTION -->
+    <div class="section-card" style="opacity:.7">
+      <div class="section-header">
+        <div style="cursor:grab;opacity:.4;font-size:12px">⠿</div>
+        <div class="section-name">External Works</div>
+        <div class="section-meta"><span>2 items</span><span>·</span><span>$2,890 excl. GST</span></div>
+        <div class="section-actions"><button class="btn-icon">＋</button><button class="btn-icon">⋯</button></div>
+      </div>
+      <div class="parent-header">
+        <div class="drag-handle">⠿</div>
+        <button class="collapse-btn" style="transform:rotate(-90deg)">▾</button>
+        <span class="cat-pill supply">Supply</span>
+        <div class="parent-name-wrap"><input class="parent-name" value="External Cable Entry"><input class="parent-desc" value="Underground duct, draw rope, seals"></div>
+        <input class="num-input" value="1">
+        <input class="num-input" value="0%">
+        <div class="parent-total">$2,890</div>
+        <div class="parent-actions"><button class="btn-icon">⋯</button></div>
+      </div>
+      <div style="padding:8px 16px"><button style="width:100%;padding:7px;border:1px dashed var(--border2);border-radius:6px;background:transparent;font-size:11px;color:var(--muted);cursor:pointer">＋ Add parent item</button></div>
+    </div>
+
+  </div><!-- /quote-left -->
+
+  <!-- BOTTOM TOTALS STRIP (under left pane only) -->
+  <div class="quote-totstrip">
+    <div class="tot-tile"><span class="tl">Material</span><span class="tv">$16,240</span></div>
+    <div class="tot-tile"><span class="tl">Labour</span><span class="tv">$9,860</span></div>
+    <div class="tot-tile"><span class="tl">Margin</span><span class="tv">18%</span></div>
+    <div class="tot-tile"><span class="tl">Excl. GST</span><span class="tv accent">$27,960</span></div>
+    <div class="tot-tile"><span class="tl">Incl. GST</span><span class="tv">$30,756</span></div>
+  </div>
+
+  <!-- RIGHT PANE: totals + client info + actions -->
+  <div class="quote-right" style="position:relative">
+    <!-- Resize handle hint -->
+    <div class="resize-handle-vis" title="Drag to resize"></div>
+
+    <div class="right-panel-header">
+      <div class="right-panel-title">
+        <span>Quote Details</span>
+        <button class="btn" style="padding:2px 8px;font-size:9px;color:var(--muted)">◀ Hide</button>
+      </div>
+    </div>
+
+    <!-- Client info -->
+    <div class="right-section">
+      <div class="right-section-title">Client</div>
+      <div class="field-group">
+        <div class="field-label">Company</div>
+        <input class="field-input" value="Sunrise Retail Pty Ltd">
+      </div>
+      <div class="field-group">
+        <div class="field-label">Contact</div>
+        <input class="field-input" value="Sarah Chen">
+      </div>
+      <div class="field-group">
+        <div class="field-label">Email</div>
+        <input class="field-input" value="sarah.chen@sunriseretail.com.au">
+      </div>
+      <div class="field-group">
+        <div class="field-label">Site Address</div>
+        <input class="field-input" value="45 Market Street, Melbourne VIC">
+      </div>
+    </div>
+
+    <!-- Section breakdown -->
+    <div class="right-section">
+      <div class="right-section-title">Sections</div>
+      <div class="section-bar"><span>Switchboard Upgrade</span><span class="section-bar-total">$4,280</span></div>
+      <div class="section-bar"><span>Fit-Out — Level 1</span><span class="section-bar-total">$9,150</span></div>
+      <div class="section-bar active"><span>Fit-Out — Level 2</span><span class="section-bar-total" style="color:var(--accent)">$11,640</span></div>
+      <div class="section-bar"><span>External Works</span><span class="section-bar-total">$2,890</span></div>
+    </div>
+
+    <!-- Quote totals -->
+    <div class="right-section">
+      <div class="right-section-title">Totals</div>
+      <div class="tot-row"><span class="tot-label">Material</span><span class="tot-val">$16,240</span></div>
+      <div class="tot-row"><span class="tot-label">Labour</span><span class="tot-val">$9,860</span></div>
+      <div class="tot-row"><span class="tot-label">Subtotal</span><span class="tot-val">$26,100</span></div>
+      <div class="tot-row"><span class="tot-label">Margin (7%)</span><span class="tot-val">$1,860</span></div>
+      <div class="tot-row total"><span>Excl. GST</span><span class="tot-val accent">$27,960</span></div>
+      <div class="tot-row" style="font-size:13px;font-weight:700;padding-top:4px"><span>Incl. GST</span><span class="tot-val" style="font-size:16px">$30,756</span></div>
+    </div>
+
+    <!-- Variations -->
+    <div class="right-section">
+      <div class="right-section-title">Variations</div>
+      <div style="font-size:10px;color:var(--muted);font-style:italic">No variations added</div>
+      <button class="btn" style="margin-top:8px;width:100%;font-size:10px;padding:5px">＋ Add Variation</button>
+    </div>
+
+    <!-- Actions -->
+    <div class="right-section" style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-primary" style="width:100%;padding:8px;font-size:12px">✉ Email Quote</button>
+      <button class="btn" style="width:100%;padding:7px;font-size:11px">⎙ Print / PDF</button>
+      <button class="btn" style="width:100%;padding:7px;font-size:11px">🔗 Publish Link</button>
+      <button class="btn" style="width:100%;padding:7px;font-size:11px;color:var(--muted)">⎘ Duplicate / New Revision</button>
+    </div>
+
+  </div><!-- /quote-right -->
+
+</div><!-- /quote-layout -->
+
+</body>
+</html>
