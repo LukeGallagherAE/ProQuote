@@ -2726,6 +2726,7 @@ function _restoreFields(fields) {
 function saveActiveQuoteState() {
   const q = _quotes.find(q => q.id === _activeQuoteId);
   if (!q) return;
+  if (q._placeholder) return;
   if (q._locked) {
     showToast('🔒 This version is locked — switch to the latest revision to edit', 3000);
     return;
@@ -12679,6 +12680,8 @@ function init(){
     } catch(e) {}
   }
   const firstQ = _newQuoteState({ fields: _captureFields(), sections: [] });
+  firstQ._hiddenTab = true;
+  firstQ._placeholder = true;
   _quotes.push(firstQ);
   _activeQuoteId = firstQ.id;
   renderQuoteTabs();
