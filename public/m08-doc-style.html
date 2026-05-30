@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>m08 — Doc Style</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#d8d6d0;--surface:#fff;--surface2:#f7f6f2;
+  --border:#ddd;--border2:#ccc;
+  --text:#1a1916;--muted:#8a8680;
+  --accent:#c8a04a;--r:4px;
+}
+body{font-family:Georgia,'Times New Roman',serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+
+/* Minimal chrome at top */
+.topbar{height:44px;background:#2d2b27;display:flex;align-items:center;padding:0 20px;gap:12px;position:fixed;top:0;left:0;right:0;z-index:100}
+.logo{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:700;font-size:14px;color:var(--accent);margin-right:8px}
+.toolbar-btn{padding:5px 12px;border-radius:5px;font-size:12px;cursor:pointer;color:#aaa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:transparent;border:1px solid #444}
+.toolbar-btn.primary{background:var(--accent);color:#1a1916;border-color:var(--accent);font-weight:600}
+.toolbar-spacer{flex:1}
+
+.subbar{height:32px;background:#3a3835;display:flex;align-items:center;padding:0 20px;gap:16px;position:fixed;top:44px;left:0;right:0;z-index:99;font-size:11px;color:#888;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.subbar span{color:#ccc;font-weight:600}
+
+/* Page area */
+.page-area{position:fixed;top:76px;left:0;right:0;bottom:0;overflow-y:auto;display:flex;justify-content:center;padding:32px 20px 40px;background:var(--bg)}
+
+/* A4-ish document */
+.doc{width:900px;background:var(--surface);border-radius:2px;box-shadow:0 2px 20px rgba(0,0,0,0.2);padding:48px 56px;min-height:calc(100vh - 76px - 72px)}
+
+/* Document header */
+.doc-header{border-bottom:2px solid var(--text);padding-bottom:24px;margin-bottom:32px;display:flex;justify-content:space-between;align-items:flex-start}
+.doc-title{font-size:24px;font-weight:700;letter-spacing:-.3px;margin-bottom:4px}
+.doc-subtitle{font-size:14px;color:var(--muted)}
+.doc-meta{text-align:right}
+.doc-meta-ref{font-size:22px;font-weight:700;color:var(--accent)}
+.doc-meta-detail{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.7}
+
+/* Client block */
+.client-block{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid var(--border)}
+.client-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:4px}
+.client-value{font-size:14px;font-weight:600}
+
+/* Section title */
+.section-title{font-size:15px;font-weight:700;margin:24px 0 12px;padding:8px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:baseline}
+.section-title span{font-size:13px;font-weight:400;color:var(--muted)}
+.parent-title{font-size:13px;font-weight:700;margin:12px 0 6px;color:var(--text);font-style:italic}
+
+/* Table */
+.quote-table{width:100%;border-collapse:collapse;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;margin-bottom:16px}
+.quote-table thead th{border-bottom:1px solid var(--border2);padding:5px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:600}
+.quote-table tbody td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:middle}
+.quote-table tbody tr:last-child td{border-bottom:none}
+.quote-table tbody tr:hover td{background:#fafaf8}
+.num{text-align:right}
+.type-badge{padding:2px 5px;border-radius:3px;font-size:9px;font-weight:600;background:#eee;color:#666}
+.type-badge.cable{background:#e8f4fd;color:#1a6fa8}
+.type-badge.point{background:#edf7ed;color:#2d7a2d}
+
+/* Totals at bottom of doc */
+.doc-totals{margin-top:32px;border-top:2px solid var(--text);padding-top:20px;display:flex;justify-content:flex-end}
+.totals-table{width:280px}
+.totals-table tr td{padding:5px 0}
+.totals-table tr td:last-child{text-align:right;font-weight:600}
+.totals-table tr.grand-total td{font-size:16px;font-weight:700;color:var(--accent);padding-top:10px;border-top:1px solid var(--border2)}
+
+/* floating doc badge */
+.doc-status{display:inline-block;padding:3px 10px;border-radius:3px;font-size:11px;font-weight:700;background:#edf7ed;color:#2d7a2d;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:.3px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">ProQuote</div>
+  <div class="toolbar-btn">Edit</div>
+  <div class="toolbar-btn">Print</div>
+  <div class="toolbar-btn">Export PDF</div>
+  <div class="toolbar-spacer"></div>
+  <div class="toolbar-btn primary">Send to Client</div>
+</div>
+
+<div class="subbar">
+  QT-2024-089 &nbsp;·&nbsp; <span>Sunrise Retail Pty Ltd</span> &nbsp;·&nbsp; Created 30 May 2026 &nbsp;·&nbsp; <span style="color:#6ab86a">Draft</span>
+</div>
+
+<div class="page-area">
+  <div class="doc">
+
+    <div class="doc-header">
+      <div>
+        <div class="doc-title">Electrical Works Quote</div>
+        <div class="doc-subtitle">Sunrise Retail — Level 2 Fit-Out &amp; External Works</div>
+        <div style="margin-top:10px"><span class="doc-status">DRAFT</span></div>
+      </div>
+      <div class="doc-meta">
+        <div class="doc-meta-ref">QT-2024-089</div>
+        <div class="doc-meta-detail">
+          Date: 30 May 2026<br>
+          Valid Until: 30 Jun 2026<br>
+          Prepared by: Luke — Adonai Electrical
+        </div>
+      </div>
+    </div>
+
+    <div class="client-block">
+      <div>
+        <div class="client-label">Client</div>
+        <div class="client-value">Sunrise Retail Pty Ltd</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">ABN 45 123 456 789</div>
+      </div>
+      <div>
+        <div class="client-label">Site Address</div>
+        <div class="client-value">Level 2, 100 Market St</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">Sydney NSW 2000</div>
+      </div>
+      <div>
+        <div class="client-label">Contact</div>
+        <div class="client-value">Jane Smith</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">jane@sunriseretail.com.au</div>
+      </div>
+    </div>
+
+    <div class="section-title">
+      Fit-Out — Level 2
+      <span>$21,760 excl GST</span>
+    </div>
+
+    <div class="parent-title">GPO Ring Main</div>
+    <table class="quote-table">
+      <thead>
+        <tr>
+          <th style="width:70px">Type</th><th>Description</th>
+          <th class="num">Qty</th><th class="num">Unit Mat</th>
+          <th class="num">Labour</th><th class="num">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="type-badge cable">Cable</span></td>
+          <td>2.5mm² TPS 3-core — GPO ring main run</td>
+          <td class="num">120m</td><td class="num">$4.05</td>
+          <td class="num">—</td><td class="num" style="font-weight:600">$486</td>
+        </tr>
+        <tr>
+          <td><span class="type-badge point">Point</span></td>
+          <td>Double GPO 10A flush white — all areas</td>
+          <td class="num">18</td><td class="num">$36.00</td>
+          <td class="num">$1,080</td><td class="num" style="font-weight:600">$1,728</td>
+        </tr>
+        <tr>
+          <td><span class="type-badge point">Point</span></td>
+          <td>Single GPO 10A flush white — cleaners/service</td>
+          <td class="num">6</td><td class="num">$27.00</td>
+          <td class="num">$288</td><td class="num" style="font-weight:600">$450</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="parent-title">Lighting Circuit</div>
+    <table class="quote-table">
+      <thead>
+        <tr>
+          <th style="width:70px">Type</th><th>Description</th>
+          <th class="num">Qty</th><th class="num">Unit Mat</th>
+          <th class="num">Labour</th><th class="num">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="type-badge cable">Cable</span></td>
+          <td>1.5mm² TPS 2-core — lighting circuit</td>
+          <td class="num">85m</td><td class="num">$3.20</td>
+          <td class="num">—</td><td class="num" style="font-weight:600">$272</td>
+        </tr>
+        <tr>
+          <td><span class="type-badge point">Point</span></td>
+          <td>LED Downlight 9W white trim — office spaces</td>
+          <td class="num">24</td><td class="num">$47.25</td>
+          <td class="num">$1,728</td><td class="num" style="font-weight:600">$2,862</td>
+        </tr>
+        <tr>
+          <td><span class="type-badge point">Point</span></td>
+          <td>Switch 1-gang white — corridor/entries</td>
+          <td class="num">8</td><td class="num">$25.00</td>
+          <td class="num">$288</td><td class="num" style="font-weight:600">$488</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-title">
+      External Works
+      <span>$9,340 excl GST</span>
+    </div>
+
+    <div class="parent-title">External Lighting &amp; Car Park Power</div>
+    <table class="quote-table">
+      <thead>
+        <tr>
+          <th style="width:70px">Type</th><th>Description</th>
+          <th class="num">Qty</th><th class="num">Unit Mat</th>
+          <th class="num">Labour</th><th class="num">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="type-badge point">Point</span></td>
+          <td>Floodlight 50W LED — external facade</td>
+          <td class="num">6</td><td class="num">$182.00</td>
+          <td class="num">$648</td><td class="num" style="font-weight:600">$1,740</td>
+        </tr>
+        <tr>
+          <td><span class="type-badge point">Point</span></td>
+          <td>PIR sensor outdoor IP65</td>
+          <td class="num">4</td><td class="num">$130.00</td>
+          <td class="num">$288</td><td class="num" style="font-weight:600">$808</td>
+        </tr>
+        <tr>
+          <td><span class="type-badge point">Point</span></td>
+          <td>3-phase socket 32A weatherproof</td>
+          <td class="num">2</td><td class="num">$324.00</td>
+          <td class="num">$576</td><td class="num" style="font-weight:600">$1,224</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="doc-totals">
+      <table class="totals-table">
+        <tr><td>Materials (excl GST)</td><td>$18,420</td></tr>
+        <tr><td>Labour (excl GST)</td><td>$12,680</td></tr>
+        <tr><td style="padding-top:8px;border-top:1px solid #eee">Subtotal Excl GST</td><td style="padding-top:8px;border-top:1px solid #eee">$31,100</td></tr>
+        <tr><td>GST (10%)</td><td>$3,110</td></tr>
+        <tr class="grand-total"><td>TOTAL INCL GST</td><td style="color:var(--accent)">$34,210</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

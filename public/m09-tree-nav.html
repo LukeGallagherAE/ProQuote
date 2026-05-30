@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>m09 — Tree Nav</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--surface2:#f0efeb;
+  --border:#e4e2dc;--border2:#d5d3cc;
+  --text:#1a1916;--muted:#8a8680;
+  --accent:#c8a04a;--r:10px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:8px;position:fixed;top:0;left:0;right:0;z-index:100}
+.logo{font-weight:700;font-size:15px;color:var(--accent);margin-right:8px}
+.tab{padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;color:var(--muted)}
+.tab.active{background:var(--surface2);color:var(--text);font-weight:600}
+
+.subbar{height:36px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px 0 244px;gap:20px;position:fixed;top:52px;left:0;right:0;z-index:99}
+.subbar-field{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.subbar-field span{color:var(--text);font-weight:600;font-size:13px}
+
+/* ICON NAV — leftmost 52px */
+.leftnav{width:52px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:88px;left:0;bottom:62px;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;z-index:98}
+.nav-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;color:var(--muted)}
+.nav-icon.active{background:var(--surface2);color:var(--accent)}
+
+/* TREE NAV — 180px wide, next to icon nav */
+.treenav{width:180px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:88px;left:52px;bottom:62px;display:flex;flex-direction:column;z-index:97;overflow-y:auto}
+.treenav-header{padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.tree-section{padding:8px 0;border-bottom:1px solid var(--border)}
+.tree-section-label{padding:6px 12px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;cursor:pointer}
+.tree-section-label:hover{background:var(--surface2)}
+.tree-expand{color:var(--muted);font-size:10px;width:12px}
+.tree-item{padding:5px 12px 5px 30px;font-size:12px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:6px}
+.tree-item:hover{background:var(--surface2);color:var(--text)}
+.tree-item.active{background:#fef9ef;color:var(--accent);font-weight:600}
+.tree-item-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+.sidebar{width:248px;background:var(--surface);border-left:1px solid var(--border);position:fixed;top:88px;right:0;bottom:62px;display:flex;flex-direction:column;z-index:97}
+.sidebar-header{padding:14px 16px 10px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)}
+.sidebar-section{padding:12px 16px;border-bottom:1px solid var(--border)}
+.sidebar-section-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.sidebar-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.sidebar-row.total{font-weight:700;font-size:14px;color:var(--accent);margin-top:4px}
+
+.bottom-bar{height:62px;background:var(--surface);border-top:1px solid var(--border2);position:fixed;bottom:0;left:232px;right:248px;display:flex;align-items:center;z-index:100}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 18px;border-right:1px solid var(--border);height:100%;gap:2px}
+.tile:last-child{border-right:none}
+.tile-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.tile-value{font-size:17px;font-weight:700;color:var(--text)}
+.tile.accent .tile-value{color:var(--accent)}
+.tile-spacer{flex:1}
+
+/* Main: offset for icon nav + tree nav + sidebar */
+.main{margin-left:232px;margin-right:248px;margin-top:88px;margin-bottom:62px;padding:20px 32px;overflow-y:auto;height:calc(100vh - 88px - 62px);position:fixed;left:0;right:0;top:0}
+
+.section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
+.section-header{padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0}
+.parent-header{padding:10px 16px;background:#faf9f6;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;position:sticky;top:44px}
+.col-headers{display:grid;grid-template-columns:80px 1fr 60px 70px 80px 80px 90px 90px 90px 44px;padding:6px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.item-row{display:grid;grid-template-columns:80px 1fr 60px 70px 80px 80px 90px 90px 90px 44px;padding:8px 16px;border-bottom:1px solid var(--border);font-size:12px;align-items:center}
+.item-row:last-child{border-bottom:none}
+.item-row:hover{background:#faf9f7}
+.type-badge{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;background:var(--surface2);color:var(--muted)}
+.type-badge.cable{background:#e8f4fd;color:#1a6fa8}
+.type-badge.point{background:#edf7ed;color:#2d7a2d}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">ProQuote</div>
+  <div class="tab active">Quote</div>
+  <div class="tab">Clients</div>
+  <div class="tab">Templates</div>
+  <div class="tab">Reports</div>
+  <div style="margin-left:auto;font-size:11px;color:var(--muted);font-style:italic">+180px tree nav: icon nav (52px) + tree (180px) + content + sidebar (248px)</div>
+</div>
+
+<div class="subbar">
+  <div class="subbar-field">Ref: <span>QT-2024-089</span></div>
+  <div class="subbar-field">Client: <span>Sunrise Retail Pty Ltd</span></div>
+  <div class="subbar-field">Date: <span>30 May 2026</span></div>
+</div>
+
+<div class="leftnav">
+  <div class="nav-icon active">⚡</div>
+  <div class="nav-icon">📋</div>
+  <div class="nav-icon">👤</div>
+  <div class="nav-icon">📎</div>
+  <div class="nav-icon">⚙️</div>
+</div>
+
+<!-- TREE NAV -->
+<div class="treenav">
+  <div class="treenav-header">
+    <span>Sections</span>
+    <span style="cursor:pointer;font-size:14px">+</span>
+  </div>
+
+  <div class="tree-section">
+    <div class="tree-section-label">
+      <span class="tree-expand">▼</span>
+      <span>Fit-Out — Level 2</span>
+    </div>
+    <div class="tree-item active">
+      <span class="tree-item-dot"></span>GPO Ring Main
+    </div>
+    <div class="tree-item">
+      <span class="tree-item-dot"></span>Lighting Circuit
+    </div>
+    <div class="tree-item">
+      <span class="tree-item-dot"></span>Data / Comms
+    </div>
+    <div class="tree-item">
+      <span class="tree-item-dot"></span>Switchboard
+    </div>
+    <div class="tree-item" style="color:var(--muted);font-style:italic">
+      + Add parent
+    </div>
+  </div>
+
+  <div class="tree-section">
+    <div class="tree-section-label">
+      <span class="tree-expand">▼</span>
+      <span>External Works</span>
+    </div>
+    <div class="tree-item">
+      <span class="tree-item-dot"></span>External Lighting
+    </div>
+    <div class="tree-item">
+      <span class="tree-item-dot"></span>Car Park Power
+    </div>
+    <div class="tree-item" style="color:var(--muted);font-style:italic">
+      + Add parent
+    </div>
+  </div>
+
+  <div style="padding:10px 12px">
+    <div style="font-size:11px;color:var(--muted);cursor:pointer">+ Add Section</div>
+  </div>
+</div>
+
+<div class="sidebar">
+  <div class="sidebar-header">Quote Summary</div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Fit-Out — Level 2</div>
+    <div class="sidebar-row"><span>Materials</span><span>$12,840</span></div>
+    <div class="sidebar-row"><span>Labour</span><span>$8,920</span></div>
+    <div class="sidebar-row total"><span>Section Total</span><span>$21,760</span></div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">External Works</div>
+    <div class="sidebar-row"><span>Materials</span><span>$5,580</span></div>
+    <div class="sidebar-row"><span>Labour</span><span>$3,760</span></div>
+    <div class="sidebar-row total"><span>Section Total</span><span>$9,340</span></div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-row" style="font-size:13px"><span>Total Excl GST</span><span style="font-weight:700">$31,100</span></div>
+    <div class="sidebar-row" style="font-size:13px"><span>GST (10%)</span><span>$3,110</span></div>
+    <div class="sidebar-row total" style="font-size:16px"><span>TOTAL</span><span>$34,210</span></div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <div class="tile"><div class="tile-label">Materials</div><div class="tile-value">$18,420</div></div>
+  <div class="tile"><div class="tile-label">Labour</div><div class="tile-value">$12,680</div></div>
+  <div class="tile"><div class="tile-label">Excl GST</div><div class="tile-value">$31,100</div></div>
+  <div class="tile accent"><div class="tile-label">GST</div><div class="tile-value">$3,110</div></div>
+  <div class="tile accent"><div class="tile-label">Incl GST</div><div class="tile-value">$34,210</div></div>
+</div>
+
+<div class="main">
+  <div class="section-card">
+    <div class="section-header">
+      <span>Fit-Out — Level 2</span>
+      <span style="font-size:12px;color:var(--muted);font-weight:400">4 parent items · $21,760 excl GST</span>
+    </div>
+
+    <div class="parent-header" style="background:#fef9ef;border-left:3px solid var(--accent)">
+      <span style="color:var(--accent)">▼</span>
+      <span>GPO Ring Main</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 4 items · $6,240 — Active in tree</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup%</div>
+      <div>Wire Min</div><div>Install Min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge cable">Cable</span></div>
+      <div>2.5mm² TPS 3-core</div>
+      <div>120m</div><div>30%</div><div>—</div><div>—</div>
+      <div>$486</div><div>—</div>
+      <div style="font-weight:600">$486</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Double GPO 10A white</div>
+      <div>18</div><div>25%</div><div>15</div><div>25</div>
+      <div>$648</div><div>$1,080</div>
+      <div style="font-weight:600">$1,728</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Single GPO 10A white</div>
+      <div>6</div><div>25%</div><div>10</div><div>20</div>
+      <div>$162</div><div>$288</div>
+      <div style="font-weight:600">$450</div><div>⋯</div>
+    </div>
+
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>Lighting Circuit</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 3 items · $4,820</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup%</div>
+      <div>Wire Min</div><div>Install Min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge cable">Cable</span></div>
+      <div>1.5mm² TPS 2-core</div>
+      <div>85m</div><div>30%</div><div>—</div><div>—</div>
+      <div>$272</div><div>—</div>
+      <div style="font-weight:600">$272</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>LED Downlight 9W</div>
+      <div>24</div><div>35%</div><div>20</div><div>30</div>
+      <div>$1,134</div><div>$1,728</div>
+      <div style="font-weight:600">$2,862</div><div>⋯</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

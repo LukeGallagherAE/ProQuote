@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>m05 — Flat Table</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--surface2:#f0efeb;
+  --border:#e4e2dc;--border2:#d5d3cc;
+  --text:#1a1916;--muted:#8a8680;
+  --accent:#c8a04a;--r:10px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:8px;position:fixed;top:0;left:0;right:0;z-index:100}
+.logo{font-weight:700;font-size:15px;color:var(--accent);margin-right:8px}
+.tab{padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;color:var(--muted)}
+.tab.active{background:var(--surface2);color:var(--text);font-weight:600}
+
+.subbar{height:36px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px 0 68px;gap:20px;position:fixed;top:52px;left:0;right:0;z-index:99}
+.subbar-field{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.subbar-field span{color:var(--text);font-weight:600;font-size:13px}
+
+.leftnav{width:52px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:88px;left:0;bottom:62px;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;z-index:97}
+.nav-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;color:var(--muted)}
+.nav-icon.active{background:var(--surface2);color:var(--accent)}
+
+.sidebar{width:248px;background:var(--surface);border-left:1px solid var(--border);position:fixed;top:88px;right:0;bottom:62px;display:flex;flex-direction:column;z-index:97}
+.sidebar-header{padding:14px 16px 10px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)}
+.sidebar-section{padding:12px 16px;border-bottom:1px solid var(--border)}
+.sidebar-section-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.sidebar-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.sidebar-row.total{font-weight:700;font-size:14px;color:var(--accent);margin-top:4px}
+
+.bottom-bar{height:62px;background:var(--surface);border-top:1px solid var(--border2);position:fixed;bottom:0;left:52px;right:248px;display:flex;align-items:center;z-index:100}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px;border-right:1px solid var(--border);height:100%;gap:2px}
+.tile:last-child{border-right:none}
+.tile-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.tile-value{font-size:18px;font-weight:700;color:var(--text)}
+.tile.accent .tile-value{color:var(--accent)}
+.tile-spacer{flex:1}
+
+.main{margin-left:52px;margin-right:248px;margin-top:88px;margin-bottom:62px;overflow-y:auto;height:calc(100vh - 88px - 62px);position:fixed;left:0;right:0;top:0}
+
+/* PURE SPREADSHEET — no card borders/shadows */
+.flat-table{width:100%;border-collapse:collapse;font-size:12px}
+.flat-table thead tr{position:sticky;top:0;z-index:10}
+.flat-table thead th{padding:8px 12px;background:#e8e7e2;border-bottom:2px solid var(--border2);font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px;text-align:left;white-space:nowrap}
+
+/* Section divider rows */
+.section-divider td{background:#2d2b27;color:#fff;font-weight:700;font-size:13px;padding:10px 12px;letter-spacing:.3px}
+.section-divider td span{color:var(--accent)}
+
+/* Parent divider rows */
+.parent-divider td{background:#e0dfd9;font-weight:600;font-size:12px;padding:7px 12px;color:var(--text)}
+.parent-divider td.subtotal{color:var(--accent);font-weight:700}
+
+/* Data rows */
+.flat-table tbody tr.item-row{border-bottom:1px solid var(--border)}
+.flat-table tbody tr.item-row:hover{background:#faf9f6}
+.flat-table tbody tr.item-row td{padding:7px 12px;vertical-align:middle}
+
+.type-badge{padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:var(--surface2);color:var(--muted)}
+.type-badge.cable{background:#e8f4fd;color:#1a6fa8}
+.type-badge.point{background:#edf7ed;color:#2d7a2d}
+.type-badge.board{background:#fef3e2;color:#8a5c0a}
+
+.num{text-align:right}
+.total-cell{font-weight:700;color:var(--text)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">ProQuote</div>
+  <div class="tab active">Quote</div>
+  <div class="tab">Clients</div>
+  <div class="tab">Templates</div>
+  <div class="tab">Reports</div>
+  <div style="margin-left:auto;font-size:11px;color:var(--muted);font-style:italic">Flat table mode — no cards, section name as divider row</div>
+</div>
+
+<div class="subbar">
+  <div class="subbar-field">Ref: <span>QT-2024-089</span></div>
+  <div class="subbar-field">Client: <span>Sunrise Retail Pty Ltd</span></div>
+  <div class="subbar-field">Date: <span>30 May 2026</span></div>
+  <div class="subbar-field">Status: <span style="color:#2d7a2d">Draft</span></div>
+</div>
+
+<div class="leftnav">
+  <div class="nav-icon active">⚡</div>
+  <div class="nav-icon">📋</div>
+  <div class="nav-icon">👤</div>
+  <div class="nav-icon">📎</div>
+  <div class="nav-icon">⚙️</div>
+</div>
+
+<div class="sidebar">
+  <div class="sidebar-header">Quote Summary</div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Fit-Out — Level 2</div>
+    <div class="sidebar-row"><span>Materials</span><span>$12,840</span></div>
+    <div class="sidebar-row"><span>Labour</span><span>$8,920</span></div>
+    <div class="sidebar-row total"><span>Section Total</span><span>$21,760</span></div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">External Works</div>
+    <div class="sidebar-row"><span>Materials</span><span>$5,580</span></div>
+    <div class="sidebar-row"><span>Labour</span><span>$3,760</span></div>
+    <div class="sidebar-row total"><span>Section Total</span><span>$9,340</span></div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-row" style="font-size:13px"><span>Total Excl GST</span><span style="font-weight:700">$31,100</span></div>
+    <div class="sidebar-row" style="font-size:13px"><span>GST (10%)</span><span>$3,110</span></div>
+    <div class="sidebar-row total" style="font-size:16px"><span>TOTAL</span><span>$34,210</span></div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <div class="tile"><div class="tile-label">Materials</div><div class="tile-value">$18,420</div></div>
+  <div class="tile"><div class="tile-label">Labour</div><div class="tile-value">$12,680</div></div>
+  <div class="tile"><div class="tile-label">Excl GST</div><div class="tile-value">$31,100</div></div>
+  <div class="tile accent"><div class="tile-label">GST (10%)</div><div class="tile-value">$3,110</div></div>
+  <div class="tile accent"><div class="tile-label">Incl GST</div><div class="tile-value">$34,210</div></div>
+</div>
+
+<div class="main">
+  <table class="flat-table">
+    <thead>
+      <tr>
+        <th style="width:80px">Type</th>
+        <th>Item Name</th>
+        <th class="num">Qty</th>
+        <th class="num">Markup%</th>
+        <th class="num">Wire min</th>
+        <th class="num">Install min</th>
+        <th class="num">Mat $</th>
+        <th class="num">Lab $</th>
+        <th class="num">Total</th>
+        <th style="width:36px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- SECTION: Fit-Out -->
+      <tr class="section-divider">
+        <td colspan="10">SECTION: Fit-Out — Level 2 &nbsp;<span>· $21,760 excl GST</span></td>
+      </tr>
+      <!-- PARENT: GPO Ring Main -->
+      <tr class="parent-divider">
+        <td colspan="7">▼ &nbsp; GPO Ring Main</td>
+        <td class="num">$1,944</td>
+        <td class="num subtotal">$4,608</td>
+        <td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge cable">Cable</span></td>
+        <td>2.5mm² TPS 3-core</td>
+        <td class="num">120m</td><td class="num">30%</td>
+        <td class="num">—</td><td class="num">—</td>
+        <td class="num">$486</td><td class="num">—</td>
+        <td class="num total-cell">$486</td><td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge point">Point</span></td>
+        <td>Double GPO 10A white</td>
+        <td class="num">18</td><td class="num">25%</td>
+        <td class="num">15</td><td class="num">25</td>
+        <td class="num">$648</td><td class="num">$1,080</td>
+        <td class="num total-cell">$1,728</td><td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge point">Point</span></td>
+        <td>Single GPO 10A white</td>
+        <td class="num">6</td><td class="num">25%</td>
+        <td class="num">10</td><td class="num">20</td>
+        <td class="num">$162</td><td class="num">$288</td>
+        <td class="num total-cell">$450</td><td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge board">Board</span></td>
+        <td>MCB 20A Single Pole</td>
+        <td class="num">4</td><td class="num">20%</td>
+        <td class="num">—</td><td class="num">15</td>
+        <td class="num">$120</td><td class="num">$144</td>
+        <td class="num total-cell">$264</td><td>⋯</td>
+      </tr>
+      <!-- PARENT: Lighting Circuit -->
+      <tr class="parent-divider">
+        <td colspan="7">▼ &nbsp; Lighting Circuit</td>
+        <td class="num">$2,016</td>
+        <td class="num subtotal">$3,694</td>
+        <td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge cable">Cable</span></td>
+        <td>1.5mm² TPS 2-core</td>
+        <td class="num">85m</td><td class="num">30%</td>
+        <td class="num">—</td><td class="num">—</td>
+        <td class="num">$272</td><td class="num">—</td>
+        <td class="num total-cell">$272</td><td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge point">Point</span></td>
+        <td>LED Downlight 9W</td>
+        <td class="num">24</td><td class="num">35%</td>
+        <td class="num">20</td><td class="num">30</td>
+        <td class="num">$1,134</td><td class="num">$1,728</td>
+        <td class="num total-cell">$2,862</td><td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge point">Point</span></td>
+        <td>Switch 1-gang white</td>
+        <td class="num">8</td><td class="num">25%</td>
+        <td class="num">5</td><td class="num">18</td>
+        <td class="num">$200</td><td class="num">$288</td>
+        <td class="num total-cell">$488</td><td>⋯</td>
+      </tr>
+      <!-- PARENT: Data / Comms -->
+      <tr class="parent-divider">
+        <td colspan="7">▼ &nbsp; Data / Comms</td>
+        <td class="num">$864</td>
+        <td class="num subtotal">$2,964</td>
+        <td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge cable">Cable</span></td>
+        <td>Cat6 UTP 4-pair</td>
+        <td class="num">60m</td><td class="num">30%</td>
+        <td class="num">—</td><td class="num">—</td>
+        <td class="num">$390</td><td class="num">—</td>
+        <td class="num total-cell">$390</td><td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge point">Point</span></td>
+        <td>RJ45 data outlet</td>
+        <td class="num">12</td><td class="num">25%</td>
+        <td class="num">—</td><td class="num">25</td>
+        <td class="num">$450</td><td class="num">$720</td>
+        <td class="num total-cell">$1,170</td><td>⋯</td>
+      </tr>
+      <!-- SECTION: External Works -->
+      <tr class="section-divider">
+        <td colspan="10">SECTION: External Works &nbsp;<span>· $9,340 excl GST</span></td>
+      </tr>
+      <tr class="parent-divider">
+        <td colspan="7">▼ &nbsp; External Lighting</td>
+        <td class="num">$1,296</td>
+        <td class="num subtotal">$4,488</td>
+        <td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge point">Point</span></td>
+        <td>Floodlight 50W LED</td>
+        <td class="num">6</td><td class="num">40%</td>
+        <td class="num">30</td><td class="num">45</td>
+        <td class="num">$1,092</td><td class="num">$648</td>
+        <td class="num total-cell">$1,740</td><td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge point">Point</span></td>
+        <td>PIR Sensor Outdoor</td>
+        <td class="num">4</td><td class="num">30%</td>
+        <td class="num">10</td><td class="num">30</td>
+        <td class="num">$520</td><td class="num">$288</td>
+        <td class="num total-cell">$808</td><td>⋯</td>
+      </tr>
+      <tr class="parent-divider">
+        <td colspan="7">▼ &nbsp; Car Park Power</td>
+        <td class="num">$2,464</td>
+        <td class="num subtotal">$4,852</td>
+        <td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge cable">Cable</span></td>
+        <td>4mm² TPS 3-core</td>
+        <td class="num">75m</td><td class="num">30%</td>
+        <td class="num">—</td><td class="num">—</td>
+        <td class="num">$487</td><td class="num">—</td>
+        <td class="num total-cell">$487</td><td>⋯</td>
+      </tr>
+      <tr class="item-row">
+        <td><span class="type-badge point">Point</span></td>
+        <td>3-phase socket 32A</td>
+        <td class="num">2</td><td class="num">35%</td>
+        <td class="num">40</td><td class="num">60</td>
+        <td class="num">$648</td><td class="num">$576</td>
+        <td class="num total-cell">$1,224</td><td>⋯</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>
