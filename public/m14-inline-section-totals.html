@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>m14 — Inline Section Totals</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--surface2:#f0efeb;
+  --border:#e4e2dc;--border2:#d5d3cc;
+  --text:#1a1916;--muted:#8a8680;
+  --accent:#c8a04a;--r:10px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:8px;position:fixed;top:0;left:0;right:0;z-index:100}
+.logo{font-weight:700;font-size:15px;color:var(--accent);margin-right:8px}
+.tab{padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;color:var(--muted)}
+.tab.active{background:var(--surface2);color:var(--text);font-weight:600}
+
+.subbar{height:36px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px 0 68px;gap:20px;position:fixed;top:52px;left:0;right:0;z-index:99}
+.subbar-field{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.subbar-field span{color:var(--text);font-weight:600;font-size:13px}
+
+.leftnav{width:52px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:88px;left:0;bottom:0;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;z-index:97}
+.nav-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;color:var(--muted)}
+.nav-icon.active{background:var(--surface2);color:var(--accent)}
+
+/* NO RIGHT SIDEBAR — full width content */
+/* NO BOTTOM BAR — totals inline */
+
+.main{margin-left:52px;margin-right:0;margin-top:88px;margin-bottom:0;padding:24px 48px;overflow-y:auto;height:calc(100vh - 88px);position:fixed;left:0;right:0;top:0}
+
+/* No-sidebar note */
+.no-sidebar-banner{background:#fef9ef;border:1px solid var(--accent);border-radius:8px;padding:8px 16px;font-size:11px;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+
+.section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:20px;overflow:hidden}
+.section-header{padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.parent-header{padding:10px 16px;background:#faf9f6;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;position:sticky;top:44px;z-index:9}
+.col-headers{display:grid;grid-template-columns:80px 1fr 60px 70px 80px 80px 110px 110px 110px 44px;padding:6px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.item-row{display:grid;grid-template-columns:80px 1fr 60px 70px 80px 80px 110px 110px 110px 44px;padding:8px 16px;border-bottom:1px solid var(--border);font-size:12px;align-items:center}
+.item-row:last-child{border-bottom:none}
+.item-row:hover{background:#faf9f7}
+.type-badge{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;background:var(--surface2);color:var(--muted)}
+.type-badge.cable{background:#e8f4fd;color:#1a6fa8}
+.type-badge.point{background:#edf7ed;color:#2d7a2d}
+
+/* EXPANDED SECTION FOOTER — mat/lab/total for this section */
+.section-footer{
+  background:linear-gradient(to right, var(--surface2), #fef9ef);
+  border-top:2px solid var(--border2);
+  padding:14px 16px;
+  display:flex;align-items:center;gap:0;
+}
+.sf-tile{display:flex;flex-direction:column;align-items:flex-start;padding:0 24px;border-right:1px solid var(--border);gap:3px}
+.sf-tile:last-child{border-right:none}
+.sf-tile .sf-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600}
+.sf-tile .sf-value{font-size:16px;font-weight:700;color:var(--text)}
+.sf-tile.accent .sf-value{color:var(--accent)}
+.sf-spacer{flex:1}
+
+/* GRAND TOTAL ROW at very bottom */
+.grand-total-row{
+  background:var(--text);
+  color:#fff;
+  border-radius:var(--r);
+  padding:18px 24px;
+  display:flex;align-items:center;
+  margin-bottom:32px;
+  gap:0;
+}
+.gt-tile{display:flex;flex-direction:column;align-items:flex-start;padding:0 28px;border-right:1px solid rgba(255,255,255,0.15);gap:3px}
+.gt-tile:first-child{padding-left:0}
+.gt-tile:last-child{border-right:none}
+.gt-tile .gt-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,0.5);font-weight:600}
+.gt-tile .gt-value{font-size:18px;font-weight:700;color:#fff}
+.gt-tile.accent .gt-value{color:var(--accent)}
+.gt-spacer{flex:1}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">ProQuote</div>
+  <div class="tab active">Quote</div>
+  <div class="tab">Clients</div>
+  <div class="tab">Templates</div>
+  <div class="tab">Reports</div>
+  <div style="margin-left:auto;font-size:11px;color:var(--muted);font-style:italic">No sidebar. Each section has inline totals footer. Grand total at bottom.</div>
+</div>
+
+<div class="subbar">
+  <div class="subbar-field">Ref: <span>QT-2024-089</span></div>
+  <div class="subbar-field">Client: <span>Sunrise Retail Pty Ltd</span></div>
+  <div class="subbar-field">Date: <span>30 May 2026</span></div>
+  <div class="subbar-field">Status: <span style="color:#2d7a2d">Draft</span></div>
+</div>
+
+<div class="leftnav">
+  <div class="nav-icon active">⚡</div>
+  <div class="nav-icon">📋</div>
+  <div class="nav-icon">👤</div>
+  <div class="nav-icon">📎</div>
+  <div class="nav-icon">⚙️</div>
+</div>
+
+<div class="main">
+  <div class="no-sidebar-banner">
+    No right sidebar. Totals live in each section footer + grand total inline at page bottom. No bottom bar needed.
+  </div>
+
+  <!-- SECTION 1 -->
+  <div class="section-card">
+    <div class="section-header">
+      <span>Fit-Out — Level 2</span>
+      <span style="font-size:12px;color:var(--muted);font-weight:400">3 parent items</span>
+    </div>
+
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>GPO Ring Main</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 4 items · $4,608</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup%</div>
+      <div>Wire Min</div><div>Install Min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge cable">Cable</span></div>
+      <div>2.5mm² TPS 3-core</div>
+      <div>120m</div><div>30%</div><div>—</div><div>—</div>
+      <div>$486</div><div>—</div>
+      <div style="font-weight:600">$486</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Double GPO 10A white</div>
+      <div>18</div><div>25%</div><div>15</div><div>25</div>
+      <div>$648</div><div>$1,080</div>
+      <div style="font-weight:600">$1,728</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Single GPO 10A white</div>
+      <div>6</div><div>25%</div><div>10</div><div>20</div>
+      <div>$162</div><div>$288</div>
+      <div style="font-weight:600">$450</div><div>⋯</div>
+    </div>
+
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>Lighting Circuit</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 3 items · $3,622</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup%</div>
+      <div>Wire Min</div><div>Install Min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge cable">Cable</span></div>
+      <div>1.5mm² TPS 2-core</div>
+      <div>85m</div><div>30%</div><div>—</div><div>—</div>
+      <div>$272</div><div>—</div>
+      <div style="font-weight:600">$272</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>LED Downlight 9W</div>
+      <div>24</div><div>35%</div><div>20</div><div>30</div>
+      <div>$1,134</div><div>$1,728</div>
+      <div style="font-weight:600">$2,862</div><div>⋯</div>
+    </div>
+
+    <!-- SECTION FOOTER — expanded with mat/lab/total -->
+    <div class="section-footer">
+      <div class="sf-tile">
+        <div class="sf-label">Materials</div>
+        <div class="sf-value">$12,840</div>
+      </div>
+      <div class="sf-tile">
+        <div class="sf-label">Labour</div>
+        <div class="sf-value">$8,920</div>
+      </div>
+      <div class="sf-tile">
+        <div class="sf-label">Section Excl GST</div>
+        <div class="sf-value">$21,760</div>
+      </div>
+      <div class="sf-tile accent">
+        <div class="sf-label">Section Incl GST</div>
+        <div class="sf-value">$23,936</div>
+      </div>
+      <div class="sf-spacer"></div>
+      <div style="font-size:11px;color:var(--muted);text-align:right">
+        3 parent items<br>10 subitems
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2 -->
+  <div class="section-card">
+    <div class="section-header">
+      <span>External Works</span>
+      <span style="font-size:12px;color:var(--muted);font-weight:400">2 parent items</span>
+    </div>
+
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>External Lighting</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 3 items · $4,488</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup%</div>
+      <div>Wire Min</div><div>Install Min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Floodlight 50W LED</div>
+      <div>6</div><div>40%</div><div>30</div><div>45</div>
+      <div>$1,092</div><div>$648</div>
+      <div style="font-weight:600">$1,740</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>PIR Sensor Outdoor</div>
+      <div>4</div><div>30%</div><div>10</div><div>30</div>
+      <div>$520</div><div>$288</div>
+      <div style="font-weight:600">$808</div><div>⋯</div>
+    </div>
+
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>Car Park Power</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 2 items · $4,852</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup%</div>
+      <div>Wire Min</div><div>Install Min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge cable">Cable</span></div>
+      <div>4mm² TPS 3-core</div>
+      <div>75m</div><div>30%</div><div>—</div><div>—</div>
+      <div>$487</div><div>—</div>
+      <div style="font-weight:600">$487</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>3-phase socket 32A</div>
+      <div>2</div><div>35%</div><div>40</div><div>60</div>
+      <div>$648</div><div>$576</div>
+      <div style="font-weight:600">$1,224</div><div>⋯</div>
+    </div>
+
+    <div class="section-footer">
+      <div class="sf-tile">
+        <div class="sf-label">Materials</div>
+        <div class="sf-value">$5,580</div>
+      </div>
+      <div class="sf-tile">
+        <div class="sf-label">Labour</div>
+        <div class="sf-value">$3,760</div>
+      </div>
+      <div class="sf-tile">
+        <div class="sf-label">Section Excl GST</div>
+        <div class="sf-value">$9,340</div>
+      </div>
+      <div class="sf-tile accent">
+        <div class="sf-label">Section Incl GST</div>
+        <div class="sf-value">$10,274</div>
+      </div>
+      <div class="sf-spacer"></div>
+      <div style="font-size:11px;color:var(--muted);text-align:right">
+        2 parent items<br>5 subitems
+      </div>
+    </div>
+  </div>
+
+  <!-- GRAND TOTAL INLINE ROW -->
+  <div class="grand-total-row">
+    <div class="gt-tile">
+      <div class="gt-label">Total Materials</div>
+      <div class="gt-value">$18,420</div>
+    </div>
+    <div class="gt-tile">
+      <div class="gt-label">Total Labour</div>
+      <div class="gt-value">$12,680</div>
+    </div>
+    <div class="gt-tile">
+      <div class="gt-label">Total Excl GST</div>
+      <div class="gt-value">$31,100</div>
+    </div>
+    <div class="gt-tile accent">
+      <div class="gt-label">GST (10%)</div>
+      <div class="gt-value">$3,110</div>
+    </div>
+    <div class="gt-tile accent">
+      <div class="gt-label">TOTAL INCL GST</div>
+      <div class="gt-value" style="font-size:22px">$34,210</div>
+    </div>
+    <div class="gt-spacer"></div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.4);text-align:right">2 sections · 5 parents · 15 items</div>
+  </div>
+</div>
+
+</body>
+</html>

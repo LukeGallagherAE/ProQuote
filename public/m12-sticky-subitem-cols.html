@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>m12 — Sticky Subitem Cols</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--surface2:#f0efeb;
+  --border:#e4e2dc;--border2:#d5d3cc;
+  --text:#1a1916;--muted:#8a8680;
+  --accent:#c8a04a;--r:10px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:8px;position:fixed;top:0;left:0;right:0;z-index:100}
+.logo{font-weight:700;font-size:15px;color:var(--accent);margin-right:8px}
+.tab{padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;color:var(--muted)}
+.tab.active{background:var(--surface2);color:var(--text);font-weight:600}
+
+.subbar{height:36px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px 0 68px;gap:20px;position:fixed;top:52px;left:0;right:0;z-index:99}
+.subbar-field{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.subbar-field span{color:var(--text);font-weight:600;font-size:13px}
+
+.leftnav{width:52px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:88px;left:0;bottom:62px;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;z-index:97}
+.nav-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;color:var(--muted)}
+.nav-icon.active{background:var(--surface2);color:var(--accent)}
+
+.sidebar{width:248px;background:var(--surface);border-left:1px solid var(--border);position:fixed;top:88px;right:0;bottom:62px;display:flex;flex-direction:column;z-index:97}
+.sidebar-header{padding:14px 16px 10px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)}
+.sidebar-section{padding:12px 16px;border-bottom:1px solid var(--border)}
+.sidebar-section-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.sidebar-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.sidebar-row.total{font-weight:700;font-size:14px;color:var(--accent);margin-top:4px}
+
+.bottom-bar{height:62px;background:var(--surface);border-top:1px solid var(--border2);position:fixed;bottom:0;left:52px;right:248px;display:flex;align-items:center;z-index:100}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px;border-right:1px solid var(--border);height:100%;gap:2px}
+.tile:last-child{border-right:none}
+.tile-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.tile-value{font-size:18px;font-weight:700;color:var(--text)}
+.tile.accent .tile-value{color:var(--accent)}
+
+.main{margin-left:52px;margin-right:248px;margin-top:88px;margin-bottom:62px;padding:24px 40px;overflow-y:auto;height:calc(100vh - 88px - 62px);position:fixed;left:0;right:0;top:0}
+
+.section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
+.section-header{padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.parent-header{padding:10px 16px;background:#faf9f6;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;position:sticky;top:44px;z-index:9}
+
+/* HORIZONTALLY SCROLLABLE subitems area */
+.subitems-scroll{overflow-x:auto}
+.subitems-table{width:max-content;min-width:100%;border-collapse:collapse}
+
+/* Header row */
+.subitems-table thead tr{background:var(--surface2);border-bottom:1px solid var(--border)}
+.subitems-table thead th{padding:6px 14px;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;border-right:1px solid var(--border)}
+.subitems-table thead th:last-child{border-right:none}
+
+/* FROZEN COLUMNS — sticky left */
+.col-frozen-1{position:sticky;left:0;z-index:5;background:var(--surface2);border-right:2px solid var(--border2) !important;min-width:90px}
+.col-frozen-2{position:sticky;left:90px;z-index:5;background:var(--surface2);border-right:2px solid var(--border2) !important;min-width:180px}
+
+/* Data row frozen */
+.subitems-table tbody tr{border-bottom:1px solid var(--border)}
+.subitems-table tbody tr:last-child{border-bottom:none}
+.subitems-table tbody tr:hover td{background:#faf9f7}
+.subitems-table tbody td{padding:8px 14px;font-size:12px;white-space:nowrap;border-right:1px solid var(--border)}
+.subitems-table tbody td:last-child{border-right:none}
+.td-frozen-1{position:sticky;left:0;z-index:5;background:#fff;border-right:2px solid var(--border2) !important}
+.td-frozen-2{position:sticky;left:90px;z-index:5;background:#fff;border-right:2px solid var(--border2) !important}
+.subitems-table tbody tr:hover .td-frozen-1,
+.subitems-table tbody tr:hover .td-frozen-2{background:#faf9f7}
+
+.type-badge{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;background:var(--surface2);color:var(--muted)}
+.type-badge.cable{background:#e8f4fd;color:#1a6fa8}
+.type-badge.point{background:#edf7ed;color:#2d7a2d}
+
+.scroll-hint{background:#fef9ef;border:1px dashed var(--accent);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--accent);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">ProQuote</div>
+  <div class="tab active">Quote</div>
+  <div class="tab">Clients</div>
+  <div class="tab">Templates</div>
+  <div class="tab">Reports</div>
+  <div style="margin-left:auto;font-size:11px;color:var(--muted);font-style:italic">First 2 cols frozen (sticky left) — scroll right for extra columns</div>
+</div>
+
+<div class="subbar">
+  <div class="subbar-field">Ref: <span>QT-2024-089</span></div>
+  <div class="subbar-field">Client: <span>Sunrise Retail Pty Ltd</span></div>
+  <div class="subbar-field">Date: <span>30 May 2026</span></div>
+  <div class="subbar-field">Status: <span style="color:#2d7a2d">Draft</span></div>
+</div>
+
+<div class="leftnav">
+  <div class="nav-icon active">⚡</div>
+  <div class="nav-icon">📋</div>
+  <div class="nav-icon">👤</div>
+  <div class="nav-icon">📎</div>
+  <div class="nav-icon">⚙️</div>
+</div>
+
+<div class="sidebar">
+  <div class="sidebar-header">Quote Summary</div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Fit-Out — Level 2</div>
+    <div class="sidebar-row"><span>Materials</span><span>$12,840</span></div>
+    <div class="sidebar-row"><span>Labour</span><span>$8,920</span></div>
+    <div class="sidebar-row total"><span>Section Total</span><span>$21,760</span></div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">External Works</div>
+    <div class="sidebar-row"><span>Materials</span><span>$5,580</span></div>
+    <div class="sidebar-row"><span>Labour</span><span>$3,760</span></div>
+    <div class="sidebar-row total"><span>Section Total</span><span>$9,340</span></div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-row"><span>Total Excl GST</span><span style="font-weight:700">$31,100</span></div>
+    <div class="sidebar-row"><span>GST (10%)</span><span>$3,110</span></div>
+    <div class="sidebar-row total" style="font-size:16px"><span>TOTAL</span><span>$34,210</span></div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <div class="tile"><div class="tile-label">Materials</div><div class="tile-value">$18,420</div></div>
+  <div class="tile"><div class="tile-label">Labour</div><div class="tile-value">$12,680</div></div>
+  <div class="tile"><div class="tile-label">Excl GST</div><div class="tile-value">$31,100</div></div>
+  <div class="tile accent"><div class="tile-label">GST (10%)</div><div class="tile-value">$3,110</div></div>
+  <div class="tile accent"><div class="tile-label">Incl GST</div><div class="tile-value">$34,210</div></div>
+</div>
+
+<div class="main">
+  <div class="scroll-hint">
+    ← Col 1 (Type) and Col 2 (Item Name) are frozen — scroll right to see additional columns without losing context →
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">
+      <span>Fit-Out — Level 2</span>
+      <span style="font-size:12px;color:var(--muted);font-weight:400">3 parent items</span>
+    </div>
+
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>GPO Ring Main</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 4 items · $6,240</span>
+    </div>
+    <div class="subitems-scroll">
+      <table class="subitems-table">
+        <thead>
+          <tr>
+            <th class="col-frozen-1">Type</th>
+            <th class="col-frozen-2">Item Name</th>
+            <th>Qty</th><th>Markup%</th>
+            <th>Wire Min</th><th>Install Min</th>
+            <th>Unit Mat</th><th>Unit Lab</th>
+            <th>Mat Total</th><th>Lab Total</th>
+            <th>Line Total</th><th>Supplier</th>
+            <th>Cat No.</th><th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="td-frozen-1"><span class="type-badge cable">Cable</span></td>
+            <td class="td-frozen-2">2.5mm² TPS 3-core</td>
+            <td>120m</td><td>30%</td>
+            <td>—</td><td>—</td>
+            <td>$4.05</td><td>—</td>
+            <td>$486</td><td>—</td>
+            <td style="font-weight:600">$486</td>
+            <td>Olex</td><td>2.5TPS3C-WH</td>
+            <td>Grey sheath, from DB1</td>
+            <td>⋯</td>
+          </tr>
+          <tr>
+            <td class="td-frozen-1"><span class="type-badge point">Point</span></td>
+            <td class="td-frozen-2">Double GPO 10A white</td>
+            <td>18</td><td>25%</td>
+            <td>15</td><td>25</td>
+            <td>$36.00</td><td>$60.00</td>
+            <td>$648</td><td>$1,080</td>
+            <td style="font-weight:600">$1,728</td>
+            <td>Clipsal</td><td>1020/2</td>
+            <td>Flush plate, office areas</td>
+            <td>⋯</td>
+          </tr>
+          <tr>
+            <td class="td-frozen-1"><span class="type-badge point">Point</span></td>
+            <td class="td-frozen-2">Single GPO 10A white</td>
+            <td>6</td><td>25%</td>
+            <td>10</td><td>20</td>
+            <td>$27.00</td><td>$48.00</td>
+            <td>$162</td><td>$288</td>
+            <td style="font-weight:600">$450</td>
+            <td>Clipsal</td><td>1020/1</td>
+            <td>Service areas</td>
+            <td>⋯</td>
+          </tr>
+          <tr>
+            <td class="td-frozen-1"><span class="type-badge point">Point</span></td>
+            <td class="td-frozen-2">MCB 20A Single Pole</td>
+            <td>4</td><td>20%</td>
+            <td>—</td><td>15</td>
+            <td>$30.00</td><td>$36.00</td>
+            <td>$120</td><td>$144</td>
+            <td style="font-weight:600">$264</td>
+            <td>Hager</td><td>MCN120</td>
+            <td>Din rail in DB-L2</td>
+            <td>⋯</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>Lighting Circuit</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 3 items · $4,820</span>
+    </div>
+    <div class="subitems-scroll">
+      <table class="subitems-table">
+        <thead>
+          <tr>
+            <th class="col-frozen-1">Type</th>
+            <th class="col-frozen-2">Item Name</th>
+            <th>Qty</th><th>Markup%</th>
+            <th>Wire Min</th><th>Install Min</th>
+            <th>Unit Mat</th><th>Unit Lab</th>
+            <th>Mat Total</th><th>Lab Total</th>
+            <th>Line Total</th><th>Supplier</th>
+            <th>Cat No.</th><th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="td-frozen-1"><span class="type-badge cable">Cable</span></td>
+            <td class="td-frozen-2">1.5mm² TPS 2-core</td>
+            <td>85m</td><td>30%</td>
+            <td>—</td><td>—</td>
+            <td>$3.20</td><td>—</td>
+            <td>$272</td><td>—</td>
+            <td style="font-weight:600">$272</td>
+            <td>Olex</td><td>1.5TPS2C-WH</td>
+            <td>Lighting circuit L-1 to L-4</td>
+            <td>⋯</td>
+          </tr>
+          <tr>
+            <td class="td-frozen-1"><span class="type-badge point">Point</span></td>
+            <td class="td-frozen-2">LED Downlight 9W</td>
+            <td>24</td><td>35%</td>
+            <td>20</td><td>30</td>
+            <td>$47.25</td><td>$72.00</td>
+            <td>$1,134</td><td>$1,728</td>
+            <td style="font-weight:600">$2,862</td>
+            <td>Brilliant</td><td>BRL-DL9W</td>
+            <td>White trim, IC-F rated</td>
+            <td>⋯</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

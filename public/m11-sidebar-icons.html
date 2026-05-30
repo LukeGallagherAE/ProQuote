@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>m11 — Sidebar Icons</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--surface2:#f0efeb;
+  --border:#e4e2dc;--border2:#d5d3cc;
+  --text:#1a1916;--muted:#8a8680;
+  --accent:#c8a04a;--r:10px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:8px;position:fixed;top:0;left:0;right:0;z-index:100}
+.logo{font-weight:700;font-size:15px;color:var(--accent);margin-right:8px}
+.tab{padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;color:var(--muted)}
+.tab.active{background:var(--surface2);color:var(--text);font-weight:600}
+
+.subbar{height:36px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px 0 68px;gap:20px;position:fixed;top:52px;left:0;right:0;z-index:99}
+.subbar-field{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.subbar-field span{color:var(--text);font-weight:600;font-size:13px}
+
+.leftnav{width:52px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:88px;left:0;bottom:62px;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;z-index:97}
+.nav-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;color:var(--muted)}
+.nav-icon.active{background:var(--surface2);color:var(--accent)}
+
+/* COLLAPSED SIDEBAR — 40px icon strip */
+.sidebar-strip{width:40px;background:var(--surface);border-left:1px solid var(--border);position:fixed;top:88px;right:0;bottom:62px;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;z-index:97}
+.sidebar-icon-btn{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;position:relative}
+.sidebar-icon-btn:hover{background:var(--surface2)}
+.sidebar-icon-btn.active{background:var(--accent)}
+
+/* POPOVER on hover */
+.sidebar-icon-btn .popover{
+  position:absolute;right:44px;top:-8px;
+  width:240px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--r);
+  box-shadow:0 4px 20px rgba(0,0,0,0.12);
+  display:none;z-index:200;padding:12px 14px;
+  pointer-events:none;
+}
+.sidebar-icon-btn:hover .popover{display:block}
+.popover-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:8px}
+.popover-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}
+.popover-row.total{font-weight:700;font-size:13px;color:var(--accent);margin-top:4px}
+.sidebar-divider{width:24px;height:1px;background:var(--border);margin:4px 0}
+
+.bottom-bar{height:62px;background:var(--surface);border-top:1px solid var(--border2);position:fixed;bottom:0;left:52px;right:40px;display:flex;align-items:center;z-index:100}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px;border-right:1px solid var(--border);height:100%;gap:2px}
+.tile:last-child{border-right:none}
+.tile-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.tile-value{font-size:18px;font-weight:700;color:var(--text)}
+.tile.accent .tile-value{color:var(--accent)}
+.tile-spacer{flex:1}
+
+/* Wider content: right offset is only 40px now */
+.main{margin-left:52px;margin-right:40px;margin-top:88px;margin-bottom:62px;padding:24px 36px;overflow-y:auto;height:calc(100vh - 88px - 62px);position:fixed;left:0;right:0;top:0}
+
+.section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
+.section-header{padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0}
+.parent-header{padding:10px 16px;background:#faf9f6;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;position:sticky;top:44px}
+.col-headers{display:grid;grid-template-columns:80px 1fr 60px 70px 90px 90px 100px 100px 100px 44px;padding:6px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.item-row{display:grid;grid-template-columns:80px 1fr 60px 70px 90px 90px 100px 100px 100px 44px;padding:8px 16px;border-bottom:1px solid var(--border);font-size:12px;align-items:center}
+.item-row:last-child{border-bottom:none}
+.item-row:hover{background:#faf9f7}
+.type-badge{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;background:var(--surface2);color:var(--muted)}
+.type-badge.cable{background:#e8f4fd;color:#1a6fa8}
+.type-badge.point{background:#edf7ed;color:#2d7a2d}
+
+.sidebar-note{background:#fef9ef;border:1px dashed var(--accent);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--accent);margin-bottom:12px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">ProQuote</div>
+  <div class="tab active">Quote</div>
+  <div class="tab">Clients</div>
+  <div class="tab">Templates</div>
+  <div class="tab">Reports</div>
+  <div style="margin-left:auto;font-size:11px;color:var(--muted);font-style:italic">Right sidebar collapsed to 40px icon strip — hover an icon for popover</div>
+</div>
+
+<div class="subbar">
+  <div class="subbar-field">Ref: <span>QT-2024-089</span></div>
+  <div class="subbar-field">Client: <span>Sunrise Retail Pty Ltd</span></div>
+  <div class="subbar-field">Date: <span>30 May 2026</span></div>
+  <div class="subbar-field">Status: <span style="color:#2d7a2d">Draft</span></div>
+</div>
+
+<div class="leftnav">
+  <div class="nav-icon active">⚡</div>
+  <div class="nav-icon">📋</div>
+  <div class="nav-icon">👤</div>
+  <div class="nav-icon">📎</div>
+  <div class="nav-icon">⚙️</div>
+</div>
+
+<!-- COLLAPSED SIDEBAR — icon strip with popover -->
+<div class="sidebar-strip">
+  <div class="sidebar-icon-btn active" title="Grand Total">
+    $
+    <div class="popover">
+      <div class="popover-title">Grand Total</div>
+      <div class="popover-row"><span>Excl GST</span><span style="font-weight:700">$31,100</span></div>
+      <div class="popover-row"><span>GST (10%)</span><span>$3,110</span></div>
+      <div class="popover-row total"><span>Incl GST</span><span>$34,210</span></div>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-icon-btn" title="Fit-Out Section">
+    📋
+    <div class="popover">
+      <div class="popover-title">Fit-Out — Level 2</div>
+      <div class="popover-row"><span>GPO Ring Main</span><span>$4,608</span></div>
+      <div class="popover-row"><span>Lighting Circuit</span><span>$3,694</span></div>
+      <div class="popover-row"><span>Data / Comms</span><span>$2,964</span></div>
+      <div class="popover-row"><span>Switchboard</span><span>$10,494</span></div>
+      <div class="popover-row total"><span>Section Total</span><span>$21,760</span></div>
+    </div>
+  </div>
+
+  <div class="sidebar-icon-btn" title="External Works">
+    🔌
+    <div class="popover">
+      <div class="popover-title">External Works</div>
+      <div class="popover-row"><span>External Lighting</span><span>$4,488</span></div>
+      <div class="popover-row"><span>Car Park Power</span><span>$4,852</span></div>
+      <div class="popover-row total"><span>Section Total</span><span>$9,340</span></div>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-icon-btn" title="Client">
+    👤
+    <div class="popover">
+      <div class="popover-title">Client Details</div>
+      <div style="font-size:12px;line-height:1.8">
+        <strong>Sunrise Retail Pty Ltd</strong><br>
+        ABN: 45 123 456 789<br>
+        Contact: Jane Smith<br>
+        jane@sunriseretail.com.au<br>
+        (02) 9876 5432
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <div class="tile"><div class="tile-label">Materials</div><div class="tile-value">$18,420</div></div>
+  <div class="tile"><div class="tile-label">Labour</div><div class="tile-value">$12,680</div></div>
+  <div class="tile"><div class="tile-label">Excl GST</div><div class="tile-value">$31,100</div></div>
+  <div class="tile accent"><div class="tile-label">GST (10%)</div><div class="tile-value">$3,110</div></div>
+  <div class="tile accent"><div class="tile-label">Incl GST</div><div class="tile-value">$34,210</div></div>
+</div>
+
+<div class="main">
+  <div class="sidebar-note">
+    Right sidebar collapsed to 40px icon strip — hover the $ / 📋 / 🔌 / 👤 icons for popover panel
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">
+      <span>Fit-Out — Level 2</span>
+      <span style="font-size:12px;color:var(--muted);font-weight:400">3 parent items · $21,760 excl GST</span>
+    </div>
+
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>GPO Ring Main</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 4 items · $6,240</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup%</div>
+      <div>Wire Min</div><div>Install Min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge cable">Cable</span></div>
+      <div>2.5mm² TPS 3-core</div>
+      <div>120m</div><div>30%</div><div>—</div><div>—</div>
+      <div>$486</div><div>—</div>
+      <div style="font-weight:600">$486</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Double GPO 10A white</div>
+      <div>18</div><div>25%</div><div>15</div><div>25</div>
+      <div>$648</div><div>$1,080</div>
+      <div style="font-weight:600">$1,728</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Single GPO 10A white</div>
+      <div>6</div><div>25%</div><div>10</div><div>20</div>
+      <div>$162</div><div>$288</div>
+      <div style="font-weight:600">$450</div><div>⋯</div>
+    </div>
+
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>Lighting Circuit</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 3 items · $4,820</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup%</div>
+      <div>Wire Min</div><div>Install Min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge cable">Cable</span></div>
+      <div>1.5mm² TPS 2-core</div>
+      <div>85m</div><div>30%</div><div>—</div><div>—</div>
+      <div>$272</div><div>—</div>
+      <div style="font-weight:600">$272</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>LED Downlight 9W</div>
+      <div>24</div><div>35%</div><div>20</div><div>30</div>
+      <div>$1,134</div><div>$1,728</div>
+      <div style="font-weight:600">$2,862</div><div>⋯</div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">
+      <span>External Works</span>
+      <span style="font-size:12px;color:var(--muted);font-weight:400">2 parent items · $9,340 excl GST</span>
+    </div>
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>External Lighting</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 3 items · $4,150</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup%</div>
+      <div>Wire Min</div><div>Install Min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Floodlight 50W LED</div>
+      <div>6</div><div>40%</div><div>30</div><div>45</div>
+      <div>$1,092</div><div>$648</div>
+      <div style="font-weight:600">$1,740</div><div>⋯</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

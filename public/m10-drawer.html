@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>m10 — Drawer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--surface2:#f0efeb;
+  --border:#e4e2dc;--border2:#d5d3cc;
+  --text:#1a1916;--muted:#8a8680;
+  --accent:#c8a04a;--r:10px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:8px;position:fixed;top:0;left:0;right:0;z-index:100}
+.logo{font-weight:700;font-size:15px;color:var(--accent);margin-right:8px}
+.tab{padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;color:var(--muted)}
+.tab.active{background:var(--surface2);color:var(--text);font-weight:600}
+
+.subbar{height:36px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px 0 68px;gap:20px;position:fixed;top:52px;left:0;right:0;z-index:99}
+.subbar-field{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.subbar-field span{color:var(--text);font-weight:600;font-size:13px}
+
+.leftnav{width:52px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:88px;left:0;bottom:62px;display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;z-index:97}
+.nav-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;color:var(--muted)}
+.nav-icon.active{background:var(--surface2);color:var(--accent)}
+
+.bottom-bar{height:62px;background:var(--surface);border-top:1px solid var(--border2);position:fixed;bottom:0;left:52px;right:0;display:flex;align-items:center;z-index:100}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px;border-right:1px solid var(--border);height:100%;gap:2px}
+.tile:last-child{border-right:none}
+.tile-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.tile-value{font-size:18px;font-weight:700;color:var(--text)}
+.tile.accent .tile-value{color:var(--accent)}
+.tile-spacer{flex:1}
+
+/* Full width content — no right margin */
+.main{margin-left:52px;margin-right:0;margin-top:88px;margin-bottom:62px;padding:24px 40px;overflow-y:auto;height:calc(100vh - 88px - 62px);position:fixed;left:0;right:0;top:0}
+
+.section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:16px;overflow:hidden}
+.section-header{padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0}
+.parent-header{padding:10px 16px;background:#faf9f6;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;position:sticky;top:44px}
+.col-headers{display:grid;grid-template-columns:80px 1fr 60px 70px 90px 90px 100px 100px 100px 44px;padding:6px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.item-row{display:grid;grid-template-columns:80px 1fr 60px 70px 90px 90px 100px 100px 100px 44px;padding:8px 16px;border-bottom:1px solid var(--border);font-size:12px;align-items:center}
+.item-row:last-child{border-bottom:none}
+.item-row:hover{background:#faf9f7}
+.type-badge{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;background:var(--surface2);color:var(--muted)}
+.type-badge.cable{background:#e8f4fd;color:#1a6fa8}
+.type-badge.point{background:#edf7ed;color:#2d7a2d}
+
+/* DRAWER — slides in from right */
+.drawer-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);z-index:200;opacity:1;pointer-events:all;transition:opacity .25s}
+.drawer{position:fixed;top:88px;right:0;bottom:62px;width:300px;background:var(--surface);border-left:1px solid var(--border);z-index:201;transform:translateX(0);transition:transform .25s ease;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,0.12)}
+.drawer-header{padding:14px 16px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.drawer-close{cursor:pointer;color:var(--muted);font-size:18px;line-height:1}
+.drawer-section{padding:12px 16px;border-bottom:1px solid var(--border)}
+.drawer-section-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.drawer-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.drawer-row.total{font-weight:700;font-size:14px;color:var(--accent);margin-top:4px}
+
+/* Details toggle button */
+.details-btn{position:fixed;bottom:76px;right:16px;background:var(--accent);color:#1a1916;font-size:13px;font-weight:700;padding:10px 16px;border-radius:24px;cursor:pointer;z-index:150;box-shadow:0 2px 12px rgba(200,160,74,0.4);display:flex;align-items:center;gap:6px}
+
+/* Note badge */
+.full-width-note{background:#fef9ef;border:1px solid var(--accent);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--accent);display:inline-flex;align-items:center;gap:6px;margin-bottom:8px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">ProQuote</div>
+  <div class="tab active">Quote</div>
+  <div class="tab">Clients</div>
+  <div class="tab">Templates</div>
+  <div class="tab">Reports</div>
+  <div style="margin-left:auto;font-size:11px;color:var(--muted);font-style:italic">Drawer hidden → full width. Click "Details ▸" to slide in</div>
+</div>
+
+<div class="subbar">
+  <div class="subbar-field">Ref: <span>QT-2024-089</span></div>
+  <div class="subbar-field">Client: <span>Sunrise Retail Pty Ltd</span></div>
+  <div class="subbar-field">Date: <span>30 May 2026</span></div>
+  <div class="subbar-field">Status: <span style="color:#2d7a2d">Draft</span></div>
+</div>
+
+<div class="leftnav">
+  <div class="nav-icon active">⚡</div>
+  <div class="nav-icon">📋</div>
+  <div class="nav-icon">👤</div>
+  <div class="nav-icon">📎</div>
+  <div class="nav-icon">⚙️</div>
+</div>
+
+<div class="bottom-bar">
+  <div class="tile"><div class="tile-label">Materials</div><div class="tile-value">$18,420</div></div>
+  <div class="tile"><div class="tile-label">Labour</div><div class="tile-value">$12,680</div></div>
+  <div class="tile"><div class="tile-label">Excl GST</div><div class="tile-value">$31,100</div></div>
+  <div class="tile accent"><div class="tile-label">GST (10%)</div><div class="tile-value">$3,110</div></div>
+  <div class="tile accent"><div class="tile-label">Incl GST</div><div class="tile-value">$34,210</div></div>
+</div>
+
+<!-- DRAWER (shown open for mockup) -->
+<div class="drawer-overlay" id="overlay" onclick="toggleDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <span>Quote Details</span>
+    <span class="drawer-close" onclick="toggleDrawer()">✕</span>
+  </div>
+  <div class="drawer-section">
+    <div class="drawer-section-title">Fit-Out — Level 2</div>
+    <div class="drawer-row"><span>Materials</span><span>$12,840</span></div>
+    <div class="drawer-row"><span>Labour</span><span>$8,920</span></div>
+    <div class="drawer-row total"><span>Section Total</span><span>$21,760</span></div>
+  </div>
+  <div class="drawer-section">
+    <div class="drawer-section-title">External Works</div>
+    <div class="drawer-row"><span>Materials</span><span>$5,580</span></div>
+    <div class="drawer-row"><span>Labour</span><span>$3,760</span></div>
+    <div class="drawer-row total"><span>Section Total</span><span>$9,340</span></div>
+  </div>
+  <div class="drawer-section">
+    <div class="drawer-row" style="font-size:13px"><span>Total Excl GST</span><span style="font-weight:700">$31,100</span></div>
+    <div class="drawer-row" style="font-size:13px"><span>GST (10%)</span><span>$3,110</span></div>
+    <div class="drawer-row total" style="font-size:16px"><span>TOTAL</span><span>$34,210</span></div>
+  </div>
+  <div class="drawer-section">
+    <div class="drawer-section-title">Quick Actions</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);font-size:12px;cursor:pointer;text-align:left">📄 Export PDF</button>
+      <button style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);font-size:12px;cursor:pointer;text-align:left">📧 Send to Client</button>
+      <button style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);font-size:12px;cursor:pointer;text-align:left">📋 Duplicate Quote</button>
+    </div>
+  </div>
+</div>
+
+<!-- Details button (visible when drawer is closed) -->
+<div class="details-btn" id="detailsBtn" onclick="toggleDrawer()" style="display:none">
+  Details ▸
+</div>
+
+<div class="main">
+  <div class="full-width-note">
+    ↔ Full-width content (no right sidebar). The "Details ▸" button bottom-right opens a 300px overlay drawer — no layout shift.
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">
+      <span>Fit-Out — Level 2</span>
+      <span style="font-size:12px;color:var(--muted);font-weight:400">3 parent items · $21,760 excl GST</span>
+    </div>
+
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>GPO Ring Main</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 4 items · $6,240</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup%</div>
+      <div>Wire Min</div><div>Install Min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge cable">Cable</span></div>
+      <div>2.5mm² TPS 3-core</div>
+      <div>120m</div><div>30%</div><div>—</div><div>—</div>
+      <div>$486</div><div>—</div>
+      <div style="font-weight:600">$486</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Double GPO 10A white</div>
+      <div>18</div><div>25%</div><div>15</div><div>25</div>
+      <div>$648</div><div>$1,080</div>
+      <div style="font-weight:600">$1,728</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Single GPO 10A white</div>
+      <div>6</div><div>25%</div><div>10</div><div>20</div>
+      <div>$162</div><div>$288</div>
+      <div style="font-weight:600">$450</div><div>⋯</div>
+    </div>
+
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>Lighting Circuit</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 3 items · $4,820</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup%</div>
+      <div>Wire Min</div><div>Install Min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge cable">Cable</span></div>
+      <div>1.5mm² TPS 2-core</div>
+      <div>85m</div><div>30%</div><div>—</div><div>—</div>
+      <div>$272</div><div>—</div>
+      <div style="font-weight:600">$272</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>LED Downlight 9W</div>
+      <div>24</div><div>35%</div><div>20</div><div>30</div>
+      <div>$1,134</div><div>$1,728</div>
+      <div style="font-weight:600">$2,862</div><div>⋯</div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">
+      <span>External Works</span>
+      <span style="font-size:12px;color:var(--muted);font-weight:400">2 parent items · $9,340 excl GST</span>
+    </div>
+    <div class="parent-header">
+      <span style="color:var(--accent)">▼</span>
+      <span>External Lighting</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:400">· 3 items · $4,150</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup%</div>
+      <div>Wire Min</div><div>Install Min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Floodlight 50W LED</div>
+      <div>6</div><div>40%</div><div>30</div><div>45</div>
+      <div>$1,092</div><div>$648</div>
+      <div style="font-weight:600">$1,740</div><div>⋯</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let open = true;
+function toggleDrawer() {
+  open = !open;
+  const d = document.getElementById('drawer');
+  const o = document.getElementById('overlay');
+  const btn = document.getElementById('detailsBtn');
+  if (open) {
+    d.style.transform = 'translateX(0)';
+    o.style.opacity = '1';
+    o.style.pointerEvents = 'all';
+    btn.style.display = 'none';
+  } else {
+    d.style.transform = 'translateX(300px)';
+    o.style.opacity = '0';
+    o.style.pointerEvents = 'none';
+    btn.style.display = 'flex';
+  }
+}
+</script>
+</body>
+</html>
