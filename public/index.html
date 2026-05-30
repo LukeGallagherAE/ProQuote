@@ -3168,6 +3168,26 @@ function syncDOM() {
   syncFittings();
 }
 
+// ── Targeted numeric setters (skip full syncDOM + fullRender) ────────────────
+// These update a single value in the model then recalculate totals only,
+// avoiding the O(n) DOM scan + full section re-render on every field change.
+function _findPar(pid) {
+  for (const sec of S.sections) { const p = sec.parents.find(p => p.id === pid); if (p) return p; }
+  return null;
+}
+function _findSub(subid) {
+  for (const sec of S.sections) { for (const par of sec.parents) { const s = par.subitems.find(s => s.id === subid); if (s) return s; } }
+  return null;
+}
+function setParentQty(pid, val)       { const p=_findPar(pid);   if(p) { p.qty=parseFloat(val)||1;         renderTotals(); scheduleSave(); } }
+function setParentDiscount(pid, val)  { const p=_findPar(pid);   if(p) { p.discount=parseFloat(val)||0;    renderTotals(); scheduleSave(); } }
+function setParentLumpPrice(pid, val) { const p=_findPar(pid);   if(p) { p.lumpPrice=parseFloat(val)||0;   renderTotals(); scheduleSave(); } }
+function setSubQty(subid, val)        { const s=_findSub(subid); if(s) { s.qty=parseFloat(val)||0;         renderTotals(); scheduleSave(); } }
+function setSubMarkup(subid, val)     { const s=_findSub(subid); if(s) { s.markup=parseFloat(val)||0;      renderTotals(); scheduleSave(); } }
+function setSubWireMin(subid, val)    { const s=_findSub(subid); if(s) { s.wireMin=parseFloat(val)||0;     renderTotals(); scheduleSave(); } }
+function setSubInstMin(subid, val)    { const s=_findSub(subid); if(s) { s.instMin=parseFloat(val)||0;     renderTotals(); scheduleSave(); } }
+function setSubCustomPrice(subid, val){ const s=_findSub(subid); if(s) { s.customPrice=parseFloat(val)||0; renderTotals(); scheduleSave(); } }
+
 // ── Mutations ─────────────────────────────────────────────────────────────────
 function addSection(name) {
   S.sections.push(newSection(name)); fullRender();
@@ -5843,9 +5863,9 @@ function renderParent(sid,par,pi,total){
           '<textarea class="parent-desc" id="pd-'+par.id+'" placeholder="Add a description…" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'" rows="1" style="width:100%">'+esc(par.description||'')+'</textarea>'+
         '</div>'+
         swiHtml+
-        '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncDOM();fullRender()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
-        '<div style="display:flex;align-items:center;gap:3px;flex-shrink:0" title="Discount %"><span style="font-size:9px;color:var(--muted)">%</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:12px;padding:3px 5px" placeholder="0" title="Discount (%)"></div>'+
-        '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">'+(par.lumpSum?'Price':'Total')+'</span>'+(par.lumpSum?'<input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)">':((c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)))+'</span>'+
+        '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="setParentQty('+par.id+',this.value)" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
+        '<div style="display:flex;align-items:center;gap:3px;flex-shrink:0" title="Discount %"><span style="font-size:9px;color:var(--muted)">%</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="setParentDiscount('+par.id+',this.value)" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:12px;padding:3px 5px" placeholder="0" title="Discount (%)"></div>'+
+        '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">'+(par.lumpSum?'Price':'Total')+'</span>'+(par.lumpSum?'<input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="setParentLumpPrice('+par.id+',this.value)" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)">':((c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)))+'</span>'+
         '<div class="ph-actions">'+optPill+photoThumb+photoBtn+menuBtn+'</div>'+
       '</div>'+
       '<div style="padding:7px 14px 7px 36px;font-size:11px;color:var(--muted);background:var(--surface2)">'+(par.lumpSum?'Fixed price'+( par.qty>1?' · '+fmt(par.lumpPrice||0)+' × '+par.qty+' = '+fmt(c.total):'')+' — use price field in header':subCount+' sub-item'+(subCount!==1?'s':'')+' hidden — '+fmt(c.total))+'</div>'+
@@ -5881,9 +5901,9 @@ function renderParent(sid,par,pi,total){
         '<textarea class="parent-desc" id="pd-'+par.id+'" placeholder="Add a description…" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'" rows="1" style="width:100%">'+esc(par.description||'')+'</textarea>'+
       '</div>'+
       swiHtml+
-      '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="syncDOM();fullRender()" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
-      '<div style="display:flex;align-items:center;gap:3px;flex-shrink:0" title="Discount %"><span style="font-size:9px;color:var(--muted)">%</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:12px;padding:3px 5px" placeholder="0" title="Discount (%)"></div>'+
-      '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">'+(par.lumpSum?'Price':'Total')+'</span>'+(par.lumpSum?'<input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="syncDOM();fullRender()" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)">':((c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)))+'</span>'+
+      '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="setParentQty('+par.id+',this.value)" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
+      '<div style="display:flex;align-items:center;gap:3px;flex-shrink:0" title="Discount %"><span style="font-size:9px;color:var(--muted)">%</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="setParentDiscount('+par.id+',this.value)" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:12px;padding:3px 5px" placeholder="0" title="Discount (%)"></div>'+
+      '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">'+(par.lumpSum?'Price':'Total')+'</span>'+(par.lumpSum?'<input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="setParentLumpPrice('+par.id+',this.value)" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)">':((c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)))+'</span>'+
       '<div class="ph-actions">'+optPill+photoThumb+photoBtn+menuBtn+'</div>'+
     '</div>'+
     descRow+
@@ -5930,7 +5950,7 @@ function renderSubitem(sid,pid,par,sub){
   const customPriceField=!hasItem
     ? '<div style="display:flex;align-items:center;gap:4px;margin-top:2px;height:24px">'+
         '<span style="font-size:10px;color:var(--muted)">$</span>'+
-        '<input type="number" id="scp-'+sub.id+'" value="'+(sub.customPrice||0)+'" min="0" placeholder="0.00" step="0.01" onchange="syncDOM();fullRender()" style="width:72px;height:22px;font-size:11px;padding:2px 5px" title="Custom unit price">'+
+        '<input type="number" id="scp-'+sub.id+'" value="'+(sub.customPrice||0)+'" min="0" placeholder="0.00" step="0.01" onchange="setSubCustomPrice('+sub.id+',this.value)" style="width:72px;height:22px;font-size:11px;padding:2px 5px" title="Custom unit price">'+
         '<span style="font-size:10px;color:var(--muted)">/</span>'+
         '<input type="text" id="scu-'+sub.id+'" value="'+esc(sub.customUnit||'EA')+'" onchange="syncDOM();fullRender()" style="width:38px;height:22px;font-size:11px;padding:2px 4px" title="Unit">'+
       '</div>'
@@ -5947,11 +5967,11 @@ function renderSubitem(sid,pid,par,sub){
   const instSug = !sub.instMin ? suggestLabourTime(subLabel,'install') : null;
 
   const wireField = isWire
-    ? '<input type="number" id="sw-'+sub.id+'" value="'+sub.wireMin+'" min="0" placeholder="'+(wireSug||'0')+'" onchange="syncDOM();fullRender()" style="text-align:center" title="Wire labour minutes per item">'
+    ? '<input type="number" id="sw-'+sub.id+'" value="'+sub.wireMin+'" min="0" placeholder="'+(wireSug||'0')+'" onchange="setSubWireMin('+sub.id+',this.value)" style="text-align:center" title="Wire labour minutes per item">'
     : '<input type="number" id="sw-'+sub.id+'" value="'+sub.wireMin+'" style="display:none"><span style="text-align:center;color:var(--border2);font-size:11px">—</span>';
 
   const instField = (isInstall||isSupply)
-    ? '<input type="number" id="si-'+sub.id+'" value="'+sub.instMin+'" min="0" placeholder="'+(instSug||'0')+'" onchange="syncDOM();fullRender()" style="text-align:center" title="Install labour minutes'+(isSupply?' (counted when Install is active)':'')+'">'
+    ? '<input type="number" id="si-'+sub.id+'" value="'+sub.instMin+'" min="0" placeholder="'+(instSug||'0')+'" onchange="setSubInstMin('+sub.id+',this.value)" style="text-align:center" title="Install labour minutes'+(isSupply?' (counted when Install is active)':'')+'">'
     : '<input type="number" id="si-'+sub.id+'" value="'+sub.instMin+'" style="display:none"><span style="text-align:center;color:var(--border2);font-size:11px">—</span>';
 
   const menuBtn='<div class="ctx-anchor" style="position:relative">'+
@@ -5970,9 +5990,9 @@ function renderSubitem(sid,pid,par,sub){
       customPriceField+
       '<div class="dropdown" id="drop-'+sid+'-'+pid+'-'+sub.id+'" style="display:none"></div>'+
     '</div>'+
-    '<input type="number" id="sq-'+sub.id+'" value="'+sub.qty+'" min="0" onchange="syncDOM();fullRender()" style="text-align:center">'+
+    '<input type="number" id="sq-'+sub.id+'" value="'+sub.qty+'" min="0" onchange="setSubQty('+sub.id+',this.value)" style="text-align:center">'+
     '<div style="display:flex;align-items:center;gap:2px">'+
-      '<input type="number" id="sm-'+sub.id+'" value="'+sub.markup+'" min="0" onchange="syncDOM();fullRender()" style="text-align:center">'+
+      '<input type="number" id="sm-'+sub.id+'" value="'+sub.markup+'" min="0" onchange="setSubMarkup('+sub.id+',this.value)" style="text-align:center">'+
       '<span style="font-size:10px;color:var(--muted)">%</span>'+
     '</div>'+
     wireField+
