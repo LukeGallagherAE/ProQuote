@@ -1,11 +1,12 @@
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 // Force IPv4 DNS resolution — Railway's network doesn't support IPv6
 require('dns').setDefaultResultOrder('ipv4first');
-const express = require('express');
-const cors    = require('cors');
-const path    = require('path');
-const fs      = require('fs');
-const bcrypt  = require('bcryptjs');
+const express     = require('express');
+const compression = require('compression');
+const cors        = require('cors');
+const path        = require('path');
+const fs          = require('fs');
+const bcrypt      = require('bcryptjs');
 
 const storageRoutes  = require('./routes/storage');
 const quotesRoutes   = require('./routes/quotes');
@@ -17,6 +18,7 @@ const db             = require('./db');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); // large limit — quotes can contain base64 photos
 app.use(express.static(path.join(__dirname, 'public')));
