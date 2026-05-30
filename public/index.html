@@ -12691,6 +12691,29 @@ function init(){
   existingCustom.forEach(item => {
     if (item.name && item.price > 0) syncToAdonai(item.name, item.price, item.unit);
   });
+  // One-time cleanup: delete any blank placeholder quotes named Q-2026-001
+  // that were auto-created before the startup placeholder was hidden.
+  setTimeout(async () => {
+    const token = window._nativeLS?.getItem('pq_jwt');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/quotes', { headers: { 'Authorization': 'Bearer ' + token } });
+      if (!res.ok) return;
+      const rows = await res.json();
+      const stale = rows.filter(r => {
+        const d = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+        const ref = d?.fields?.quoteRef || d?.name || r.name || '';
+        return ref === 'Q-2026-001' || ref === 'Q-' + new Date().getFullYear() + '-001';
+      });
+      for (const row of stale) {
+        await fetch('/api/quotes/' + row.id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+        _quotes = _quotes.filter(q => q.id !== row.id);
+        console.log('[ProQuote] Deleted placeholder quote', row.id, row.name);
+      }
+      if (stale.length) { renderQuoteTabs(); _persistSession(); }
+    } catch(e) { console.warn('[ProQuote] Placeholder cleanup failed:', e); }
+  }, 2000);
+
   // Show workspace screen
   wsShowScreen();
   // Show welcome banner for first-time users
