@@ -234,6 +234,26 @@ html.dark ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38)}
 .section-name-inp:hover{border-color:var(--border);background:var(--surface2)}
 .section-name-inp:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px rgba(0,122,255,.1);outline:none}
 .section-badge{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;background:var(--accent-bg);color:var(--accent);padding:3px 9px;border-radius:4px;white-space:nowrap}
+/* ── FLAT SECTION LIST ── */
+.sec-group{margin-bottom:0}
+.sec-flat-hdr{display:flex;align-items:center;gap:8px;padding:7px 18px;background:var(--surface2);border-bottom:1px solid var(--border);border-top:3px solid transparent;position:sticky;top:0;z-index:15;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.sfh-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.sfh-name{font-size:13px;font-weight:700;background:transparent;border:1px solid transparent;border-radius:4px;padding:2px 6px;flex:1;color:var(--text);font-family:inherit}
+.sfh-name:hover{border-color:var(--border);background:var(--surface)}
+.sfh-name:focus{border-color:var(--accent);background:var(--surface);outline:none}
+.sfh-meta{font-size:11px;color:var(--muted);white-space:nowrap}
+.sfh-total{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--accent);background:var(--accent-bg);padding:2px 8px;border-radius:4px;white-space:nowrap}
+.sfh-add-btn{font-size:11px;padding:3px 9px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;white-space:nowrap;flex-shrink:0}
+.sfh-add-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sec-add-row{padding:8px 18px;border-top:1px dashed var(--border);display:flex;align-items:center;gap:10px;background:var(--surface2)}
+.pq-flat-subtitle{padding:7px 18px;font-size:11px;color:var(--muted);border-bottom:2px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:6px;letter-spacing:.2px}
+.pq-flat-subtitle b{color:var(--text);font-weight:700}
+.pq-flat-empty{padding:60px 18px;text-align:center;color:var(--muted);font-size:13px}
+/* ── TREE NAV HEADER ── */
+.tn-header{display:flex;align-items:center;padding:8px 10px 7px;border-bottom:2px solid var(--border);flex-shrink:0;gap:6px}
+.tn-header-label{font-size:9px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted);flex:1}
+.tn-hbtn{background:none;border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-size:11px;color:var(--muted);cursor:pointer;line-height:1.5;flex-shrink:0}
+.tn-hbtn:hover{background:var(--surface2);color:var(--text);border-color:var(--text)}
 
 .parent-item{border-bottom:1px solid var(--border);position:relative;transition:background .15s}
 .parent-item:last-child{border-bottom:none}
@@ -241,7 +261,7 @@ html.dark ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38)}
 html.dark .parent-item:focus-within{background:var(--blue-bg)}
 @keyframes newItemGlow{0%{box-shadow:0 0 30px 12px rgba(0,122,255,.5),0 0 60px 20px rgba(0,122,255,.25);background:rgba(0,122,255,.07)}80%{box-shadow:0 0 10px 4px rgba(0,122,255,.08);background:rgba(0,122,255,.02)}100%{box-shadow:none;background:transparent}}
 .new-item-glow{animation:newItemGlow 10s ease-out forwards;z-index:2;position:relative}
-.parent-header{display:grid;grid-template-columns:18px 24px auto 1fr 56px 60px 90px auto;align-items:center;gap:8px;padding:11px 18px;background:var(--surface);transition:background .1s;position:sticky;top:44px;z-index:10;box-shadow:0 2px 4px rgba(0,0,0,.04)}
+.parent-header{display:grid;grid-template-columns:18px 24px auto 1fr 56px 60px 90px auto;align-items:center;gap:8px;padding:11px 18px;background:var(--surface);transition:background .1s}
 .ph-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
 .parent-header:hover{background:#fafaf8}
 .parent-name-inp{font-size:13px;font-weight:600;background:transparent;border:1px solid transparent;border-radius:4px;padding:2px 6px;color:var(--text);width:100%}
@@ -5771,23 +5791,14 @@ function renderSections(){
   const wrap=document.getElementById('sectionsWrap');if(!wrap)return;
   const zwBtn = document.getElementById('zone-wizard-btn');
   if(!S.sections.length){
-    wrap.innerHTML='';
+    wrap.innerHTML='<div class="pq-flat-empty">No sections yet — add one using the <b>+</b> button in the sidebar ←</div>';
     if(zwBtn) zwBtn.style.display='';
     return;
   }
   if(zwBtn) zwBtn.style.display='none';
-  const allCollapsed = S.sections.every(s => s.collapsed);
-  const allItemsCollapsed = S.sections.every(s => s.parents.every(p => p.collapsed));
-  const colRow = S.sections.length > 1
-    ? '<div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-bottom:6px;padding:0 2px">'
-      + '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--muted)" onclick="collapseExpandAllItems()">'
-      + (allItemsCollapsed ? '⊞ Expand items' : '⊟ Collapse items')
-      + '</button>'
-      + '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--muted)" onclick="collapseExpandAll()">'
-      + (allCollapsed ? '⊞ Expand sections' : '⊟ Collapse sections')
-      + '</button></div>'
-    : '';
-  wrap.innerHTML = colRow + S.sections.map(renderSection).join('');
+  const totalParents = S.sections.reduce((n,s)=>n+s.parents.length,0);
+  const subtitle = '<div class="pq-flat-subtitle"><b>'+totalParents+' item'+(totalParents!==1?'s':'')+' across '+S.sections.length+' section'+(S.sections.length!==1?'s':'')+'</b><span style="margin:0 4px;opacity:.4">·</span>Click a parent to view its sub-items below</div>';
+  wrap.innerHTML = subtitle + S.sections.map(renderSection).join('');
 }
 
 function renderTreeNav(){
@@ -5804,7 +5815,14 @@ function renderTreeNav(){
   const main = document.querySelector('.main');
   if(main) main.style.marginLeft = '244px';
 
-  nav.innerHTML = S.sections.map(sec => {
+  const allCollapsed = S.sections.every(s => !!_treeNavCollapsed[s.id]);
+  nav.innerHTML =
+    '<div class="tn-header">'
+      +'<span class="tn-header-label">Sections</span>'
+      +'<button class="tn-hbtn" onclick="collapseAllTreeSections()" title="'+(allCollapsed?'Expand all':'Collapse all')+'">'+(allCollapsed?'⊞':'⊟')+'</button>'
+      +'<button class="tn-hbtn" onclick="syncDOM();addSection()" title="Add section" style="font-size:14px;font-weight:700;padding:1px 7px">+</button>'
+    +'</div>'
+    + S.sections.map(sec => {
     const collapsed = !!_treeNavCollapsed[sec.id];
     const pars = sec.parents || [];
     const parItems = collapsed ? '' : pars.map(par => {
@@ -5833,6 +5851,12 @@ function toggleTreeSection(sid){
   _treeNavCollapsed[sid] = !_treeNavCollapsed[sid];
   renderTreeNav();
   if(!_treeNavCollapsed[sid]) scrollToSection(sid);
+}
+
+function collapseAllTreeSections(){
+  const allCollapsed = S.sections.every(s => !!_treeNavCollapsed[s.id]);
+  S.sections.forEach(s => { _treeNavCollapsed[s.id] = !allCollapsed; });
+  renderTreeNav();
 }
 
 function scrollToParent(pid){
@@ -5908,69 +5932,35 @@ function renderSection(sec,si){
   const c=calcSection(sec),col=COLORS[si%COLORS.length];
   const itemCount=sec.parents.filter(p=>p.subitems.some(s=>s.item||s.customName)).length;
 
-  // Sort parents by category order then alphabetically — render only, don't mutate state
-  const allCatsForSort = [...ITEM_CATS, ..._customCats];
-  const catOrder = cat => {
-    const i = allCatsForSort.indexOf(cat||'');
-    return i === -1 ? allCatsForSort.length : i;
-  };
-  // Always group by category (preserving manual order within group when sort is off)
-  const sortedParents = [...sec.parents].sort((a,b) => {
-    const catDiff = catOrder(a.category) - catOrder(b.category);
-    if (catDiff !== 0) return catDiff;
-    // Within same category: alpha if sort active, otherwise original order
-    if (_sortActive) return (a.name||'').localeCompare(b.name||'');
-    return 0; // stable sort preserves original order
+  const allCatsForSort=[...ITEM_CATS,..._customCats];
+  const catOrder=cat=>{const i=allCatsForSort.indexOf(cat||'');return i===-1?allCatsForSort.length:i;};
+  const sortedParents=[...sec.parents].sort((a,b)=>{
+    const d=catOrder(a.category)-catOrder(b.category);
+    if(d!==0)return d;
+    if(_sortActive)return(a.name||'').localeCompare(b.name||'');
+    return 0;
   });
 
-  const secCollapsed = !!sec.collapsed;
-
-  return '<div class="section-card" id="sec-'+sec.id+'" style="border-top:3px solid '+col+'">'+
-    '<div class="section-header">'+
-      '<button class="cbtn" onclick="syncDOM();toggleSec('+sec.id+')">'+(secCollapsed?'▶':'▼')+'</button>'+
-      '<div style="width:10px;height:10px;border-radius:50%;background:'+col+';flex-shrink:0"></div>'+
-      '<input class="section-name-inp" id="sn-'+sec.id+'" value="'+esc(sec.name)+'" oninput="S.sections.find(s=>s.id==='+sec.id+').name=this.value;softRender()">'+
-      '<span class="section-badge">'+fmt(c.total)+'</span>'+
-      '<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 9px;white-space:nowrap" onclick="syncDOM();addParent('+sec.id+');S.sections.find(s=>s.id==='+sec.id+').collapsed=false;fullRender()">+ Item</button>'+
-      '<div style="display:flex;flex-direction:column">'+
-        '<button class="mbtn" onclick="syncDOM();moveSection('+sec.id+',-1)"'+(si===0?' disabled':'')+'>▲</button>'+
-        '<button class="mbtn" onclick="syncDOM();moveSection('+sec.id+',1)"'+(si===S.sections.length-1?' disabled':'')+'>▼</button>'+
-      '</div>'+
-      '<button class="btn-icon danger" onclick="syncDOM();removeSection('+sec.id+')">✕</button>'+
-    '</div>'+
-    (secCollapsed
-    ? '<div style="padding:8px 14px;font-size:11px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)">'+itemCount+' item'+(itemCount!==1?'s':'')+' · '+fmt(c.total)+'</div>'
-    : sortedParents.map((par,pi) => {
-        let divider = '';
-        const prevCat = pi > 0 ? (sortedParents[pi-1].category||'') : null;
-        const thisCat = par.category||'';
-        if (pi === 0 || thisCat !== prevCat) {
-          const catColor = getCatColor(thisCat);
-          const catLabel = esc(thisCat||'Uncategorised');
-          const showDivider = thisCat || pi > 0;
-          divider = showDivider
-            ? '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 18px 3px;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:'+(thisCat?catColor:'var(--muted)')+';background:var(--surface2);border-bottom:1px solid var(--border)">'
-              + '<span>'+catLabel+'</span>'
-              + '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();syncDOM();addParentWithCat('+sec.id+',\''+esc(thisCat||'')+'\')" style="font-size:10px;padding:1px 7px;text-transform:none;letter-spacing:0;opacity:.6" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.6">+ Add</button>'
-              + '</div>'
-            : '';
-        }
-        return divider + renderParent(sec.id,par,pi,sortedParents.length);
-      }).join('')+
-      '<div id="ai-sec-panel-'+sec.id+'"></div>'+
-      '<div class="add-parent-row">'+
-        '<button class="btn btn-ghost btn-sm" onclick="syncDOM();addParent('+sec.id+')">+ Add item</button>'+
-        '<button class="ai-btn" id="ai-sec-btn-'+sec.id+'" onclick="syncDOM();suggestSectionItems('+sec.id+')">✦ AI suggest items</button>'+
-      '</div>'
-  )+
-  '<div class="section-footer">'+
-      '<span class="sf-label">'+itemCount+' item'+(itemCount!==1?'s':'')+' · Section total</span>'+
-      '<span class="sf-val">'+fmt(c.matSell)+'</span>'+
-      '<span class="sf-val lab">'+fmt(c.labSell)+'</span>'+
-      '<span class="sf-val tot">'+fmt(c.total)+'</span>'+
-      '<span></span>'+
-    '</div>'+
-  '</div>';
+  return '<div class="sec-group" id="sec-'+sec.id+'">'
+    +'<div class="sec-flat-hdr" style="border-top:3px solid '+col+'">'
+      +'<div class="sfh-dot" style="background:'+col+'"></div>'
+      +'<input class="sfh-name" id="sn-'+sec.id+'" value="'+esc(sec.name)+'" oninput="S.sections.find(s=>s.id==='+sec.id+').name=this.value;softRender()">'
+      +'<span class="sfh-meta">'+itemCount+' item'+(itemCount!==1?'s':'')+'</span>'
+      +'<span class="sfh-total">'+fmt(c.total)+'</span>'
+      +'<button class="sfh-add-btn" onclick="syncDOM();addParent('+sec.id+')">+ Item</button>'
+      +'<div style="display:flex;flex-direction:column">'
+        +'<button class="mbtn" onclick="syncDOM();moveSection('+sec.id+',-1)"'+(si===0?' disabled':'')+'>▲</button>'
+        +'<button class="mbtn" onclick="syncDOM();moveSection('+sec.id+',1)"'+(si===S.sections.length-1?' disabled':'')+'>▼</button>'
+      +'</div>'
+      +'<button class="btn-icon danger" onclick="syncDOM();removeSection('+sec.id+')">✕</button>'
+    +'</div>'
+    +sortedParents.map((par,pi)=>renderParent(sec.id,par,pi,sortedParents.length)).join('')
+    +'<div id="ai-sec-panel-'+sec.id+'"></div>'
+    +'<div class="sec-add-row">'
+      +'<button class="btn btn-ghost btn-sm" onclick="syncDOM();addParent('+sec.id+')">+ Add item</button>'
+      +'<button class="ai-btn" id="ai-sec-btn-'+sec.id+'" onclick="syncDOM();suggestSectionItems('+sec.id+')">✦ AI suggest items</button>'
+    +'</div>'
+  +'</div>';
 }
 
 function renderParent(sid,par,pi,total){
