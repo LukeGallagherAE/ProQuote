@@ -286,8 +286,7 @@ html.dark .parent-item:focus-within{background:var(--blue-bg)}
 .parent-name-inp:hover{border-color:var(--border);background:var(--surface2)}
 .parent-name-inp:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px rgba(0,122,255,.1);outline:none}
 .parent-desc{width:100%;margin-top:2px;font-size:10px;color:var(--muted);background:none;border:none;outline:none;resize:none;padding:0;line-height:1.4;min-height:14px;height:auto;font-family:inherit}
-.par-desc-add{font-size:9px;color:transparent;padding:0 6px;cursor:pointer;display:block;height:10px}
-.parent-item:hover .par-desc-add{color:var(--border)}
+.par-desc-add{font-size:9px;color:var(--border);padding:0 6px;cursor:pointer;display:block;height:10px;font-style:italic}
 .par-desc-add:hover{color:var(--muted)!important}
 
 .swi-wrap{display:flex;gap:4px;align-items:center}
@@ -6089,8 +6088,7 @@ function renderSection(sec,si){
       +'<div id="ai-sec-panel-'+sec.id+'"></div>'
       +'<div class="sec-add-row">'
         +'<button class="btn btn-ghost btn-sm" onclick="syncDOM();addParent('+sec.id+')">+ Add item</button>'
-        +'<button class="ai-btn" id="ai-sec-btn-'+sec.id+'" onclick="syncDOM();suggestSectionItems('+sec.id+')">✦ AI suggest items</button>'
-      +'</div>'
+        +'</div>'
     +'</div>'
   +'</div>';
 }
@@ -6099,7 +6097,6 @@ function renderParent(sid,par,pi,total){
   const c=calcParent(par);
   const ac=par.activeCats||{supply:true,wire:true,install:true};
   const _swiPartial = !par.lumpSum && (!ac.supply || !ac.wire || !ac.install);
-  const swiHtml='';
   const menuBtn='<button class="parent-menu-btn" onclick="showParentMenu('+sid+','+par.id+',this)" title="Move / duplicate / remove">⋮</button>';
   const optPill = '<label onclick="event.stopPropagation()" title="Mark as optional extra — shown separately on quote with client checkbox" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;user-select:none">'
     + '<span style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:'+(par.optional?'rgba(220,130,0,1)':'var(--muted)')+';transition:color .15s">Optional</span>'
@@ -6116,8 +6113,10 @@ function renderParent(sid,par,pi,total){
     + (_photos.length > 4 ? '<span style="font-size:10px;color:var(--muted);align-self:center">+'+(_photos.length-4)+'</span>' : '')
     : '';
   const photoBtn = '<button onclick="event.stopPropagation();addParentPhoto('+sid+','+par.id+')" title="'
-    +(_photos.length ? 'Add another photo' : 'Add reference photo')
-    +'" style="flex-shrink:0;padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;opacity:'+(_photos.length?'.7':'.45')+'" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity='+(_photos.length?'.7':'.45')+'">📷</button>';
+    +(_photos.length ? 'View / add photos ('+_photos.length+')' : 'Add reference photo')
+    +'" style="flex-shrink:0;padding:2px 6px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer">'
+    +'📷'+(_photos.length ? '<span style="font-size:9px;font-weight:700;margin-left:2px">'+_photos.length+'</span>' : '')
+    +'</button>';
 
   const cat = par.category||'';
   const catColor = getCatColor(cat);
@@ -6125,30 +6124,13 @@ function renderParent(sid,par,pi,total){
   const catBorder = cat ? catColor+'55' : 'var(--border2)';
   const catTextColor = cat ? catColor : 'var(--muted)';
   const catLabel = cat||'Category';
-  // Category pill
+  // Category select options
   const allCats = [...ITEM_CATS, ..._customCats];
   const catOptions =
     allCats.map(c =>
       '<option value="'+c+'"'+(c===cat?' selected':'')+'>'+( c||'— Category —')+'</option>'
     ).join('') +
     '<option value="__add__" style="color:var(--blue);font-style:italic">+ Add category…</option>';
-  const catPill=
-    '<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">'
-    +'<select id="pc-'+par.id+'" onchange="handleCatChange('+par.id+',this)" '+
-      'style="font-size:10px;padding:1px 4px;border-radius:8px;border:1px solid '+catBorder+';'+
-      'background:'+catBg+';color:'+catTextColor+';font-weight:700;cursor:pointer;'+
-      'font-family:inherit;flex-shrink:0;height:20px;max-width:100px">'+
-      catOptions+
-    '</select>'
-    +'<div class="swi-pills">'
-      +'<button class="swi-pill'+(ac.supply?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'supply\')" title="Toggle Supply cost">S</button>'
-      +'<button class="swi-pill'+(ac.wire?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'wire\')" title="Toggle Wire labour">W</button>'
-      +'<button class="swi-pill'+(ac.install?'':' off')+'" onclick="event.stopPropagation();toggleActiveCat('+sid+','+par.id+',\'install\')" title="Toggle Install labour">I</button>'
-      +'<button class="swi-pill'+(par.lumpSum?' lump-on':'')+'" onclick="event.stopPropagation();toggleLumpSum('+sid+','+par.id+')" title="Fixed price">$</button>'
-    +'</div>'
-    +'</div>';
-  // Description row (below header, only rendered if has content or expanded)
-  const descRow='';
 
   const parDragHandle='<span class="drag-handle" draggable="true" ondragstart="_onParDragStart(event,'+sid+','+par.id+')" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>';
 
