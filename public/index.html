@@ -155,8 +155,10 @@ html.dark .sidebar{box-shadow:-2px 0 16px rgba(0,0,0,.3)}
 .tree-nav.visible{display:flex}
 html.dark .tree-nav{background:var(--surface)}
 .tn-sec-group{border-bottom:1px solid var(--border)}
-.tree-nav-section{padding:9px 10px 8px;font-size:11px;font-weight:700;color:var(--text);background:var(--surface2);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;gap:6px}
+.tree-nav-section{padding:7px 10px 7px;font-size:11px;font-weight:700;color:var(--text);background:var(--surface2);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;gap:6px}
 .tree-nav-section:hover{background:var(--border)}
+.tree-nav-section.tn-sec-active{background:rgba(200,160,74,.15);color:var(--accent)}
+.tree-nav-section.tn-sec-active .tn-toggle{color:var(--accent)}
 .tn-sec-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tn-toggle{font-size:9px;color:var(--muted);flex-shrink:0;transition:transform .15s}
 .tree-nav-par{padding:5px 10px 5px 16px;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:0;transition:background .08s,color .08s;display:flex;align-items:center;gap:5px}
@@ -263,7 +265,11 @@ html.dark ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38)}
 html.dark .parent-item:focus-within{background:var(--blue-bg)}
 @keyframes newItemGlow{0%{box-shadow:0 0 30px 12px rgba(0,122,255,.5),0 0 60px 20px rgba(0,122,255,.25);background:rgba(0,122,255,.07)}80%{box-shadow:0 0 10px 4px rgba(0,122,255,.08);background:rgba(0,122,255,.02)}100%{box-shadow:none;background:transparent}}
 .new-item-glow{animation:newItemGlow 10s ease-out forwards;z-index:2;position:relative}
-.parent-header{display:grid;grid-template-columns:18px 24px auto 1fr 56px 60px 90px auto;align-items:center;gap:8px;padding:11px 18px;background:var(--surface);transition:background .1s}
+.parent-header{display:grid;grid-template-columns:14px 16px 1fr auto 82px 82px 92px auto;align-items:center;gap:8px;padding:8px 16px;background:var(--surface);transition:background .1s;cursor:pointer}
+.par-part-ref{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;white-space:nowrap;flex-shrink:0;margin-left:4px}
+.par-num{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:var(--muted);text-align:right;white-space:nowrap}
+.par-num.mat{color:var(--text)}.par-num.lab{color:var(--blue)}
+.par-controls-bar{display:flex;align-items:center;gap:8px;padding:4px 16px 5px 44px;background:var(--surface2);border-top:1px solid var(--border);flex-wrap:wrap}
 .ph-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
 .parent-header:hover{background:#fafaf8}
 .parent-name-inp{font-size:13px;font-weight:600;background:transparent;border:1px solid transparent;border-radius:4px;padding:2px 6px;color:var(--text);width:100%}
@@ -292,12 +298,15 @@ html.dark .parent-item:focus-within{background:var(--blue-bg)}
 .sub-col-headers span:nth-child(2){text-align:left}
 .sub-col-headers .r{text-align:right}
 
-.subitem-row{display:grid;grid-template-columns:56px 1fr 44px 62px 52px 52px minmax(80px,1fr) minmax(80px,1fr) minmax(88px,1fr) 30px;gap:8px;padding:7px 12px;align-items:center;border-bottom:1px solid var(--border);transition:background .08s}
+.subitem-row{display:grid;grid-template-columns:56px 1fr 44px 62px 52px 52px minmax(80px,1fr) minmax(80px,1fr) minmax(88px,1fr) 30px;gap:8px;padding:4px 12px;align-items:center;border-bottom:1px solid var(--border);transition:background .08s}
 .subitem-row>*{min-width:0}
-.subitem-row:hover{background:#f7f6f2}
+.subitem-row:nth-child(odd){background:var(--surface)}
+.subitem-row:nth-child(even){background:var(--surface2)}
+.subitem-row:hover{background:rgba(200,160,74,.06)!important}
 .subitem-row:last-of-type{border-bottom:none}
 .subitem-row.faded{opacity:.35}
 .subitem-row.faded:hover{opacity:.6}
+.sub-col-headers{position:sticky;top:0;z-index:10;background:var(--surface2)}
 .subitems-wrap.sub-drag-over{outline:2px dashed var(--accent);outline-offset:-2px;background:rgba(0,122,255,.04)}
 .subitem-row input,.subitem-row select{padding:2px 5px;font-size:11px;border-radius:4px;height:24px}
 
@@ -3926,6 +3935,7 @@ let _skipNextSync=false; // set before fullRender to skip syncDOM for the next f
 let _subPanelPid=null, _subPanelSid=null;
 let _treeNavCollapsed={};
 let _treeNavHidden=false;
+let _activeSectionId=null;
 function fullRender(){
   if(_renderPending)return;
   _renderPending=true;
@@ -5800,9 +5810,25 @@ function renderSections(){
     return;
   }
   if(zwBtn) zwBtn.style.display='none';
-  const totalParents = S.sections.reduce((n,s)=>n+s.parents.length,0);
-  const subtitle = '<div class="pq-flat-subtitle"><b>'+totalParents+' item'+(totalParents!==1?'s':'')+' across '+S.sections.length+' section'+(S.sections.length!==1?'s':'')+'</b><span style="margin:0 4px;opacity:.4">·</span>Click a parent to view its sub-items below</div>';
-  wrap.innerHTML = subtitle + S.sections.map(renderSection).join('');
+  if(!_activeSectionId){
+    wrap.innerHTML='<div class="pq-flat-empty" style="padding:80px 40px">← Select a section from the sidebar to view its items</div>';
+    return;
+  }
+  const si = S.sections.findIndex(s=>s.id==_activeSectionId);
+  const sec = S.sections[si];
+  if(!sec){ _activeSectionId=null; wrap.innerHTML='<div class="pq-flat-empty">Section not found — select one from the sidebar</div>'; return; }
+  wrap.innerHTML = renderSection(sec, si);
+}
+
+function selectSection(sid){
+  const _num = Number(sid);
+  if(_activeSectionId===_num){ _activeSectionId=null; }
+  else {
+    _activeSectionId=_num;
+    if(_subPanelPid!==null){ const sec=S.sections.find(s=>s.id==_subPanelSid); if(!sec||!sec.parents.find(p=>p.id==_subPanelPid)){ _subPanelPid=null;_subPanelSid=null; } }
+  }
+  _skipNextSync=true;
+  fullRender();
 }
 
 function renderTreeNav(){
@@ -5839,13 +5865,14 @@ function renderTreeNav(){
     +'</div>'
     + S.sections.map(sec => {
     const collapsed = !!_treeNavCollapsed[sec.id];
+    const isActiveSection = sec.id == _activeSectionId;
     const pars = sec.parents || [];
     const parItems = collapsed ? '' : pars.map(par => {
       const label = par.name || 'Untitled';
       const isActive = par.id == _subPanelPid;
-      return `<div class="tree-nav-par${isActive?' active':''}" onclick="scrollToParent('${par.id}');openSubitemPanel('${sec.id}','${par.id}')" title="${label.replace(/'/g,"&#39;")}">${label}</div>`;
+      return `<div class="tree-nav-par${isActive?' active':''}" onclick="selectSection('${sec.id}');openSubitemPanel('${sec.id}','${par.id}')" title="${label.replace(/'/g,"&#39;")}">${label}</div>`;
     }).join('');
-    return `<div class="tn-sec-group"><div class="tree-nav-section" onclick="toggleTreeSection('${sec.id}')" title="${(sec.name||'').replace(/'/g,"&#39;")}"><span class="tn-sec-label">${sec.name||'Untitled section'}</span><span class="tn-toggle">${collapsed?'▶':'▾'}</span></div>${parItems}</div>`;
+    return `<div class="tn-sec-group"><div class="tree-nav-section${isActiveSection?' tn-sec-active':''}" title="${(sec.name||'').replace(/'/g,"&#39;")}"><span class="tn-sec-label" onclick="selectSection('${sec.id}')">${sec.name||'Untitled section'}</span><span class="tn-toggle" onclick="event.stopPropagation();toggleTreeSection('${sec.id}')" style="padding:4px 6px">${collapsed?'▶':'▾'}</span></div>${parItems}</div>`;
   }).join('') + '<div style="height:40px"></div>';
 }
 
@@ -5891,6 +5918,7 @@ function toggleTreeNavSidebar(){
     }
     renderTreeNav();
   }
+  _updatePanelBounds(document.getElementById('subitem-panel'));
 }
 
 function scrollToParent(pid){
@@ -5926,6 +5954,15 @@ function closeSubitemPanel() {
   fullRender();
 }
 
+function _updatePanelBounds(panel) {
+  if(!panel) return;
+  const leftPx = _treeNavHidden ? 64 : 244;
+  const sb = document.getElementById('sidebar');
+  const rightPx = (!sb || sb.classList.contains('collapsed')) ? 0 : 248;
+  panel.style.left = leftPx + 'px';
+  panel.style.right = rightPx + 'px';
+}
+
 function renderSubitemPanel() {
   const panel = document.getElementById('subitem-panel');
   if (!panel) return;
@@ -5935,8 +5972,9 @@ function renderSubitemPanel() {
     if (main) main.style.paddingBottom = '';
     return;
   }
-  const sec = S.sections.find(s => s.id === _subPanelSid);
-  const par = sec?.parents.find(p => p.id === _subPanelPid);
+  _updatePanelBounds(panel);
+  const sec = S.sections.find(s => s.id == _subPanelSid);
+  const par = sec?.parents.find(p => p.id == _subPanelPid);
   if (!sec || !par) { closeSubitemPanel(); return; }
 
   const c = calcParent(par);
@@ -6059,6 +6097,10 @@ function renderParent(sid,par,pi,total){
   const _inPanel = par.id === _subPanelPid;
   const subCount = par.subitems.filter(s => s.item || s.customName).length;
 
+  // Part ref = first supply item code
+  const _mainSub = par.subitems.find(s=>s.cat==='supply'&&s.item?.c);
+  const partRef = _mainSub?.item?.c || '';
+
   let _labMins = 0;
   (par.subitems||[]).forEach(sub => {
     if (sub.cat==='wire' && ac.wire) _labMins += (sub.wireMin||0)*(sub.qty||1);
@@ -6068,35 +6110,38 @@ function renderParent(sid,par,pi,total){
   _labMins *= (par.qty||1);
   const _labH = Math.floor(_labMins/60), _labM = Math.round(_labMins%60);
   const _labStr = _labMins>0 ? (_labH>0 ? _labH+'h'+(_labM>0?' '+_labM+'m':'') : _labM+'m') : null;
-  const _matStr = (!par.lumpSum && c.matCost>0) ? '📦 '+fmt(c.matCost) : '';
-  const _labLabel = _labStr ? '⏱ '+_labStr : '';
-  const _metaParts = [subCount+' sub-item'+(subCount!==1?'s':''), _labLabel, _matStr].filter(Boolean).join(' · ');
 
-  const hintsBar = par.lumpSum
-    ? '<div style="padding:5px 18px;font-size:11px;color:var(--muted);background:var(--surface2);border-top:1px solid var(--border)">'
-      +(par.qty>1?'<span style="color:var(--text);font-weight:600">'+fmt(par.lumpPrice||0)+'</span> × '+par.qty+' = <span style="color:var(--accent);font-weight:700">'+fmt(c.total)+'</span>':'Fixed price — enter amount in the price field above')
-      +'</div>'
-    : (_inPanel
-      ? '<div class="sip-indicator" onclick="closeSubitemPanel()"><span>▾ '+_metaParts+' — editing in panel</span><span style="font-size:10px;opacity:.7">close ✕</span></div>'
-      : '<div class="par-item-hint" onclick="openSubitemPanel(\''+sid+'\',\''+par.id+'\')"><span>'+_metaParts+'</span><span>▶ Edit</span></div>');
+  // Controls bar: category + SWI + qty + discount (shown below main row)
+  const controlsBar = '<div class="par-controls-bar">'
+    + catPill
+    + '<div style="display:flex;align-items:center;gap:3px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="setParentQty('+par.id+',this.value)" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:11px;padding:2px 4px"></div>'
+    + '<div style="display:flex;align-items:center;gap:2px" title="Discount %"><span style="font-size:9px;color:var(--muted)">%off</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="setParentDiscount('+par.id+',this.value)" onclick="event.stopPropagation()" style="width:36px;text-align:center;font-size:11px;padding:2px 4px" placeholder="0"></div>'
+    + (_labStr ? '<span style="font-size:10px;color:var(--muted);margin-left:4px">⏱ '+_labStr+'</span>' : '')
+    + '<span style="font-size:10px;color:var(--muted);margin-left:auto">'+subCount+' sub-item'+(subCount!==1?'s':'')+'</span>'
+    + (_inPanel
+        ? '<span class="sip-indicator" onclick="closeSubitemPanel()" style="padding:2px 8px;font-size:11px;border-radius:4px">▾ editing in panel · close ✕</span>'
+        : '<span class="par-item-hint" onclick="openSubitemPanel(\''+sid+'\',\''+par.id+'\')" style="padding:2px 8px;font-size:11px;border-radius:4px">▶ Edit sub-items</span>')
+    + '</div>';
+
+  const totalSpan = par.lumpSum
+    ? '<span class="ptotal tot"><span class="ptotal-lbl">Price</span><input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="setParentLumpPrice('+par.id+',this.value)" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)"></span>'
+    : '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">Total</span>'+(c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)+'</span>';
 
   return '<div class="parent-item'+(_inPanel?' in-panel':'')+'" id="par-'+par.id+'" ondragover="_dragParId!=null?_onParDragOver(event,'+sid+','+par.id+'):(event.preventDefault(),event.stopPropagation(),this.classList.add(\'drag-over\'))" ondragleave="this.classList.remove(\'drag-over\');this.classList.remove(\'item-drag-over\')" ondrop="_dragParId!=null?_onParDrop(event,'+sid+','+par.id+'):(dropParentPhoto(event,'+sid+','+par.id+'),this.classList.remove(\'drag-over\'))">'+
-  (par.optional ? '<div style="position:absolute;inset:0;border:2px dashed rgba(255,165,0,.35);border-radius:10px;pointer-events:none"></div>' : '')+
+  (par.optional ? '<div style="position:absolute;inset:0;border:2px dashed rgba(255,165,0,.35);border-radius:4px;pointer-events:none"></div>' : '')+
     '<div class="parent-header" onclick="if(!([\'INPUT\',\'TEXTAREA\',\'BUTTON\',\'SELECT\'].includes(event.target.tagName)||event.target.closest(\'.ph-actions\')))openSubitemPanel(\''+sid+'\',\''+par.id+'\')">'+
       parDragHandle+
-      '<span style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;color:'+(_inPanel?'var(--accent)':'var(--muted)')+';flex-shrink:0">'+(_inPanel?'▾':'▸')+'</span>'+
-      catPill+
-      '<div style="min-width:0;display:flex;flex-direction:column;gap:2px">'+
-        '<div style="position:relative;width:100%"><input class="parent-name-inp" id="pn-'+par.id+'" value="'+esc(par.name)+'" placeholder="Item name…" style="width:100%" oninput="onParentNameInput('+sid+','+par.id+',this.value)" onblur="setTimeout(closeTemplateDrop,200)"></div>'+
-        '<textarea class="parent-desc" id="pd-'+par.id+'" placeholder="Add a description…" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'" rows="1" style="width:100%">'+esc(par.description||'')+'</textarea>'+
+      '<span style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;color:'+(_inPanel?'var(--accent)':'var(--muted)')+';flex-shrink:0">'+(_inPanel?'▾':'▸')+'</span>'+
+      '<div style="min-width:0;display:flex;align-items:baseline;gap:0">'+
+        '<input class="parent-name-inp" id="pn-'+par.id+'" value="'+esc(par.name)+'" placeholder="Item name…" style="width:100%;font-size:13px" oninput="onParentNameInput('+sid+','+par.id+',this.value)" onblur="setTimeout(closeTemplateDrop,200)">'+
+        (partRef ? '<span class="par-part-ref">'+esc(partRef)+'</span>' : '')+
       '</div>'+
-      swiHtml+
-      '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--muted)">×</span><input type="number" id="pq-'+par.id+'" value="'+par.qty+'" min="1" onchange="setParentQty('+par.id+',this.value)" style="width:44px;text-align:center;font-size:12px;padding:3px 5px"></div>'+
-      '<div style="display:flex;align-items:center;gap:3px;flex-shrink:0" title="Discount %"><span style="font-size:9px;color:var(--muted)">%</span><input type="number" id="pdisc-'+par.id+'" value="'+(par.discount||0)+'" min="0" max="100" step="0.5" onchange="setParentDiscount('+par.id+',this.value)" onclick="event.stopPropagation()" style="width:40px;text-align:center;font-size:12px;padding:3px 5px" placeholder="0" title="Discount (%)"></div>'+
-      '<span class="ptotal tot'+(c.discAmt>0?' has-disc':'')+'"><span class="ptotal-lbl">'+(par.lumpSum?'Price':'Total')+'</span>'+(par.lumpSum?'<input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="setParentLumpPrice('+par.id+',this.value)" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)">':((c.discAmt>0?'<span style="font-size:9px;color:#e03;font-weight:600">-'+fmt(c.discAmt)+'</span> ':'')+fmt(c.total)))+'</span>'+
-      '<div class="ph-actions">'+optPill+photoThumb+photoBtn+menuBtn+'</div>'+
+      '<div class="par-num mat" title="Materials sell">'+fmt(c.matSell)+'</div>'+
+      '<div class="par-num lab" title="Labour sell">'+fmt(c.labSell)+'</div>'+
+      totalSpan+
+      '<div class="ph-actions">'+optPill+menuBtn+'</div>'+
     '</div>'+
-    hintsBar+
+    controlsBar+
   '</div>';
 }
 
@@ -10224,6 +10269,7 @@ function toggleSidebar() {
   }
 
   _updateToggleBtn(preset, collapsed);
+  _updatePanelBounds(document.getElementById('subitem-panel'));
 }
 
 // ── Rolodex ──────────────────────────────────────────────────────────────
