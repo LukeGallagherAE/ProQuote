@@ -2824,8 +2824,11 @@ function loadQuoteState(id) {
   // Cancel any pending auto-save for the previous quote before switching
   if (window._autoSaveDeb) { clearTimeout(window._autoSaveDeb); window._autoSaveDeb = null; }
   _activeQuoteId = id;
-  S.sections = JSON.parse(JSON.stringify(q.sections));
-  _restoreFields(q.fields);
+  if (!q.sections || !q.sections.length) {
+    console.warn('[ProQuote] loadQuoteState: quote', id, 'has no sections — data may be missing from server');
+  }
+  S.sections = JSON.parse(JSON.stringify(q.sections || []));
+  _restoreFields(q.fields || {});
   // Show/hide auto-revision notice / lock banner
   const notice = document.getElementById('auto-rev-notice');
   if (notice) {
@@ -3168,9 +3171,27 @@ function syncDOM() {
   syncFittings();
 }
 
-// ── Targeted numeric setters (skip full syncDOM + fullRender) ────────────────
-// These update a single value in the model then recalculate totals only,
-// avoiding the O(n) DOM scan + full section re-render on every field change.
+// ── Targeted numeric setters (bypass expensive syncDOM) ──────────────────────
+// syncTextFields() reads only text inputs (names, descriptions) — no number
+// inputs, no localStorage writes. Used before fullRender+_skipNextSync so
+// the DOM rebuild is correct while avoiding the costly full syncDOM scan.
+function syncTextFields() {
+  for (const sec of S.sections) {
+    const n = document.getElementById('sn-' + sec.id);
+    if (n) sec.name = n.value;
+    for (const par of sec.parents) {
+      const pn = document.getElementById('pn-' + par.id); if (pn) par.name = pn.value;
+      const pd = document.getElementById('pd-' + par.id); if (pd) par.description = pd.value;
+    }
+  }
+}
+function _numSet(updateFn) {
+  syncTextFields();
+  updateFn();
+  _skipNextSync = true;
+  fullRender();
+  scheduleSave();
+}
 function _findPar(pid) {
   for (const sec of S.sections) { const p = sec.parents.find(p => p.id === pid); if (p) return p; }
   return null;
@@ -3179,14 +3200,14 @@ function _findSub(subid) {
   for (const sec of S.sections) { for (const par of sec.parents) { const s = par.subitems.find(s => s.id === subid); if (s) return s; } }
   return null;
 }
-function setParentQty(pid, val)       { const p=_findPar(pid);   if(p) { p.qty=parseFloat(val)||1;         renderTotals(); scheduleSave(); } }
-function setParentDiscount(pid, val)  { const p=_findPar(pid);   if(p) { p.discount=parseFloat(val)||0;    renderTotals(); scheduleSave(); } }
-function setParentLumpPrice(pid, val) { const p=_findPar(pid);   if(p) { p.lumpPrice=parseFloat(val)||0;   renderTotals(); scheduleSave(); } }
-function setSubQty(subid, val)        { const s=_findSub(subid); if(s) { s.qty=parseFloat(val)||0;         renderTotals(); scheduleSave(); } }
-function setSubMarkup(subid, val)     { const s=_findSub(subid); if(s) { s.markup=parseFloat(val)||0;      renderTotals(); scheduleSave(); } }
-function setSubWireMin(subid, val)    { const s=_findSub(subid); if(s) { s.wireMin=parseFloat(val)||0;     renderTotals(); scheduleSave(); } }
-function setSubInstMin(subid, val)    { const s=_findSub(subid); if(s) { s.instMin=parseFloat(val)||0;     renderTotals(); scheduleSave(); } }
-function setSubCustomPrice(subid, val){ const s=_findSub(subid); if(s) { s.customPrice=parseFloat(val)||0; renderTotals(); scheduleSave(); } }
+function setParentQty(pid, val)       { const p=_findPar(pid);   if(p) _numSet(()=>{ p.qty=parseFloat(val)||1; }); }
+function setParentDiscount(pid, val)  { const p=_findPar(pid);   if(p) _numSet(()=>{ p.discount=parseFloat(val)||0; }); }
+function setParentLumpPrice(pid, val) { const p=_findPar(pid);   if(p) _numSet(()=>{ p.lumpPrice=parseFloat(val)||0; }); }
+function setSubQty(subid, val)        { const s=_findSub(subid); if(s) _numSet(()=>{ s.qty=parseFloat(val)||0; }); }
+function setSubMarkup(subid, val)     { const s=_findSub(subid); if(s) _numSet(()=>{ s.markup=parseFloat(val)||0; }); }
+function setSubWireMin(subid, val)    { const s=_findSub(subid); if(s) _numSet(()=>{ s.wireMin=parseFloat(val)||0; }); }
+function setSubInstMin(subid, val)    { const s=_findSub(subid); if(s) _numSet(()=>{ s.instMin=parseFloat(val)||0; }); }
+function setSubCustomPrice(subid, val){ const s=_findSub(subid); if(s) _numSet(()=>{ s.customPrice=parseFloat(val)||0; }); }
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 function addSection(name) {
@@ -10232,8 +10253,9 @@ function loadJobQuote(client, jobIdx, quoteIdx) {
       saveActiveQuoteState();
       existing._hiddenTab = false; // unhide: make it a visible tab
       _activeQuoteId = existing.id;
-      S.sections = JSON.parse(JSON.stringify(existing.sections));
-      _restoreFields(existing.fields);
+      S.sections = JSON.parse(JSON.stringify(existing.sections || []));
+      _restoreFields(existing.fields || {});
+      _skipNextSync = true;
       fullRender();
       renderQuoteTabs();
       updateQuoteTabLabel();
@@ -10256,6 +10278,7 @@ function loadJobQuote(client, jobIdx, quoteIdx) {
   _activeQuoteId = nq.id;
   _restoreFields(fields);
   S.sections = sections;
+  _skipNextSync = true;
   fullRender();
   renderQuoteTabs();
   updateQuoteTabLabel();
