@@ -151,9 +151,9 @@ html.dark .qsub-btn.active{background:rgba(255,255,255,.15);color:#fff}
 .sidebar{width:248px;flex-shrink:0;background:var(--surface);border:none;border-right:1px solid var(--border);border-left:none;border-radius:0;padding:0;display:flex;flex-direction:column;overflow:hidden;position:fixed;top:88px;left:64px;right:auto;bottom:62px;height:auto;z-index:100;transition:width .2s ease,padding .2s ease;box-shadow:2px 0 12px rgba(0,0,0,.06)}
 html.dark .sidebar{box-shadow:2px 0 16px rgba(0,0,0,.3)}
 .sb-tabs{display:flex;flex-shrink:0;background:var(--surface2);border-bottom:2px solid var(--border)}
-.sb-tab{flex:1;padding:9px 2px;font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;color:var(--muted);font-family:inherit;transition:color .1s,border-color .1s}
-.sb-tab:hover{color:var(--text)}
-.sb-tab.sb-tab-active{color:var(--accent);border-bottom-color:var(--accent)}
+.sb-tab{flex:1;padding:9px 2px;font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;background:var(--surface2);border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;color:var(--muted);font-family:inherit;transition:color .1s,border-color .1s,background .1s;box-shadow:inset 0 -4px 8px rgba(0,0,0,.07)}
+.sb-tab:hover{color:var(--text);background:var(--surface)}
+.sb-tab.sb-tab-active{color:var(--accent);border-bottom-color:var(--accent);background:var(--surface);box-shadow:none}
 .sb-tab-content{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
 .sb-tab-content.sb-hidden{display:none!important}
 #sb-sidebar-content{display:flex;flex-direction:column;gap:16px;padding:12px 16px 24px;overflow-y:auto;flex:1;min-height:0}
@@ -176,8 +176,8 @@ html.dark .tree-nav{background:var(--surface)}
 .tree-nav-par.active::before{color:var(--accent)}
 @media print{.tree-nav{display:none!important}}
 /* ── SUBITEM PANEL ── */
-#subitem-panel{position:fixed;left:64px;right:0;bottom:62px;height:0;background:var(--surface);border-top:2px solid var(--accent);z-index:150;display:flex;flex-direction:column;transition:height .2s ease;overflow:hidden}
-#subitem-panel.open{height:280px}
+#subitem-panel{position:fixed;left:64px;right:0;bottom:62px;height:0;background:var(--surface);border-top:none;z-index:150;display:flex;flex-direction:column;transition:height .2s ease;overflow:hidden}
+#subitem-panel.open{height:280px;border-top:2px solid var(--accent)}
 .sip-header{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0}
 .sip-title{font-size:13px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sip-body{flex:1;overflow-y:auto;overflow-x:auto}
@@ -5887,7 +5887,8 @@ function renderTreeNav(){
       +'<span class="tn-header-label">Sections</span>'
       +'<button class="tn-hbtn" onclick="collapseAllTreeSections()" title="'+(allCollapsed?'Expand all':'Collapse all')+'">'+(allCollapsed?'⊞':'⊟')+'</button>'
     +'</div>'
-    + S.sections.map(sec => {
+    + S.sections.map((sec, si) => {
+    const col = COLORS[si % COLORS.length];
     const collapsed = !!_treeNavCollapsed[sec.id];
     const isActiveSection = sec.id == _activeSectionId;
     const pars = sec.parents || [];
@@ -5896,11 +5897,9 @@ function renderTreeNav(){
       const isActive = par.id == _subPanelPid;
       return `<div class="tree-nav-par${isActive?' active':''}" onclick="selectSection('${sec.id}');openSubitemPanel('${sec.id}','${par.id}')" title="${label.replace(/'/g,"&#39;")}">${label}</div>`;
     }).join('');
-    return `<div class="tn-sec-group"><div class="tree-nav-section${isActiveSection?' tn-sec-active':''}" title="${(sec.name||'').replace(/'/g,"&#39;")}"><span class="tn-sec-label" onclick="selectSection('${sec.id}')">${sec.name||'Untitled section'}</span><span class="tn-toggle" onclick="event.stopPropagation();toggleTreeSection('${sec.id}')" style="padding:4px 6px">${collapsed?'▶':'▾'}</span></div>${parItems}</div>`;
-  }).join('')
-    + '<div style="padding:8px 10px;border-top:1px dashed var(--border);margin-top:4px">'
-    + '<button class="btn btn-secondary btn-sm" style="width:100%" onclick="syncDOM();addSection()">+ Add section</button>'
-    + '</div>';
+    const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;margin-right:6px"></span>`;
+    return `<div class="tn-sec-group"><div class="tree-nav-section${isActiveSection?' tn-sec-active':''}" title="${(sec.name||'').replace(/'/g,"&#39;")}" style="display:flex;align-items:center">${dot}<span class="tn-sec-label" onclick="selectSection('${sec.id}')" style="flex:1">${sec.name||'Untitled section'}</span><span class="tn-toggle" onclick="event.stopPropagation();toggleTreeSection('${sec.id}')" style="padding:4px 6px">${collapsed?'▶':'▾'}</span></div>${parItems}</div>`;
+  }).join('');
 }
 
 function scrollToSection(sid){
@@ -6212,9 +6211,9 @@ function renderSubitem(sid,pid,par,sub){
   const displayVal=hasItem?(sub.item.d1+(sub.item.d2?' — '+sub.item.d2:'')):(sub.customName||'');
   const placeholder=isWire?'Search or type a description…':isInstall?'Search or type a description…':'Search pricelist or type a custom item…';
 
-  const itemInfo=hasItem
-    ? '<div class="item-lbl">'+sub.item.c+' · '+sub.item.u+' <span style="color:var(--accent);cursor:pointer;font-size:9px" onclick="clearItem('+sid+','+pid+','+sub.id+')">✕</span></div>'
-    : (sub.customName ? '<div class="item-lbl">'+esc(sub.customUnit||'EA')+'</div>' : '<div class="item-lbl" style="visibility:hidden">·</div>');
+  const itemCodeBadge = hasItem
+    ? '<span style="font-size:9px;color:var(--muted);font-family:\'IBM Plex Mono\',monospace;white-space:nowrap;flex-shrink:0;padding:1px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:3px" title="'+esc(sub.item.c)+' · '+esc(sub.item.u)+'">'+esc(sub.item.c)+'<span style="cursor:pointer;margin-left:3px;color:var(--muted);font-size:8px" onclick="event.stopPropagation();clearItem('+sid+','+pid+','+sub.id+')" title="Clear item">✕</span></span>'
+    : '';
 
   // Hidden inputs kept for compatibility
   const hiddenPriceInputs=hasItem
@@ -6252,15 +6251,17 @@ function renderSubitem(sid,pid,par,sub){
 
   return '<div class="subitem-row'+(active?'':' faded')+'" id="sub-'+sub.id+'" ondragover="_onSubDragOver(event,'+sid+','+pid+','+sub.id+')" ondragleave="this.classList.remove(\'item-drag-over\')" ondrop="_onSubDrop(event,'+sid+','+pid+','+sub.id+')">'+
     '<button class="cat-tag" onclick="syncDOM();toggleSubCat('+sid+','+pid+','+sub.id+')" title="Click to change type">'+catLabel+'</button>'+
-    '<div class="sw">'+
-      '<input id="ss-'+sub.id+'" value="'+esc(displayVal)+'" placeholder="'+placeholder+'" autocomplete="off" style="width:100%;box-sizing:border-box"'+
-        ' oninput="onSearch('+sid+','+pid+','+sub.id+',this.value)"'+
-        ' onkeydown="if(event.keyCode===13){event.preventDefault();lockCustomName('+sid+','+pid+','+sub.id+',this.value);this.blur();}"'+
-        ' onblur="lockCustomName('+sid+','+pid+','+sub.id+',this.value)"'+
-        ' onfocus="if(this.value.length>=2)onSearch('+sid+','+pid+','+sub.id+',this.value)">'+
-      itemInfo+
+    '<div class="sw" style="display:flex;align-items:center;gap:4px">'+
+      '<div style="position:relative;flex:1;min-width:0">'+
+        '<input id="ss-'+sub.id+'" value="'+esc(displayVal)+'" placeholder="'+placeholder+'" autocomplete="off" style="width:100%;box-sizing:border-box"'+
+          ' oninput="onSearch('+sid+','+pid+','+sub.id+',this.value)"'+
+          ' onkeydown="if(event.keyCode===13){event.preventDefault();lockCustomName('+sid+','+pid+','+sub.id+',this.value);this.blur();}"'+
+          ' onblur="lockCustomName('+sid+','+pid+','+sub.id+',this.value)"'+
+          ' onfocus="if(this.value.length>=2)onSearch('+sid+','+pid+','+sub.id+',this.value)">'+
+        '<div class="dropdown" id="drop-'+sid+'-'+pid+'-'+sub.id+'" style="display:none"></div>'+
+      '</div>'+
+      itemCodeBadge+
       hiddenPriceInputs+
-      '<div class="dropdown" id="drop-'+sid+'-'+pid+'-'+sub.id+'" style="display:none"></div>'+
     '</div>'+
     '<input type="number" id="sq-'+sub.id+'" value="'+sub.qty+'" min="0" onchange="setSubQty('+sub.id+',this.value)" style="text-align:center">'+
     '<div style="display:flex;align-items:center;gap:2px">'+
@@ -10158,6 +10159,11 @@ function initSidebarControls() {
 
   // Restore saved width (handled by applySidebarLayout below)
   const saved = _loadSbLayout();
+  // Migrate: always force left preset
+  if (!saved.floating && saved.preset !== 'left') {
+    saved.preset = 'left';
+    _saveSbLayout(saved);
+  }
   // Restore saved preset / floating position
   if (saved.floating && saved.floatTop != null) {
     sb.classList.add('sb-floating');
