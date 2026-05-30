@@ -254,6 +254,8 @@ html.dark ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38)}
 .tn-header-label{font-size:9px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted);flex:1}
 .tn-hbtn{background:none;border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-size:11px;color:var(--muted);cursor:pointer;line-height:1.5;flex-shrink:0}
 .tn-hbtn:hover{background:var(--surface2);color:var(--text);border-color:var(--text)}
+#tn-expand-tab{position:fixed;left:64px;top:92px;width:18px;background:var(--surface2);border:1px solid var(--border);border-left:none;border-radius:0 6px 6px 0;cursor:pointer;z-index:100;display:none;flex-direction:column;align-items:center;justify-content:center;padding:8px 2px;color:var(--muted);font-size:10px;box-shadow:2px 0 6px rgba(0,0,0,.08)}
+#tn-expand-tab:hover{background:var(--surface);color:var(--accent)}
 
 .parent-item{border-bottom:1px solid var(--border);position:relative;transition:background .15s}
 .parent-item:last-child{border-bottom:none}
@@ -1616,6 +1618,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 <div id="rail-flyout" style="display:none"></div>
 <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" style="right:248px" title="Collapse sidebar">▶</button>
 <div class="tree-nav" id="treeNav"></div>
+<div id="tn-expand-tab" onclick="toggleTreeNavSidebar()" title="Show sections panel">▶</div>
 <!-- ── ACTIVE QUOTE TAB ── -->
 <div id="page-quote" class="tab-page active" style="margin-left:0;height:auto;overflow:visible"><div class="layout">
   <div class="sidebar" id="sidebar">
@@ -3922,6 +3925,7 @@ let _renderPending=false;
 let _skipNextSync=false; // set before fullRender to skip syncDOM for the next frame
 let _subPanelPid=null, _subPanelSid=null;
 let _treeNavCollapsed={};
+let _treeNavHidden=false;
 function fullRender(){
   if(_renderPending)return;
   _renderPending=true;
@@ -5805,13 +5809,23 @@ function renderTreeNav(){
   const nav = document.getElementById('treeNav');
   if(!nav) return;
   const isQuoteTab = _activeTab === 'quote';
+  const tab = document.getElementById('tn-expand-tab');
   if(!isQuoteTab || !S.sections || !S.sections.length){
     nav.classList.remove('visible');
+    if(tab) tab.style.display='none';
     const main = document.querySelector('.main');
     if(main) main.style.marginLeft = '';
     return;
   }
+  if(_treeNavHidden){
+    nav.classList.remove('visible');
+    if(tab) tab.style.display='flex';
+    const main = document.querySelector('.main');
+    if(main) main.style.marginLeft='64px';
+    return;
+  }
   nav.classList.add('visible');
+  if(tab) tab.style.display='none';
   const main = document.querySelector('.main');
   if(main) main.style.marginLeft = '244px';
 
@@ -5821,13 +5835,14 @@ function renderTreeNav(){
       +'<span class="tn-header-label">Sections</span>'
       +'<button class="tn-hbtn" onclick="collapseAllTreeSections()" title="'+(allCollapsed?'Expand all':'Collapse all')+'">'+(allCollapsed?'⊞':'⊟')+'</button>'
       +'<button class="tn-hbtn" onclick="syncDOM();addSection()" title="Add section" style="font-size:14px;font-weight:700;padding:1px 7px">+</button>'
+      +'<button class="tn-hbtn" onclick="toggleTreeNavSidebar()" title="Hide panel" style="padding:2px 5px">◀</button>'
     +'</div>'
     + S.sections.map(sec => {
     const collapsed = !!_treeNavCollapsed[sec.id];
     const pars = sec.parents || [];
     const parItems = collapsed ? '' : pars.map(par => {
       const label = par.name || 'Untitled';
-      const isActive = par.id === _subPanelPid;
+      const isActive = par.id == _subPanelPid;
       return `<div class="tree-nav-par${isActive?' active':''}" onclick="scrollToParent('${par.id}');openSubitemPanel('${sec.id}','${par.id}')" title="${label.replace(/'/g,"&#39;")}">${label}</div>`;
     }).join('');
     return `<div class="tn-sec-group"><div class="tree-nav-section" onclick="toggleTreeSection('${sec.id}')" title="${(sec.name||'').replace(/'/g,"&#39;")}"><span class="tn-sec-label">${sec.name||'Untitled section'}</span><span class="tn-toggle">${collapsed?'▶':'▾'}</span></div>${parItems}</div>`;
@@ -5859,6 +5874,25 @@ function collapseAllTreeSections(){
   renderTreeNav();
 }
 
+function toggleTreeNavSidebar(){
+  _treeNavHidden = !_treeNavHidden;
+  const nav = document.getElementById('treeNav');
+  const tab = document.getElementById('tn-expand-tab');
+  const main = document.querySelector('.main');
+  if(_treeNavHidden){
+    if(nav) nav.classList.remove('visible');
+    if(tab) tab.style.display='flex';
+    if(main) main.style.marginLeft='64px';
+  } else {
+    if(tab) tab.style.display='none';
+    if(_activeTab==='quote' && S.sections && S.sections.length){
+      if(nav) nav.classList.add('visible');
+      if(main) main.style.marginLeft='244px';
+    }
+    renderTreeNav();
+  }
+}
+
 function scrollToParent(pid){
   const el = document.getElementById('par-' + pid);
   if(!el) return;
@@ -5876,10 +5910,11 @@ function scrollToParent(pid){
 }
 
 function openSubitemPanel(sid, pid) {
-  if (_subPanelPid === pid) { closeSubitemPanel(); return; }
+  const _sid = Number(sid), _pid = Number(pid);
+  if (_subPanelPid === _pid) { closeSubitemPanel(); return; }
   syncTextFields();
-  _subPanelPid = pid;
-  _subPanelSid = sid;
+  _subPanelPid = _pid;
+  _subPanelSid = _sid;
   _skipNextSync = true;
   fullRender();
 }
