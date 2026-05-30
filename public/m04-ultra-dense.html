@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>m04 — Ultra Dense</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--surface2:#f0efeb;
+  --border:#e4e2dc;--border2:#d5d3cc;
+  --text:#1a1916;--muted:#8a8680;
+  --accent:#c8a04a;--r:6px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;font-size:12px}
+
+.topbar{height:40px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:6px;position:fixed;top:0;left:0;right:0;z-index:100}
+.logo{font-weight:700;font-size:13px;color:var(--accent);margin-right:6px}
+.tab{padding:4px 10px;border-radius:5px;font-size:12px;cursor:pointer;color:var(--muted)}
+.tab.active{background:var(--surface2);color:var(--text);font-weight:600}
+
+.subbar{height:28px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px 0 56px;gap:16px;position:fixed;top:40px;left:0;right:0;z-index:99;font-size:11px;color:var(--muted)}
+.subbar span{color:var(--text);font-weight:600}
+
+.leftnav{width:40px;background:var(--surface);border-right:1px solid var(--border);position:fixed;top:68px;left:0;bottom:50px;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;z-index:97}
+.nav-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;color:var(--muted)}
+.nav-icon.active{background:var(--surface2);color:var(--accent)}
+
+.sidebar{width:220px;background:var(--surface);border-left:1px solid var(--border);position:fixed;top:68px;right:0;bottom:50px;display:flex;flex-direction:column;z-index:97;font-size:12px}
+.sidebar-header{padding:8px 12px;font-size:12px;font-weight:700;border-bottom:1px solid var(--border)}
+.sidebar-section{padding:8px 12px;border-bottom:1px solid var(--border)}
+.sidebar-section-title{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.sidebar-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px}
+.sidebar-row.total{font-weight:700;font-size:12px;color:var(--accent);margin-top:2px}
+
+.bottom-bar{height:50px;background:var(--surface);border-top:1px solid var(--border2);position:fixed;bottom:0;left:40px;right:220px;display:flex;align-items:center;gap:0;z-index:100}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 16px;border-right:1px solid var(--border);height:100%;gap:1px;min-width:100px}
+.tile:last-child{border-right:none}
+.tile-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.tile-value{font-size:14px;font-weight:700;color:var(--text)}
+.tile.accent .tile-value{color:var(--accent)}
+.tile-spacer{flex:1}
+
+.main{margin-left:40px;margin-right:220px;margin-top:68px;margin-bottom:50px;padding:8px 16px;overflow-y:auto;height:calc(100vh - 68px - 50px);position:fixed;left:0;right:0;top:0}
+
+/* DENSE SECTION CARD */
+.section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:6px;overflow:hidden}
+.section-header{padding:6px 12px;background:var(--surface2);border-bottom:1px solid var(--border);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0}
+
+/* SINGLE-LINE PARENT ROW — no description sub-row */
+.parent-row{display:grid;grid-template-columns:24px 180px 1fr 60px 70px 70px 80px 80px 80px 36px;padding:5px 12px;background:#faf9f6;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;align-items:center;gap:4px;position:sticky;top:36px}
+.parent-row .expand{color:var(--accent);font-size:10px;cursor:pointer}
+
+.col-headers{display:grid;grid-template-columns:60px 1fr 50px 60px 65px 65px 78px 78px 78px 36px;padding:3px 12px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px;align-items:center}
+.item-row{display:grid;grid-template-columns:60px 1fr 50px 60px 65px 65px 78px 78px 78px 36px;padding:4px 12px;border-bottom:1px solid var(--border);font-size:11px;align-items:center}
+.item-row:last-child{border-bottom:none}
+.item-row:hover{background:#faf9f7}
+.type-badge{padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;background:var(--surface2);color:var(--muted)}
+.type-badge.cable{background:#e8f4fd;color:#1a6fa8}
+.type-badge.point{background:#edf7ed;color:#2d7a2d}
+.type-badge.board{background:#fef3e2;color:#8a5c0a}
+
+.density-note{text-align:right;font-size:10px;color:var(--muted);padding:4px 12px;font-style:italic}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">PQ</div>
+  <div class="tab active">Quote</div>
+  <div class="tab">Clients</div>
+  <div class="tab">Templates</div>
+  <div class="tab">Reports</div>
+  <div style="margin-left:auto;font-size:10px;color:var(--muted);font-style:italic">Ultra-dense mode — single-line parents, no description rows</div>
+</div>
+
+<div class="subbar">
+  Ref: <span>QT-2024-089</span> &nbsp;·&nbsp;
+  Client: <span>Sunrise Retail Pty Ltd</span> &nbsp;·&nbsp;
+  Date: <span>30 May 2026</span> &nbsp;·&nbsp;
+  Status: <span style="color:#2d7a2d">Draft</span>
+</div>
+
+<div class="leftnav">
+  <div class="nav-icon active">⚡</div>
+  <div class="nav-icon">📋</div>
+  <div class="nav-icon">👤</div>
+  <div class="nav-icon">📎</div>
+  <div class="nav-icon">⚙️</div>
+</div>
+
+<div class="sidebar">
+  <div class="sidebar-header">Totals</div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Fit-Out — Level 2</div>
+    <div class="sidebar-row"><span>Materials</span><span>$12,840</span></div>
+    <div class="sidebar-row"><span>Labour</span><span>$8,920</span></div>
+    <div class="sidebar-row total"><span>Total</span><span>$21,760</span></div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">External Works</div>
+    <div class="sidebar-row"><span>Materials</span><span>$5,580</span></div>
+    <div class="sidebar-row"><span>Labour</span><span>$3,760</span></div>
+    <div class="sidebar-row total"><span>Total</span><span>$9,340</span></div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-row"><span>Excl GST</span><span style="font-weight:700">$31,100</span></div>
+    <div class="sidebar-row"><span>GST</span><span>$3,110</span></div>
+    <div class="sidebar-row total" style="font-size:13px"><span>TOTAL</span><span>$34,210</span></div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <div class="tile"><div class="tile-label">Materials</div><div class="tile-value">$18,420</div></div>
+  <div class="tile"><div class="tile-label">Labour</div><div class="tile-value">$12,680</div></div>
+  <div class="tile"><div class="tile-label">Excl GST</div><div class="tile-value">$31,100</div></div>
+  <div class="tile accent"><div class="tile-label">GST</div><div class="tile-value">$3,110</div></div>
+  <div class="tile accent"><div class="tile-label">Incl GST</div><div class="tile-value">$34,210</div></div>
+  <div class="tile-spacer"></div>
+  <div class="density-note">Showing ~22 items per screen vs ~12 in standard mode</div>
+</div>
+
+<div class="main">
+  <div class="section-card">
+    <div class="section-header">
+      <span>▼ Fit-Out — Level 2</span>
+      <span style="font-size:11px;color:var(--muted);font-weight:400">6 parents · 18 items · $21,760</span>
+    </div>
+
+    <!-- Parent as single inline row -->
+    <div class="parent-row">
+      <span class="expand">▼</span>
+      <span style="font-size:12px">GPO Ring Main</span>
+      <span style="color:var(--muted);font-size:10px;font-weight:400">4 subitems</span>
+      <span></span><span></span><span></span>
+      <span style="color:var(--muted)">$2,664</span>
+      <span style="color:var(--muted)">$1,944</span>
+      <span style="font-size:12px;color:var(--accent)">$4,608</span>
+      <span>⋯</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup</div>
+      <div>Wire min</div><div>Install min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge cable">Cable</span></div>
+      <div>2.5mm² TPS 3-core</div><div>120m</div><div>30%</div>
+      <div>—</div><div>—</div><div>$486</div><div>—</div>
+      <div style="font-weight:600">$486</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Double GPO 10A white</div><div>18</div><div>25%</div>
+      <div>15</div><div>25</div><div>$648</div><div>$1,080</div>
+      <div style="font-weight:600">$1,728</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Single GPO 10A white</div><div>6</div><div>25%</div>
+      <div>10</div><div>20</div><div>$162</div><div>$288</div>
+      <div style="font-weight:600">$450</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge board">Board</span></div>
+      <div>MCB 20A Single Pole</div><div>4</div><div>20%</div>
+      <div>—</div><div>15</div><div>$120</div><div>$144</div>
+      <div style="font-weight:600">$264</div><div>⋯</div>
+    </div>
+
+    <div class="parent-row">
+      <span class="expand">▼</span>
+      <span style="font-size:12px">Lighting Circuit</span>
+      <span style="color:var(--muted);font-size:10px;font-weight:400">3 subitems</span>
+      <span></span><span></span><span></span>
+      <span style="color:var(--muted)">$1,678</span>
+      <span style="color:var(--muted)">$2,016</span>
+      <span style="font-size:12px;color:var(--accent)">$3,694</span>
+      <span>⋯</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup</div>
+      <div>Wire min</div><div>Install min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge cable">Cable</span></div>
+      <div>1.5mm² TPS 2-core</div><div>85m</div><div>30%</div>
+      <div>—</div><div>—</div><div>$272</div><div>—</div>
+      <div style="font-weight:600">$272</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>LED Downlight 9W</div><div>24</div><div>35%</div>
+      <div>20</div><div>30</div><div>$1,134</div><div>$1,728</div>
+      <div style="font-weight:600">$2,862</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Switch 1-gang</div><div>8</div><div>25%</div>
+      <div>5</div><div>18</div><div>$200</div><div>$288</div>
+      <div style="font-weight:600">$488</div><div>⋯</div>
+    </div>
+
+    <div class="parent-row">
+      <span class="expand">▼</span>
+      <span style="font-size:12px">Data / Comms</span>
+      <span style="color:var(--muted);font-size:10px;font-weight:400">3 subitems</span>
+      <span></span><span></span><span></span>
+      <span style="color:var(--muted)">$2,100</span>
+      <span style="color:var(--muted)">$864</span>
+      <span style="font-size:12px;color:var(--accent)">$2,964</span>
+      <span>⋯</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup</div>
+      <div>Wire min</div><div>Install min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge cable">Cable</span></div>
+      <div>Cat6 UTP 4-pair</div><div>60m</div><div>30%</div>
+      <div>—</div><div>—</div><div>$390</div><div>—</div>
+      <div style="font-weight:600">$390</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>RJ45 data outlet</div><div>12</div><div>25%</div>
+      <div>—</div><div>25</div><div>$450</div><div>$720</div>
+      <div style="font-weight:600">$1,170</div><div>⋯</div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">
+      <span>▼ External Works</span>
+      <span style="font-size:11px;color:var(--muted);font-weight:400">2 parents · 6 items · $9,340</span>
+    </div>
+    <div class="parent-row">
+      <span class="expand">▼</span>
+      <span style="font-size:12px">External Lighting</span>
+      <span style="color:var(--muted);font-size:10px;font-weight:400">3 subitems</span>
+      <span></span><span></span><span></span>
+      <span style="color:var(--muted)">$3,192</span>
+      <span style="color:var(--muted)">$1,296</span>
+      <span style="font-size:12px;color:var(--accent)">$4,488</span>
+      <span>⋯</span>
+    </div>
+    <div class="col-headers">
+      <div>Type</div><div>Item Name</div><div>Qty</div><div>Markup</div>
+      <div>Wire min</div><div>Install min</div><div>Mat $</div><div>Lab $</div>
+      <div>Total</div><div></div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>Floodlight 50W LED</div><div>6</div><div>40%</div>
+      <div>30</div><div>45</div><div>$1,092</div><div>$648</div>
+      <div style="font-weight:600">$1,740</div><div>⋯</div>
+    </div>
+    <div class="item-row">
+      <div><span class="type-badge point">Point</span></div>
+      <div>PIR sensor</div><div>4</div><div>30%</div>
+      <div>10</div><div>30</div><div>$520</div><div>$288</div>
+      <div style="font-weight:600">$808</div><div>⋯</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
