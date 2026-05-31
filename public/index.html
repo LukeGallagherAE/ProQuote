@@ -14353,6 +14353,54 @@ window._initStorage().then(() => {
   } catch(e) { console.warn('[ProQuote] Post-init refresh failed:', e); setSaveStatus('synced'); }
 }).catch(() => { setSaveStatus('synced'); });
 
+// ── ONE-TIME CLEANUP: remove all Q-2026-001 quotes ──────────────────────
+// Runs once on load, marks itself done in localStorage so it never repeats.
+(function _cleanup2026001() {
+  if (localStorage.getItem('_cleanup2026001_done')) return;
+  window._initStorage && window._initStorage().then && setTimeout(async () => {
+    try {
+      const token = window._nativeLS && window._nativeLS.getItem('pq_jwt');
+      if (!token) return; // not logged in yet
+      const res = await fetch('/api/quotes', { headers: { Authorization: 'Bearer ' + token } });
+      if (!res.ok) return;
+      const rows = await res.json();
+      const targets = rows.filter(r => {
+        const n = (r.name || '').toLowerCase();
+        let ref = '';
+        try { const d = typeof r.data === 'string' ? JSON.parse(r.data) : r.data; ref = (d?.fields?.quoteRef || '').toLowerCase(); } catch(e) {}
+        return n.includes('2026-001') || n.includes('2026001') || ref.includes('2026-001') || ref.includes('2026001');
+      });
+      if (!targets.length) { localStorage.setItem('_cleanup2026001_done', '1'); return; }
+      console.log('[ProQuote] Auto-cleanup: removing', targets.length, 'Q-2026-001 quote(s)');
+      for (const r of targets) {
+        await fetch('/api/quotes/' + r.id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+      }
+      // Purge from in-memory _quotes and client book
+      const badRefs = new Set(targets.map(r => {
+        try { const d = typeof r.data === 'string' ? JSON.parse(r.data) : r.data; return (d?.fields?.quoteRef || '').toLowerCase(); } catch(e) { return ''; }
+      }).filter(Boolean));
+      const badIds  = new Set(targets.map(r => r.id));
+      if (typeof _quotes !== 'undefined') _quotes = _quotes.filter(q => !badIds.has(q.id));
+      try {
+        const clients = JSON.parse(localStorage.getItem('proquote_clients') || '[]');
+        clients.forEach(c => (c.jobs||[]).forEach(j => {
+          if (j.quotes) j.quotes = j.quotes.filter(q => {
+            const qr = (q.quoteRef || q.fields?.quoteRef || '').toLowerCase();
+            return !badRefs.has(qr) && !qr.includes('2026-001') && !qr.includes('2026001');
+          });
+        }));
+        localStorage.setItem('proquote_clients', JSON.stringify(clients));
+      } catch(e) {}
+      localStorage.setItem('_cleanup2026001_done', '1');
+      if (typeof renderQuoteTabs === 'function') renderQuoteTabs();
+      if (typeof renderQuotesAll === 'function' && document.getElementById('quotes-all-content')) renderQuotesAll();
+      console.log('[ProQuote] Auto-cleanup complete — ', targets.length, 'quote(s) removed.');
+      if (typeof showToast === 'function') showToast('Cleaned up ' + targets.length + ' old test quote(s)', 3000);
+    } catch(e) { console.warn('[ProQuote] Auto-cleanup failed:', e); }
+  }, 3000); // wait 3s for app to fully initialize
+})();
+// ── END ONE-TIME CLEANUP ─────────────────────────────────────────────────
+
 // Fetch build date and stamp the nav + help footer
 fetch('/api/build-info').then(r => r.json()).then(d => {
   if (!d.built) return;
