@@ -2662,6 +2662,18 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
           const quotes = qRows.map(r => {
             try { return typeof r.data === 'string' ? JSON.parse(r.data) : r.data; } catch(e) { return null; }
           }).filter(Boolean).filter(q => !pendingSet.has(q.id));
+          // Re-apply _binned flag from client book in case server save was in-flight at last refresh
+          try {
+            const _cls = JSON.parse(window._nativeLS.getItem('proquote_clients') || '[]');
+            const _binnedRefs = new Set();
+            _cls.forEach(c => (c.jobs||[]).forEach(j => (j.quotes||[]).forEach(qq => {
+              if (qq._binned) { const r2 = qq.quoteRef||qq.fields?.quoteRef||''; if(r2) _binnedRefs.add(r2); }
+            })));
+            if (_binnedRefs.size) quotes.forEach(q => {
+              const ref = q.fields?.quoteRef||'';
+              if (ref && _binnedRefs.has(ref)) { q._binned = true; if(!q._binnedAt) q._binnedAt = Date.now(); }
+            });
+          } catch(e) {}
           if (quotes.length > 0) {
             _ls['proquote_session_quotes'] = JSON.stringify(quotes);
             // Validate active ID still exists
@@ -9358,6 +9370,7 @@ function switchTab(tab) {
   document.body.classList.toggle('show-totals-bar', tab === 'quote' && !_sidebarCollapsed);
   if (sidebar) sidebar.style.display = isQuote ? '' : 'none';
   if (sidebarToggle) sidebarToggle.style.display = isQuote ? '' : 'none';
+  if (!isQuote) { const sp = document.getElementById('subitem-panel'); if (sp) sp.classList.remove('open'); }
   if (isQuote && _activeSbTab === 'schedule') switchSbTab('sections');
   const saveBtn = document.getElementById('manual-save-btn');
   if (saveBtn) saveBtn.style.display = isQuoteTool ? '' : 'none';
@@ -10855,13 +10868,16 @@ function deleteStoredQuote(clientIdx, jobIdx, quoteIdx, ref) {
   job.quotes[quoteIdx]._binned = true;
   job.quotes[quoteIdx]._binnedAt = now;
   saveClients(clients);
-  // Mark all family members in memory as binned, hide tabs, save to server
+  // Mark all family members in memory as binned, hide tabs, save ALL to server
   const matchingTab = _quotes.find(oq => (oq.fields?.quoteRef || '') === ref);
   if (matchingTab) {
-    _getRevisionFamily(matchingTab).forEach(m => { m._binned = true; m._binnedAt = now; m._hiddenTab = true; });
-    if (window._flushQuoteNow) window._flushQuoteNow(matchingTab).catch(() => {
-      if (window._saveQuoteToServer) window._saveQuoteToServer(matchingTab);
-    });
+    const family = _getRevisionFamily(matchingTab);
+    family.forEach(m => { m._binned = true; m._binnedAt = now; m._hiddenTab = true; });
+    if (window._flushQuoteNow) {
+      family.forEach(m => window._flushQuoteNow(m).catch(() => {
+        if (window._saveQuoteToServer) window._saveQuoteToServer(m);
+      }));
+    }
   }
   _persistSession();
   renderQuoteTabs();
@@ -10944,10 +10960,13 @@ function batchDeleteQuotes() {
     qq._binned = true; qq._binnedAt = now;
     const tab = _quotes.find(oq => (oq.fields?.quoteRef || '') === ref);
     if (tab) {
-      _getRevisionFamily(tab).forEach(m => { m._binned = true; m._binnedAt = now; m._hiddenTab = true; });
-      if (window._flushQuoteNow) window._flushQuoteNow(tab).catch(() => {
-        if (window._saveQuoteToServer) window._saveQuoteToServer(tab);
-      });
+      const fam = _getRevisionFamily(tab);
+      fam.forEach(m => { m._binned = true; m._binnedAt = now; m._hiddenTab = true; });
+      if (window._flushQuoteNow) {
+        fam.forEach(m => window._flushQuoteNow(m).catch(() => {
+          if (window._saveQuoteToServer) window._saveQuoteToServer(m);
+        }));
+      }
     }
   });
   saveClients(clients);
@@ -11314,12 +11333,13 @@ function renderQuotesAll() {
     }).join('') +
     '</tbody></table>';
 
-  // Build bin section from in-memory _quotes (grouped by base ref, deduped)
+  // Build bin section — from client-book _binRows AND any binned _quotes not in client book
   let _binSectionHtml = '';
-  if (_binRows.length) {
-    const _THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-    const _nowMs = Date.now();
-    // Also auto-purge any in-memory binned quotes older than 30 days (silent, no confirm)
+  const _THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  const _nowMs = Date.now();
+  const _anyBinnedInMemory = (_quotes||[]).some(q => q._binned);
+  if (_binRows.length || _anyBinnedInMemory) {
+    // Auto-purge any in-memory binned quotes older than 30 days
     const _toAutoPurge = (_quotes||[]).filter(q => q._binned && q._binnedAt && (_nowMs - q._binnedAt) > _THIRTY_DAYS_MS);
     if (_toAutoPurge.length) {
       setTimeout(() => {
@@ -11338,7 +11358,7 @@ function renderQuotesAll() {
         _persistSession(); renderQuotesAll();
       }, 0);
     }
-    // Group visible binned rows by base ref (one row per quote family)
+    // Group by base ref (one row per quote family)
     const _binFamilyMap = {};
     _binRows.forEach(r => {
       const base = _revBaseName(r.ref) || r.ref;
@@ -11346,7 +11366,7 @@ function renderQuotesAll() {
       _binFamilyMap[base].rows.push(r);
       if ((r.qq._binnedAt||0) < _binFamilyMap[base].earliest || !_binFamilyMap[base].earliest) _binFamilyMap[base].earliest = r.qq._binnedAt||0;
     });
-    // Also include any binned _quotes not represented in client book rows (e.g. server-only)
+    // Include binned _quotes not in client book rows
     (_quotes||[]).filter(q => q._binned && !(_toAutoPurge.find(x=>x.id===q.id))).forEach(q => {
       const ref = q.fields?.quoteRef || '—';
       const base = _revBaseName(ref) || ref;
