@@ -10332,7 +10332,7 @@ function initSidebarControls() {
   const SNAP_EDGE = 80; // px from each edge
   const TOP_OFF   = 88; // topbar + action bar
   const TOTALS_H  = 56;
-  const NAV_W     = 56;
+  const NAV_W     = 64;
 
   function _snapZone(cx, cy) {
     const vw = window.innerWidth, vh = window.innerHeight;
@@ -10379,7 +10379,7 @@ function initSidebarControls() {
       sb.style.width=_sw+'px'; sb.style.bottom='auto'; sb.style.height=_sh+'px';
       sb.style.left='auto'; sb.style.borderRadius='12px';
       const main=document.querySelector('.main');
-      if(main) { main.style.marginRight='0'; main.style.marginLeft='56px'; main.style.paddingTop=''; main.style.paddingBottom=''; }
+      if(main) { main.style.marginRight='0'; main.style.marginLeft='64px'; main.style.paddingTop=''; main.style.paddingBottom=''; }
       document.getElementById('sidebarToggle').style.display='none';
       ['right','left','top','bottom'].forEach(p=>{ const b=document.getElementById('sbp-'+p); if(b) b.classList.remove('sbp-active'); });
     }
