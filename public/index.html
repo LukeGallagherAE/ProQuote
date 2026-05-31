@@ -13065,11 +13065,25 @@ function init(){
       }
     } catch(e) {}
   }
-  const firstQ = _newQuoteState({ fields: _captureFields(), sections: [] });
-  firstQ._hiddenTab = true;
-  firstQ._placeholder = true;
-  _quotes.push(firstQ);
-  _activeQuoteId = firstQ.id;
+  // Add placeholder only if we have no real quotes yet
+  if (!_quotes.length) {
+    const firstQ = _newQuoteState({ fields: _captureFields(), sections: [] });
+    firstQ._hiddenTab = true;
+    firstQ._placeholder = true;
+    _quotes.push(firstQ);
+    _activeQuoteId = firstQ.id;
+  } else {
+    // Restore the last-active quote as the visible open tab
+    const _savedActiveId = localStorage.getItem('proquote_active_id');
+    const _targetQ = (_savedActiveId && _quotes.find(q => q.id === _savedActiveId))
+                  || _quotes[_quotes.length - 1];
+    if (_targetQ) {
+      _getRevisionFamily(_targetQ).forEach(m => { m._hiddenTab = false; });
+      _activeQuoteId = _targetQ.id;
+      _restoreFields(_targetQ.fields || {});
+      S.sections = JSON.parse(JSON.stringify(_targetQ.sections || []));
+    }
+  }
   renderQuoteTabs();
   renderCustomTabButtons();
   // Pre-populate Adonai from existing custom library items
@@ -13925,7 +13939,52 @@ try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '
 // Render immediately — login screen appears without any API round-trip
 init();
 // Prefetch server data in background so it's ready when the user authenticates
-window._initStorage().catch(() => {});
+window._initStorage().then(() => {
+  // After server data lands, merge any quotes not already in memory and refresh UI
+  try {
+    const raw = localStorage.getItem('proquote_session_quotes');
+    if (!raw) return;
+    const restored = JSON.parse(raw);
+    if (!Array.isArray(restored) || !restored.length) return;
+    // Remove startup placeholder now that we have real data
+    _quotes = _quotes.filter(q => !q._placeholder);
+    const existingIds = new Set(_quotes.map(q => q.id));
+    let anyNew = false;
+    for (const q of restored) {
+      if (!existingIds.has(q.id)) {
+        // Advance ID counter past server IDs
+        for (const s of (q.sections||[])) {
+          if (s.id >= _id) _id = s.id + 1;
+          for (const p of (s.parents||[])) {
+            if (p.id >= _id) _id = p.id + 1;
+            for (const sub of (p.subitems||[])) { if (sub.id >= _id) _id = sub.id + 1; }
+          }
+        }
+        _quotes.push({ ...q, _hiddenTab: true });
+        anyNew = true;
+      }
+    }
+    // Restore the active quote as a visible tab
+    const savedActiveId = localStorage.getItem('proquote_active_id');
+    const targetQ = (savedActiveId && _quotes.find(q => q.id === savedActiveId))
+                 || _quotes.find(q => !q._placeholder);
+    if (targetQ && targetQ.id !== _activeQuoteId) {
+      _getRevisionFamily(targetQ).forEach(m => { m._hiddenTab = false; });
+      loadQuoteState(targetQ.id);
+    } else if (targetQ) {
+      _getRevisionFamily(targetQ).forEach(m => { m._hiddenTab = false; });
+    }
+    // Refresh categories and profile from server settings
+    try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e) {}
+    loadProfile();
+    loadCompanyLogo();
+    renderQuoteTabs();
+    if (_activeTab === 'dashboard')   renderDashboard();
+    if (_activeTab === 'quotes-all')  renderQuotesAll();
+    if (_activeTab === 'clients')     renderClients();
+    if (_activeTab === 'projects')    renderProjects();
+  } catch(e) { console.warn('[ProQuote] Post-init refresh failed:', e); }
+}).catch(() => {});
 
 // Fetch build date and stamp the nav + help footer
 fetch('/api/build-info').then(r => r.json()).then(d => {
