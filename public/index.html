@@ -156,6 +156,10 @@ html.dark .sidebar{box-shadow:2px 0 16px rgba(0,0,0,.3)}
 .sb-tab.sb-tab-active{color:var(--accent);border-bottom-color:var(--accent);background:var(--surface);box-shadow:none}
 .sb-tab-content{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
 .sb-tab-content.sb-hidden{display:none!important}
+#sb-tab-changelog{display:grid!important;grid-template-rows:auto 1fr auto;overflow:hidden}
+#rev-notes-banner{grid-row:1}
+#sb-changelog-list{grid-row:2;overflow-y:auto;min-height:0;padding:4px 0}
+#sb-changelog-input-bar{grid-row:3;padding:8px 10px;border-top:1px solid var(--border);background:var(--surface);display:flex;gap:6px;align-items:center}
 #sb-sidebar-content{display:flex;flex-direction:column;gap:16px;padding:12px 16px 24px;overflow-y:auto;flex:1;min-height:0}
 #tn-expand-tab{display:none!important}
 .main{display:block;padding:24px 32px 80px;margin-left:312px;margin-right:0;transition:margin-right .2s ease,margin-left .2s ease;height:calc(100vh - 114px);overflow-y:auto;overflow-x:hidden}
@@ -1749,8 +1753,8 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         <div class="rev-notes-label" id="rev-banner-label">↪ Rev B — Changes from Rev A</div>
         <div id="rev-diff-list"></div>
       </div>
-      <div id="sb-changelog-list" style="flex:1;min-height:0;overflow-y:auto;padding:4px 0"></div>
-      <div style="padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:6px">
+      <div id="sb-changelog-list"></div>
+      <div id="sb-changelog-input-bar">
         <input id="sb-changelog-input" placeholder="Add a note…" style="flex:1;font-size:11px" onkeydown="if(event.key==='Enter')addChangelogEntry()">
         <button class="btn btn-primary btn-sm" onclick="addChangelogEntry()">+ Add</button>
       </div>
@@ -2541,15 +2545,41 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     _quoteSaveTimers[id] = setTimeout(() => _putQuote(quote), 2000);
   };
 
+  function _addPendingDelete(id) {
+    try {
+      const arr = JSON.parse(window._nativeLS.getItem('proquote_pending_deletes') || '[]');
+      if (!arr.includes(id)) arr.push(id);
+      window._nativeLS.setItem('proquote_pending_deletes', JSON.stringify(arr));
+    } catch(e) {}
+  }
+  function _removePendingDelete(id) {
+    try {
+      const arr = JSON.parse(window._nativeLS.getItem('proquote_pending_deletes') || '[]');
+      const filtered = arr.filter(x => x !== id);
+      window._nativeLS.setItem('proquote_pending_deletes', JSON.stringify(filtered));
+    } catch(e) {}
+  }
+  window._addPendingDelete = _addPendingDelete;
+
   window._deleteQuoteFromServer = async function (id) {
     const token = getToken();
-    if (!token) return;
+    if (!token) { _addPendingDelete(id); return false; }
+    _addPendingDelete(id); // optimistically track; cleared on success
     try {
-      await fetch('/api/quotes/' + id, {
+      const res = await fetch('/api/quotes/' + id, {
         method: 'DELETE',
         headers: { 'Authorization': 'Bearer ' + token },
       });
-    } catch (e) { console.warn('[ProQuote] Quote delete failed:', e); }
+      if (res.ok || res.status === 404) {
+        _removePendingDelete(id);
+        return true;
+      }
+      console.warn('[ProQuote] Quote DELETE returned', res.status, 'for id', id);
+      return false;
+    } catch (e) {
+      console.warn('[ProQuote] Quote delete failed:', e);
+      return false;
+    }
   };
 
   window._flushStorage = _flushStorage;
@@ -2616,9 +2646,23 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       if (quotesRes.ok) {
         const qRows = await quotesRes.json();
         if (Array.isArray(qRows) && qRows.length > 0) {
+          // Filter out quotes that were permanently deleted but server DELETE may have failed
+          let pendingDeletes = [];
+          try { pendingDeletes = JSON.parse(window._nativeLS.getItem('proquote_pending_deletes') || '[]'); } catch(e) {}
+          const pendingSet = new Set(pendingDeletes);
+          // Retry server deletion for any pending IDs found in this load
+          if (pendingSet.size) {
+            qRows.forEach(r => {
+              const q = typeof r.data === 'string' ? (() => { try { return JSON.parse(r.data); } catch(e) { return null; } })() : r.data;
+              if (q && pendingSet.has(q.id)) {
+                // Fire-and-forget retry — will clear from pendingDeletes on success
+                window._deleteQuoteFromServer && window._deleteQuoteFromServer(q.id);
+              }
+            });
+          }
           const quotes = qRows.map(r => {
             try { return typeof r.data === 'string' ? JSON.parse(r.data) : r.data; } catch(e) { return null; }
-          }).filter(Boolean);
+          }).filter(Boolean).filter(q => !pendingSet.has(q.id));
           if (quotes.length > 0) {
             _ls['proquote_session_quotes'] = JSON.stringify(quotes);
             // Validate active ID still exists
