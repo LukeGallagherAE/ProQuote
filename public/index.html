@@ -10135,11 +10135,11 @@ const SB_LAYOUT_KEY = 'proquote_sb_layout';
 function _loadSbLayout(){ try{ return JSON.parse(localStorage.getItem(SB_LAYOUT_KEY)||'{}'); }catch(e){ return {}; } }
 function _saveSbLayout(p){ try{ localStorage.setItem(SB_LAYOUT_KEY,JSON.stringify(p)); }catch(e){} }
 
-function _updateToggleBtn(preset, collapsed) {
+function _updateToggleBtn(preset, collapsed, overrideW) {
   const tog = document.getElementById('sidebarToggle');
   if (!tog) return;
   const saved = _loadSbLayout();
-  const w   = saved.width  || 248;
+  const w   = overrideW != null ? overrideW : (saved.width  || 248);
   const SH  = saved.snapH  || 220;
   const TOP = 88;
   const TOTALS = 56;
@@ -10305,7 +10305,7 @@ function initSidebarControls() {
     if (!sb.classList.contains('sb-floating')) {
       const main = document.querySelector('.main');
       if (main) { main.style.marginLeft = (64+newW)+'px'; main.style.marginRight = '0'; }
-      _updateToggleBtn('left', sb.classList.contains('collapsed'));
+      _updateToggleBtn('left', sb.classList.contains('collapsed'), newW);
     }
   });
   document.addEventListener('mouseup', () => {
@@ -13044,15 +13044,8 @@ function init(){
       }
     } catch(e) {}
   }
-  // Add placeholder only if we have no real quotes yet
-  if (!_quotes.length) {
-    const firstQ = _newQuoteState({ fields: _captureFields(), sections: [] });
-    firstQ._hiddenTab = true;
-    firstQ._placeholder = true;
-    _quotes.push(firstQ);
-    _activeQuoteId = firstQ.id;
-  } else {
-    // Restore the last-active quote as the visible open tab
+  // Restore the last-active quote as the visible open tab (no placeholder creation)
+  if (_quotes.length) {
     const _savedActiveId = localStorage.getItem('proquote_active_id');
     const _targetQ = (_savedActiveId && _quotes.find(q => q.id === _savedActiveId))
                   || _quotes[_quotes.length - 1];
@@ -13070,28 +13063,6 @@ function init(){
   existingCustom.forEach(item => {
     if (item.name && item.price > 0) syncToAdonai(item.name, item.price, item.unit);
   });
-  // One-time cleanup: delete any blank placeholder quotes named Q-2026-001
-  // that were auto-created before the startup placeholder was hidden.
-  setTimeout(async () => {
-    const token = window._nativeLS?.getItem('pq_jwt');
-    if (!token) return;
-    try {
-      const res = await fetch('/api/quotes', { headers: { 'Authorization': 'Bearer ' + token } });
-      if (!res.ok) return;
-      const rows = await res.json();
-      const stale = rows.filter(r => {
-        const d = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
-        const ref = d?.fields?.quoteRef || d?.name || r.name || '';
-        return ref === 'Q-2026-001' || ref === 'Q-' + new Date().getFullYear() + '-001';
-      });
-      for (const row of stale) {
-        await fetch('/api/quotes/' + row.id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
-        _quotes = _quotes.filter(q => q.id !== row.id);
-        console.log('[ProQuote] Deleted placeholder quote', row.id, row.name);
-      }
-      if (stale.length) { renderQuoteTabs(); _persistSession(); }
-    } catch(e) { console.warn('[ProQuote] Placeholder cleanup failed:', e); }
-  }, 2000);
 
   // Show workspace screen
   wsShowScreen();
@@ -13925,8 +13896,6 @@ window._initStorage().then(() => {
     if (!raw) return;
     const restored = JSON.parse(raw);
     if (!Array.isArray(restored) || !restored.length) return;
-    // Remove startup placeholder now that we have real data
-    _quotes = _quotes.filter(q => !q._placeholder);
     const existingIds = new Set(_quotes.map(q => q.id));
     let anyNew = false;
     for (const q of restored) {
@@ -13946,7 +13915,7 @@ window._initStorage().then(() => {
     // Restore the active quote as a visible tab
     const savedActiveId = localStorage.getItem('proquote_active_id');
     const targetQ = (savedActiveId && _quotes.find(q => q.id === savedActiveId))
-                 || _quotes.find(q => !q._placeholder);
+                 || _quotes[_quotes.length - 1];
     if (targetQ && targetQ.id !== _activeQuoteId) {
       _getRevisionFamily(targetQ).forEach(m => { m._hiddenTab = false; });
       loadQuoteState(targetQ.id);
