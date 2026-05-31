@@ -1749,7 +1749,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         <div class="rev-notes-label" id="rev-banner-label">↪ Rev B — Changes from Rev A</div>
         <div id="rev-diff-list"></div>
       </div>
-      <div id="sb-changelog-list" style="flex:1;overflow-y:auto;padding:4px 0"></div>
+      <div id="sb-changelog-list" style="flex:1;min-height:0;overflow-y:auto;padding:4px 0"></div>
       <div style="padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:6px">
         <input id="sb-changelog-input" placeholder="Add a note…" style="flex:1;font-size:11px" onkeydown="if(event.key==='Enter')addChangelogEntry()">
         <button class="btn btn-primary btn-sm" onclick="addChangelogEntry()">+ Add</button>
@@ -6143,7 +6143,7 @@ function switchSbTab(tab) {
   });
   if(tab==='sections') renderTreeNav();
   if(tab==='changelog') { renderChangelogTab(); updateRevisionBanner(); }
-  if(tab==='schedule') switchTab('fittings');
+  if(tab==='schedule') renderSbSchedule();
 }
 
 function toggleTreeNavSidebar(){
@@ -12781,10 +12781,11 @@ function syncFittings() {
   const q = _quotes.find(q => q.id === _activeQuoteId);
   if (!q || !Array.isArray(q.fittingsSchedule)) return;
   q.fittingsSchedule.forEach(row => {
-    const fc = document.getElementById('ff-code-'+row.id);   if(fc) row.ffCode=fc.value;
-    const fr = document.getElementById('ff-rating-'+row.id); if(fr) row.ffRating=fr.value;
-    const fn = document.getElementById('ff-note-'+row.id);   if(fn) row.ffNote=fn.value;
-    const fl = document.getElementById('ff-link-'+row.id);   if(fl) row.ffLink=fl.value;
+    // Read from whichever view is currently rendered (full-page or sidebar)
+    const fc = document.getElementById('ff-code-'+row.id)   || document.getElementById('sbff-code-'+row.id);   if(fc) row.ffCode=fc.value;
+    const fr = document.getElementById('ff-rating-'+row.id) || document.getElementById('sbff-rating-'+row.id); if(fr) row.ffRating=fr.value;
+    const fn = document.getElementById('ff-note-'+row.id)   || document.getElementById('sbff-note-'+row.id);   if(fn) row.ffNote=fn.value;
+    const fl = document.getElementById('ff-link-'+row.id)   || document.getElementById('sbff-link-'+row.id);   if(fl) row.ffLink=fl.value;
   });
 }
 
@@ -12907,6 +12908,125 @@ function _ffUpdateLink(rowId, val) {
   const icon = document.getElementById('ff-link-icon-'+rowId);
   if (!icon) return;
   icon.innerHTML = val.trim() ? `<a href="${esc(val.trim())}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-size:14px">↗</a>` : '';
+}
+
+// ── Sidebar (inline) Schedule ─────────────────────────────────────────────────
+
+function renderSbSchedule() {
+  const el = document.getElementById('sb-tab-schedule');
+  if (!el) return;
+  if (!_activeQuoteId) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">No active quote.</div>';
+    return;
+  }
+  syncSbFittings();
+  const parMap = {};
+  S.sections.forEach(sec => (sec.parents||[]).forEach(par => { parMap[par.id] = {sec, par}; }));
+  const sched = _getFittingsSchedule();
+  const rowsHtml = sched.map((row, idx) => {
+    const entry = parMap[row.parId];
+    const nm = entry ? esc(entry.par.name) : '<span style="color:var(--muted);font-style:italic">Removed</span>';
+    const zone = entry?.sec?.name ? `<div style="font-size:10px;color:var(--muted)">${esc(entry.sec.name)}</div>` : '';
+    const lv = row.ffLink || '';
+    const linkIcon = lv ? `<a href="${esc(lv)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">↗</a>` : '';
+    return `<div style="padding:8px 12px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:flex-start;gap:4px;margin-bottom:5px">
+        <span style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;flex-shrink:0;padding-top:2px">${idx+1}.</span>
+        <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">${nm}</div>${zone}</div>
+        <button onclick="removeFittingsRowSb('${row.id}')" style="flex-shrink:0;background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:0 3px;line-height:1" title="Remove">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px">
+        <div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px">Code</div>
+          <input id="sbff-code-${row.id}" value="${esc(row.ffCode||'')}" placeholder="e.g. MX-240" oninput="scheduleSave()" style="width:100%;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);box-sizing:border-box"></div>
+        <div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px">Rating</div>
+          <input id="sbff-rating-${row.id}" value="${esc(row.ffRating||'')}" placeholder="e.g. 10A" oninput="scheduleSave()" style="width:100%;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);box-sizing:border-box"></div>
+      </div>
+      <div style="margin-bottom:4px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px">Notes</div>
+        <input id="sbff-note-${row.id}" value="${esc(row.ffNote||'')}" placeholder="Spec / notes…" oninput="scheduleSave()" style="width:100%;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);box-sizing:border-box"></div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <input id="sbff-link-${row.id}" value="${esc(lv)}" placeholder="Link to product…" oninput="scheduleSave();_sbffUpdateLink('${row.id}',this.value)" style="flex:1;min-width:0;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+        <span id="sbff-link-icon-${row.id}">${linkIcon}</span>
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML =
+    `<div style="padding:6px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-shrink:0">
+       <span style="font-size:11px;color:var(--muted);flex:1">${sched.length} item${sched.length !== 1 ? 's' : ''}</span>
+       <button class="btn btn-secondary btn-sm" onclick="switchTab('fittings')" style="font-size:10px">Full view ↗</button>
+     </div>
+     <div style="padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0;position:relative">
+       <input id="sb-fittings-search" placeholder="Add item from quote…"
+         style="width:100%;padding:5px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--bg);font-size:12px;font-family:inherit;color:var(--text);box-sizing:border-box"
+         oninput="renderSbFittingsSugs(this.value)" onfocus="renderSbFittingsSugs(this.value)" onblur="setTimeout(closeSbFittingsSugs,200)">
+       <div id="sb-fittings-sugs" style="display:none;position:absolute;left:10px;right:10px;top:calc(100% - 4px);z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:200px;overflow-y:auto"></div>
+     </div>
+     <div style="flex:1;min-height:0;overflow-y:auto">
+       ${sched.length ? rowsHtml : '<div style="padding:30px 16px;text-align:center;color:var(--muted);font-size:12px">Search above to add items from your quote.</div>'}
+     </div>`;
+}
+
+function syncSbFittings() {
+  const q = _quotes.find(q => q.id === _activeQuoteId);
+  if (!q || !Array.isArray(q.fittingsSchedule)) return;
+  q.fittingsSchedule.forEach(row => {
+    const fc = document.getElementById('sbff-code-'+row.id);   if(fc) row.ffCode=fc.value;
+    const fr = document.getElementById('sbff-rating-'+row.id); if(fr) row.ffRating=fr.value;
+    const fn = document.getElementById('sbff-note-'+row.id);   if(fn) row.ffNote=fn.value;
+    const fl = document.getElementById('sbff-link-'+row.id);   if(fl) row.ffLink=fl.value;
+  });
+}
+
+function renderSbFittingsSugs(query) {
+  const el = document.getElementById('sb-fittings-sugs');
+  if (!el) return;
+  const q = (query || '').toLowerCase();
+  const matches = [];
+  S.sections.forEach(sec => {
+    (sec.parents||[]).forEach(par => {
+      if (!par.name || !par.name.trim()) return;
+      if (q && !par.name.toLowerCase().includes(q)) return;
+      matches.push({sec, par});
+    });
+  });
+  if (!matches.length) { el.style.display = 'none'; return; }
+  el.innerHTML = matches.map(({sec, par}) =>
+    `<div class="fittings-sug-item" onclick="addFittingsRowSb('${par.id}')">
+      <span style="font-weight:600;flex:1">${esc(par.name)}</span>
+      ${sec.name ? `<span style="color:var(--muted);font-size:11px">${esc(sec.name)}</span>` : ''}
+    </div>`
+  ).join('');
+  el.style.display = '';
+}
+
+function closeSbFittingsSugs() {
+  const el = document.getElementById('sb-fittings-sugs');
+  if (el) el.style.display = 'none';
+}
+
+function addFittingsRowSb(parId) {
+  syncSbFittings();
+  const sched = _getFittingsSchedule();
+  sched.push({id: uid(), parId, ffCode:'', ffRating:'', ffNote:'', ffLink:''});
+  const inp = document.getElementById('sb-fittings-search');
+  if (inp) inp.value = '';
+  closeSbFittingsSugs();
+  renderSbSchedule();
+  scheduleSave();
+}
+
+function removeFittingsRowSb(rowId) {
+  syncSbFittings();
+  const q = _quotes.find(q => q.id === _activeQuoteId);
+  if (!q || !Array.isArray(q.fittingsSchedule)) return;
+  q.fittingsSchedule = q.fittingsSchedule.filter(r => r.id !== rowId);
+  renderSbSchedule();
+  scheduleSave();
+}
+
+function _sbffUpdateLink(rowId, val) {
+  const icon = document.getElementById('sbff-link-icon-'+rowId);
+  if (!icon) return;
+  icon.innerHTML = val.trim() ? `<a href="${esc(val.trim())}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">↗</a>` : '';
 }
 
 function printFittings() {
