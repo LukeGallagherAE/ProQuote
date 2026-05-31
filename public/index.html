@@ -1929,7 +1929,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         <!-- Batch delete controls — shown in select mode -->
         <button id="qa-cancel-select" onclick="quotesAllExitSelect()" style="display:none;padding:7px 14px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
         <button id="qa-merge-btn" onclick="openMergeWizard()" style="display:none;padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">⇄ Merge as revisions</button>
-        <button id="qa-delete-selected" onclick="batchDeleteQuotes()" style="display:none;padding:7px 14px;background:#ff3b30;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Move to bin (0)</button>
+        <button id="qa-delete-selected" onclick="batchDeleteQuotes()" style="display:none;padding:7px 14px;background:#ff3b30;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Delete selected (0)</button>
         <button id="qa-select-btn" onclick="quotesAllEnterSelect()" style="padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Select</button>
         <button onclick="openWizard()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -10791,7 +10791,7 @@ function quotesAllExitSelect() {
 function _qaUpdateSelectionUI() {
   const n = _qaSelected.size;
   const delBtn = document.getElementById('qa-delete-selected');
-  if (delBtn) delBtn.textContent = 'Move to bin (' + n + ')';
+  if (delBtn) delBtn.textContent = 'Delete selected (' + n + ')';
   const mergeBtn = document.getElementById('qa-merge-btn');
   if (mergeBtn) mergeBtn.style.display = n === 2 ? '' : 'none';
   const allCb = document.getElementById('qa-cb-all');
@@ -10821,29 +10821,39 @@ function qaToggleAll(checked) {
 function batchDeleteQuotes() {
   if (!_qaSelected.size) return;
   const n = _qaSelected.size;
-  if (!confirm('Move ' + n + ' quote' + (n !== 1 ? 's' : '') + ' to the bin?\n\nThey will be permanently deleted after 30 days.')) return;
+  if (!confirm('Permanently delete ' + n + ' quote' + (n !== 1 ? 's' : '') + '?\n\nThis cannot be undone.')) return;
   const clients = loadClients();
-  const now = Date.now();
-  [..._qaSelected].forEach(key => {
+  const rows = window._quotesAllRows || [];
+
+  // Sort descending by index so splices don't shift subsequent indices
+  const toDelete = [..._qaSelected].map(key => {
     const [ci, ji, qi] = key.split(':').map(Number);
-    const qq = clients[ci]?.jobs?.[ji]?.quotes?.[qi];
-    if (!qq) return;
-    const ref = qq.quoteRef || qq.fields?.quoteRef || '';
-    qq._binned = true; qq._binnedAt = now;
-    const tab = _quotes.find(oq => (oq.fields?.quoteRef || '') === ref);
+    const row = rows.find(r => r.clientIdx === ci && r.jobIdx === ji && r.quoteIdx === qi);
+    return { ci, ji, qi, ref: row?.ref || '', _sqId: row?._sqId };
+  }).sort((a, b) => b.qi - a.qi || b.ji - a.ji || b.ci - a.ci);
+
+  toDelete.forEach(({ ci, ji, qi, ref, _sqId }) => {
+    // Remove from client book
+    if (ci >= 0 && clients[ci]?.jobs?.[ji]?.quotes?.[qi] != null) {
+      clients[ci].jobs[ji].quotes.splice(qi, 1);
+    }
+    // Remove from _quotes memory + server
+    const tab = _sqId
+      ? _quotes.find(q => q.id === _sqId)
+      : _quotes.find(q => (q.fields?.quoteRef || '') === ref);
     if (tab) {
-      _getRevisionFamily(tab).forEach(m => { m._binned = true; m._binnedAt = now; m._hiddenTab = true; });
-      if (window._flushQuoteNow) window._flushQuoteNow(tab).catch(() => {
-        if (window._saveQuoteToServer) window._saveQuoteToServer(tab);
-      });
+      const family = _getRevisionFamily(tab);
+      family.forEach(m => { if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(m.id); });
+      _quotes = _quotes.filter(q => !family.find(m => m.id === q.id));
     }
   });
+
   saveClients(clients);
   _persistSession(); renderQuoteTabs(); quotesAllExitSelect();
   if (typeof renderDashboard === 'function') renderDashboard();
   if (typeof renderClients   === 'function' && document.getElementById('clients-content'))  renderClients();
   if (typeof renderProjects  === 'function' && document.getElementById('projects-content')) renderProjects();
-  showToast(n + ' quote' + (n !== 1 ? 's' : '') + ' moved to bin');
+  showToast(n + ' quote' + (n !== 1 ? 's' : '') + ' deleted');
 }
 
 // ── Merge-as-revisions ────────────────────────────────────────────────────────
