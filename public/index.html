@@ -9224,28 +9224,11 @@ function switchTab(tab) {
       mainEl.style.paddingTop   = '';
       mainEl.style.paddingBottom= '';
     } else {
-      // Quote tabs: restore sidebar layout margins
-      if (_sbp === 'right') {
-        mainEl.style.marginRight  = _collapsed ? '0' : _sbw+'px';
-        mainEl.style.marginLeft   = '64px';
-        mainEl.style.paddingTop   = '';
-        mainEl.style.paddingBottom= '';
-      } else if (_sbp === 'left') {
-        mainEl.style.marginRight  = '0';
-        mainEl.style.marginLeft   = _collapsed ? '64px' : (64+_sbw)+'px';
-        mainEl.style.paddingTop   = '';
-        mainEl.style.paddingBottom= '';
-      } else if (_sbp === 'top') {
-        mainEl.style.marginRight  = '0';
-        mainEl.style.marginLeft   = '64px';
-        mainEl.style.paddingTop   = _collapsed ? '0' : _sbSH+'px';
-        mainEl.style.paddingBottom= '';
-      } else if (_sbp === 'bottom') {
-        mainEl.style.marginRight  = '0';
-        mainEl.style.marginLeft   = '64px';
-        mainEl.style.paddingTop   = '';
-        mainEl.style.paddingBottom= _collapsed ? '56px' : (56+_sbSH)+'px';
-      }
+      // Quote tabs: restore sidebar layout margins (always left preset)
+      mainEl.style.marginRight   = '0';
+      mainEl.style.marginLeft    = _collapsed ? '64px' : (64+_sbw)+'px';
+      mainEl.style.paddingTop    = '';
+      mainEl.style.paddingBottom = '';
     }
   }
 
@@ -10321,10 +10304,8 @@ function initSidebarControls() {
     sb.style.width = newW + 'px';
     if (!sb.classList.contains('sb-floating')) {
       const main = document.querySelector('.main');
-      if (_rp === 'right') {
-        if (main) main.style.marginRight = newW+'px';
-      } else if (_rp === 'left') {
-        if (main) main.style.marginLeft = (64+newW)+'px';
+      if (_rp === 'left') {
+        if (main) { main.style.marginLeft = (64+newW)+'px'; main.style.marginRight = '0'; }
       }
       // Update toggle button position live during resize
       _updateToggleBtn(_rp, sb.classList.contains('collapsed'));
@@ -10441,12 +10422,11 @@ function toggleSidebar() {
   // Hide the totals bar when sidebar collapses — keeps pricing private when a client is nearby
   document.body.classList.toggle('show-totals-bar', !collapsed && _activeTab === 'quote');
 
-  // Adjust main content area for each preset
+  // Adjust main content area for each preset (always left — never touch marginRight)
   if (main) {
-    if (preset === 'right') {
-      main.style.marginRight  = collapsed ? '0' : w+'px';
-    } else if (preset === 'left') {
+    if (preset === 'left') {
       main.style.marginLeft   = collapsed ? NAV_W+'px' : (NAV_W+w)+'px';
+      main.style.marginRight  = '0';
     } else if (preset === 'top') {
       main.style.paddingTop   = collapsed ? '0' : SH+'px';
     } else if (preset === 'bottom') {
