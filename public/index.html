@@ -11164,7 +11164,7 @@ function openQuoteFromAll(i) {
       // Open the most recent unlocked version
       const target = family.slice().reverse().find(x => !x._locked) || family[family.length - 1];
       saveActiveQuoteState();
-      target._hiddenTab = false;
+      _getRevisionFamily(target).forEach(m => { m._hiddenTab = false; });
       loadQuoteState(target.id);
       renderQuoteTabs();
       switchTab('quote');
@@ -12165,10 +12165,11 @@ function switchToQuoteFromFlyout(qid) {
   if (flyout) flyout.style.display = 'none';
   if (_activeQuoteId === qid) { switchTab('quote'); return; }
   saveActiveQuoteState();
+  const _fq = _quotes.find(q => q.id === qid);
+  if (_fq) _getRevisionFamily(_fq).forEach(m => { m._hiddenTab = false; });
   loadQuoteState(qid);
   switchTab('quote');
   renderQuoteTabs();
-  
 }
 
 function toggleDarkMode() {
