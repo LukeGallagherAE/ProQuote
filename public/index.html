@@ -5421,7 +5421,7 @@ function renderChangelogTab() {
       '<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 12px;border-bottom:1px solid var(--border)">'
       + '<span style="color:var(--muted);font-size:11px;margin-top:1px;flex-shrink:0">·</span>'
       + '<span style="flex:1;font-size:11px;line-height:1.5">'+escHtml(c)+'</span>'
-      + '<button onclick="dismissRevChange(\''+c.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\')+';renderChangelogTab()" title="Dismiss" style="flex-shrink:0;background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 2px;opacity:.5" onmouseover="this.style.opacity=1;this.style.color=\'#e03\'" onmouseout="this.style.opacity=.5;this.style.color=\'var(--muted)\'">×</button>'
+      + '<button onclick="dismissRevChange(\''+c.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\');renderChangelogTab()" title="Dismiss" style="flex-shrink:0;background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 2px;opacity:.5" onmouseover="this.style.opacity=1;this.style.color=\'#e03\'" onmouseout="this.style.opacity=.5;this.style.color=\'var(--muted)\'">×</button>'
       + '</div>'
     ).join('');
   }
