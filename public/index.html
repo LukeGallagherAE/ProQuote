@@ -9587,8 +9587,9 @@ function renderDashboard() {
     </div>`;
   }
 
-  const openQuotesHTML = (typeof _quotes !== 'undefined' && _quotes.length)
-    ? _quotes.map(q => openQuoteRow(q, q.id === _activeQuoteId)).join('')
+  const openTabs = (typeof _quotes !== 'undefined' ? _quotes : []).filter(q => !q._hiddenTab && !q._binned);
+  const openQuotesHTML = openTabs.length
+    ? openTabs.map(q => openQuoteRow(q, q.id === _activeQuoteId)).join('')
     : `<div class="db-card-empty">No open quotes</div>`;
 
   // ── Render ────────────────────────────────────────────────────────────────
