@@ -176,9 +176,9 @@ html.dark .tree-nav{background:var(--surface)}
 .tree-nav-par.active::before{color:var(--accent)}
 @media print{.tree-nav{display:none!important}}
 /* ── SUBITEM PANEL ── */
-#subitem-panel{position:fixed;left:64px;right:0;bottom:62px;height:0;background:#f0efeb;border-top:none;z-index:150;display:flex;flex-direction:column;transition:height .2s ease;overflow:hidden}
-#subitem-panel.open{height:280px;border-top:3px solid var(--accent);box-shadow:0 -6px 28px rgba(0,0,0,.10)}
-.sip-header{display:flex;align-items:center;gap:10px;padding:8px 16px;background:#fdf7ed;border-bottom:1px solid #e0d8c8;flex-shrink:0}
+#subitem-panel{position:fixed;left:64px;right:0;bottom:62px;height:0;background:var(--surface);border-top:none;z-index:150;display:flex;flex-direction:column;transition:height .2s ease;overflow:hidden}
+#subitem-panel.open{height:280px;border-top:2px solid var(--accent)}
+.sip-header{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0}
 .sip-title{font-size:13px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sip-body{flex:1;overflow-y:auto;overflow-x:auto}
 .sip-indicator{padding:5px 18px;font-size:11px;color:var(--accent);font-weight:600;background:rgba(200,160,74,.06);border-top:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between}
@@ -303,15 +303,15 @@ html.dark .parent-item:focus-within{background:var(--blue-bg)}
 .cat-tag:hover{background:var(--blue);color:#fff}
 
 .subitems-wrap{background:var(--surface2);border-top:1px solid var(--border);overflow-x:auto}
-.sub-col-headers{display:grid;grid-template-columns:44px 1fr 32px 50px 42px 42px 60px 60px 60px 70px 28px;gap:6px;padding:5px 12px;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid #d8d0be;position:sticky;top:0;background:#e8e4dc;z-index:1}
+.sub-col-headers{display:grid;grid-template-columns:44px 1fr 32px 50px 42px 42px 60px 60px 60px 70px 28px;gap:6px;padding:5px 12px;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1}
 .sub-col-headers span{text-align:center}
 .sub-col-headers span:nth-child(2){text-align:left}
 .sub-col-headers .r{text-align:right}
 
-.subitem-row{display:grid;grid-template-columns:44px 1fr 32px 50px 42px 42px 60px 60px 60px 70px 28px;gap:6px;padding:3px 12px;align-items:center;min-height:30px;border-bottom:1px solid #ddd8cc;transition:background .08s}
+.subitem-row{display:grid;grid-template-columns:44px 1fr 32px 50px 42px 42px 60px 60px 60px 70px 28px;gap:6px;padding:3px 12px;align-items:center;min-height:30px;border-bottom:1px solid var(--border);transition:background .08s}
 .subitem-row>*{min-width:0}
-.subitem-row:nth-child(odd){background:#f0efeb}
-.subitem-row:nth-child(even){background:#ece9e2}
+.subitem-row:nth-child(odd){background:var(--surface)}
+.subitem-row:nth-child(even){background:var(--surface2)}
 .subitem-row:hover{background:rgba(200,160,74,.12)!important}
 .subitem-row:last-of-type{border-bottom:none}
 .subitem-row.faded{opacity:.35}
@@ -1646,6 +1646,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       <button class="sb-tab" id="sbt-sections" onclick="switchSbTab('sections')">Sections</button>
       <button class="sb-tab" id="sbt-jobdetails" onclick="switchSbTab('jobdetails')">Job Details</button>
       <button class="sb-tab" id="sbt-changelog" onclick="switchSbTab('changelog')">Changelog</button>
+      <button class="sb-tab" id="sbt-schedule" onclick="switchSbTab('schedule')">Schedule</button>
     </div>
     <div id="sb-tab-sections" class="sb-tab-content sb-hidden">
       <div class="tree-nav" id="treeNav"></div>
@@ -1753,6 +1754,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         <button class="btn btn-primary btn-sm" onclick="addChangelogEntry()">+ Add</button>
       </div>
     </div>
+    <div id="sb-tab-schedule" class="sb-tab-content sb-hidden"></div>
   </div>
   </div><!-- /sidebar flex wrapper -->
   <div class="main">
@@ -4513,11 +4515,12 @@ function switchToQuote(qid) {
     return;
   }
   saveActiveQuoteState();
+  const _sq = _quotes.find(q => q.id === qid);
+  if (_sq) _getRevisionFamily(_sq).forEach(m => { m._hiddenTab = false; });
   loadQuoteState(qid);
   if (!isQuoteTool) switchTab('quote');
   else switchTab(_activeTab);
   renderQuoteTabs();
-  
 }
 
 let _cqwTargetId = null;
@@ -6022,7 +6025,7 @@ function collapseAllTreeSections(){
 let _activeSbTab = 'sections';
 function switchSbTab(tab) {
   _activeSbTab = tab;
-  ['sections','jobdetails','changelog'].forEach(t => {
+  ['sections','jobdetails','changelog','schedule'].forEach(t => {
     const btn = document.getElementById('sbt-'+t);
     const content = document.getElementById('sb-tab-'+t);
     if(btn) btn.classList.toggle('sb-tab-active', t===tab);
@@ -6030,6 +6033,7 @@ function switchSbTab(tab) {
   });
   if(tab==='sections') renderTreeNav();
   if(tab==='changelog') renderChangelogTab();
+  if(tab==='schedule') switchTab('fittings');
 }
 
 function toggleTreeNavSidebar(){
@@ -9191,6 +9195,7 @@ function switchTab(tab) {
   document.body.classList.toggle('show-totals-bar', tab === 'quote' && !_sidebarCollapsed);
   if (sidebar) sidebar.style.display = isQuote ? '' : 'none';
   if (sidebarToggle) sidebarToggle.style.display = isQuote ? '' : 'none';
+  if (isQuote && _activeSbTab === 'schedule') switchSbTab('sections');
   const saveBtn = document.getElementById('manual-save-btn');
   if (saveBtn) saveBtn.style.display = isQuoteTool ? '' : 'none';
   const saveCloseAllBtn = document.getElementById('save-close-all-btn');
