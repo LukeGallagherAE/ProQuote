@@ -13898,11 +13898,19 @@ function showResetPin() {
 
 // Auth is now managed server-side via JWT — no client-side seeding needed.
 
-// Re-read _customCats now that server data is loaded, then start the app
-window._initStorage().then(() => {
-  try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e){}
-  init();
-}).catch(() => init());
+// Seed _ls from native localStorage immediately — no API wait
+try {
+  const nls = window._nativeLS;
+  for (let i = 0; i < nls.length; i++) {
+    const k = nls.key(i);
+    if (k && k !== 'pq_jwt') localStorage.setItem(k, nls.getItem(k));
+  }
+} catch(e) {}
+try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e){}
+// Render immediately — login screen appears without any API round-trip
+init();
+// Prefetch server data in background so it's ready when the user authenticates
+window._initStorage().catch(() => {});
 
 // Fetch build date and stamp the nav + help footer
 fetch('/api/build-info').then(r => r.json()).then(d => {
