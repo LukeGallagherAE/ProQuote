@@ -2888,11 +2888,18 @@ function setSaveStatus(state) {
     el.style.color = 'var(--green, #34c759)';
     el.style.opacity = '1';
     window._saveStatusFade = setTimeout(() => { el.style.opacity = '0'; }, 2500);
+  } else if (state === 'syncing') {
+    el.textContent = 'Syncing…';
+    el.style.color = 'var(--muted)';
+    el.style.opacity = '1';
+  } else if (state === 'synced') {
+    el.textContent = 'Up to date ✓';
+    el.style.color = 'var(--green, #34c759)';
+    el.style.opacity = '1';
+    window._saveStatusFade = setTimeout(() => { el.style.opacity = '0'; }, 2000);
   } else if (state === 'retrying') {
-    // Silently retry — show nothing to the user
     el.style.opacity = '0';
   }
-  // No 'localonly' / 'Sync failed' state — saves either succeed or retry silently
 }
 
 function loadQuoteState(id) {
@@ -13620,7 +13627,7 @@ function _populateAccountPanel() {
   if (el && auth) el.textContent = 'Signed in as ' + (auth.username || '');
 }
 
-async function showLandingLogin() {
+function showLandingLogin() {
   const el = document.getElementById('landing');
   if (!el) return;
 
@@ -13640,7 +13647,7 @@ async function showLandingLogin() {
   el.style.transition = '';
   el.style.display = 'flex';
 
-  // Populate brand-panel stats
+  // Populate brand-panel stats from cache
   try {
     const clients = loadClients();
     const totalQuotes = clients.reduce((n,c) => n + (c.jobs||[]).reduce((m,j) => m + (j.quotes||[]).length, 0), 0);
@@ -13650,32 +13657,28 @@ async function showLandingLogin() {
     const pEl = document.getElementById('lstat-pipeline'); if (pEl) pEl.textContent = pipeline > 0 ? (typeof fmt === 'function' ? fmt(pipeline) : '$'+(pipeline/1000).toFixed(0)+'k') : '—';
   } catch(e) {}
 
-  // Ask server whether an account already exists to decide login vs setup
-  let hasUsers = false;
-  try {
-    const r = await fetch('/api/auth/status');
-    if (r.ok) hasUsers = (await r.json()).hasUsers;
-  } catch(e) {}
+  // Show login form immediately — don't block on server round-trip
+  document.getElementById('login-setup').style.display = 'none';
+  document.getElementById('login-tabs').style.display = '';
+  document.getElementById('login-signin').style.display = '';
+  document.getElementById('login-register').style.display = 'none';
+  const pf = document.getElementById('signin-password'); if (pf) pf.value = '';
+  document.getElementById('pin-error').textContent = '';
+  setTimeout(() => document.getElementById('signin-username')?.focus(), 80);
 
-  if (!hasUsers) {
-    // No account yet — show setup wizard
-    const profile = JSON.parse(localStorage.getItem('proquote_profile') || '{}');
-    const prefill = { 'setup-name': profile.pPreparedBy, 'setup-biz': profile.pBizName,
-                      'setup-phone': profile.pPhone, 'setup-email': profile.pEmail, 'setup-abn': profile.pABN };
-    Object.entries(prefill).forEach(([id, val]) => { const el = document.getElementById(id); if (el && val) el.value = val; });
-    _setupShowStep(1);
-    document.getElementById('login-setup').style.display = '';
-    document.getElementById('login-signin').style.display = 'none';
-  } else {
-    // Account exists — show tabs + sign in form
-    document.getElementById('login-setup').style.display = 'none';
-    document.getElementById('login-tabs').style.display = '';
-    document.getElementById('login-signin').style.display = '';
-    document.getElementById('login-register').style.display = 'none';
-    const pf = document.getElementById('signin-password'); if (pf) pf.value = '';
-    document.getElementById('pin-error').textContent = '';
-    setTimeout(() => (document.getElementById('signin-username'))?.focus(), 80);
-  }
+  // Check in background whether this is a fresh install (no account) — switch to setup if so
+  fetch('/api/auth/status').then(r => r.ok ? r.json() : null).then(d => {
+    if (d && !d.hasUsers) {
+      const profile = JSON.parse(localStorage.getItem('proquote_profile') || '{}');
+      const prefill = { 'setup-name': profile.pPreparedBy, 'setup-biz': profile.pBizName,
+                        'setup-phone': profile.pPhone, 'setup-email': profile.pEmail, 'setup-abn': profile.pABN };
+      Object.entries(prefill).forEach(([id, val]) => { const el = document.getElementById(id); if (el && val) el.value = val; });
+      _setupShowStep(1);
+      document.getElementById('login-setup').style.display = '';
+      document.getElementById('login-signin').style.display = 'none';
+      document.getElementById('login-tabs').style.display = 'none';
+    }
+  }).catch(() => {});
 }
 
 function showRegisterForm() {
@@ -13853,12 +13856,13 @@ async function submitPassword() {
     document.getElementById('landing').style.display = 'none';
     setTimeout(() => switchTab('dashboard'), 50);
     // Load quotes + settings from server in the background, then refresh UI
+    setSaveStatus('syncing');
     window._initStorage().then(() => {
       try {
         const raw = localStorage.getItem('proquote_session_quotes');
-        if (!raw) return;
+        if (!raw) { setSaveStatus('synced'); return; }
         const restored = JSON.parse(raw);
-        if (!Array.isArray(restored) || !restored.length) return;
+        if (!Array.isArray(restored) || !restored.length) { setSaveStatus('synced'); return; }
         const existingIds = new Set(_quotes.map(q => q.id));
         for (const q of restored) {
           if (!existingIds.has(q.id)) {
@@ -13889,8 +13893,9 @@ async function submitPassword() {
         if (_activeTab === 'quotes-all') renderQuotesAll();
         if (_activeTab === 'clients')    renderClients();
         if (_activeTab === 'projects')   renderProjects();
-      } catch(e) { console.warn('[ProQuote] Post-login refresh failed:', e); }
-    }).catch(() => {});
+        setSaveStatus('synced');
+      } catch(e) { console.warn('[ProQuote] Post-login refresh failed:', e); setSaveStatus('synced'); }
+    }).catch(() => { setSaveStatus('synced'); });
   } catch(e) {
     if (errEl) errEl.textContent = 'Connection error — try again';
     if (btn) { btn.disabled = false; btn.textContent = 'Sign In →'; }
@@ -13917,19 +13922,17 @@ try {
 try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e){}
 // Render immediately — login screen appears without any API round-trip
 init();
-// Prefetch server data in background so it's ready when the user authenticates
+// Prefetch server data in background — warms the DB connection and syncs any server-side changes
+setSaveStatus('syncing');
 window._initStorage().then(() => {
-  // After server data lands, merge any quotes not already in memory and refresh UI
   try {
     const raw = localStorage.getItem('proquote_session_quotes');
-    if (!raw) return;
+    if (!raw) { setSaveStatus('synced'); return; }
     const restored = JSON.parse(raw);
-    if (!Array.isArray(restored) || !restored.length) return;
+    if (!Array.isArray(restored) || !restored.length) { setSaveStatus('synced'); return; }
     const existingIds = new Set(_quotes.map(q => q.id));
-    let anyNew = false;
     for (const q of restored) {
       if (!existingIds.has(q.id)) {
-        // Advance ID counter past server IDs
         for (const s of (q.sections||[])) {
           if (s.id >= _id) _id = s.id + 1;
           for (const p of (s.parents||[])) {
@@ -13938,10 +13941,8 @@ window._initStorage().then(() => {
           }
         }
         _quotes.push({ ...q, _hiddenTab: true });
-        anyNew = true;
       }
     }
-    // Restore the active quote as a visible tab
     const savedActiveId = localStorage.getItem('proquote_active_id');
     const targetQ = (savedActiveId && _quotes.find(q => q.id === savedActiveId))
                  || _quotes[_quotes.length - 1];
@@ -13951,7 +13952,6 @@ window._initStorage().then(() => {
     } else if (targetQ) {
       _getRevisionFamily(targetQ).forEach(m => { m._hiddenTab = false; });
     }
-    // Refresh categories and profile from server settings
     try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e) {}
     loadProfile();
     loadCompanyLogo();
@@ -13960,8 +13960,9 @@ window._initStorage().then(() => {
     if (_activeTab === 'quotes-all')  renderQuotesAll();
     if (_activeTab === 'clients')     renderClients();
     if (_activeTab === 'projects')    renderProjects();
-  } catch(e) { console.warn('[ProQuote] Post-init refresh failed:', e); }
-}).catch(() => {});
+    setSaveStatus('synced');
+  } catch(e) { console.warn('[ProQuote] Post-init refresh failed:', e); setSaveStatus('synced'); }
+}).catch(() => { setSaveStatus('synced'); });
 
 // Fetch build date and stamp the nav + help footer
 fetch('/api/build-info').then(r => r.json()).then(d => {
