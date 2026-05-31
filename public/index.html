@@ -1929,7 +1929,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         <!-- Batch delete controls — shown in select mode -->
         <button id="qa-cancel-select" onclick="quotesAllExitSelect()" style="display:none;padding:7px 14px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
         <button id="qa-merge-btn" onclick="openMergeWizard()" style="display:none;padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">⇄ Merge as revisions</button>
-        <button id="qa-delete-selected" onclick="batchDeleteQuotes()" style="display:none;padding:7px 14px;background:#ff3b30;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Delete selected (0)</button>
+        <button id="qa-delete-selected" onclick="batchDeleteQuotes()" style="display:none;padding:7px 14px;background:#ff3b30;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Move to bin (0)</button>
         <button id="qa-select-btn" onclick="quotesAllEnterSelect()" style="padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Select</button>
         <button onclick="openWizard()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -4556,19 +4556,63 @@ function closeQuoteTab(qid) {
 }
 
 function _doCloseQuote(qid) {
-  if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(qid);
-  _quotes = _quotes.filter(q => q.id !== qid);
-  if (!_quotes.length) {
+  // Close tab: just hide the quote, keep it on the server and in memory
+  const q = _quotes.find(q => q.id === qid);
+  if (q) _getRevisionFamily(q).forEach(m => { m._hiddenTab = true; });
+  const visible = _quotes.filter(q => !q._hiddenTab && !q._binned);
+  if (!visible.length) {
     _persistSession();
     renderQuoteTabs();
     switchTab('dashboard');
     return;
   }
   if (_activeQuoteId === qid) {
-    loadQuoteState(_quotes[_quotes.length - 1].id);
+    const next = visible.filter(q => !q._parentRef)[0] || visible[visible.length - 1];
+    loadQuoteState(next.id);
   }
   _persistSession();
   renderQuoteTabs();
+}
+
+function restoreFromBin(qid) {
+  const q = _quotes.find(q => q.id === qid);
+  if (!q) return;
+  const ref = q.fields?.quoteRef || '';
+  _getRevisionFamily(q).forEach(m => {
+    delete m._binned; delete m._binnedAt; m._hiddenTab = false;
+  });
+  // Also clear _binned from client book
+  if (ref) {
+    const clients = loadClients();
+    clients.forEach(c => (c.jobs||[]).forEach(j => (j.quotes||[]).forEach(qq => {
+      if ((qq.quoteRef || qq.fields?.quoteRef) === ref) { delete qq._binned; delete qq._binnedAt; }
+    })));
+    saveClients(clients);
+  }
+  if (window._flushQuoteNow) window._flushQuoteNow(q).catch(() => {
+    if (window._saveQuoteToServer) window._saveQuoteToServer(q);
+  });
+  _persistSession(); renderQuoteTabs(); renderQuotesAll();
+  showToast('Quote restored', 2000);
+}
+
+function permanentlyDeleteQuote(qid) {
+  if (!confirm('Permanently delete this quote? This cannot be undone.')) return;
+  const q = _quotes.find(q => q.id === qid);
+  const family = q ? _getRevisionFamily(q) : [{ id: qid }];
+  const refs = new Set(family.map(m => m.fields?.quoteRef || '').filter(Boolean));
+  // Remove from client book
+  if (refs.size) {
+    const clients = loadClients();
+    clients.forEach(c => (c.jobs||[]).forEach(j => {
+      if (j.quotes) j.quotes = j.quotes.filter(qq => !refs.has(qq.quoteRef || qq.fields?.quoteRef || ''));
+    }));
+    saveClients(clients);
+  }
+  family.forEach(m => { if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(m.id); });
+  _quotes = _quotes.filter(q => !family.find(m => m.id === q.id));
+  _persistSession(); renderQuotesAll();
+  showToast('Quote permanently deleted', 2000);
 }
 
 function cqwSaveAndClose() {
@@ -10690,23 +10734,34 @@ function openRolodex() {
 
 function deleteStoredQuote(clientIdx, jobIdx, quoteIdx, ref) {
   const label = ref ? '"' + ref + '"' : 'this quote';
-  if (!confirm('Are you sure you want to delete ' + label + '?')) return;
-  if (!confirm('⚠️ This cannot be undone.\n\nThe quote will be permanently removed from your records.\n\nProceed?')) return;
+  if (!confirm('Move ' + label + ' to the bin?\n\nIt will be permanently deleted after 30 days.')) return;
   const clients = loadClients();
   const job = clients[clientIdx]?.jobs?.[jobIdx];
-  if (!job?.quotes) return;
-  job.quotes.splice(quoteIdx, 1);
+  if (!job?.quotes?.[quoteIdx]) return;
+  const now = Date.now();
+  // Mark as binned in client book (keep the entry, just flag it)
+  job.quotes[quoteIdx]._binned = true;
+  job.quotes[quoteIdx]._binnedAt = now;
   saveClients(clients);
-  // Close any open tab for this quote
+  // Mark all family members in memory as binned, hide tabs, save to server
   const matchingTab = _quotes.find(oq => (oq.fields?.quoteRef || '') === ref);
-  if (matchingTab) _doCloseQuote(matchingTab.id);
-  // Re-render all affected views
+  if (matchingTab) {
+    _getRevisionFamily(matchingTab).forEach(m => { m._binned = true; m._binnedAt = now; m._hiddenTab = true; });
+    if (window._flushQuoteNow) window._flushQuoteNow(matchingTab).catch(() => {
+      if (window._saveQuoteToServer) window._saveQuoteToServer(matchingTab);
+    });
+  }
+  _persistSession();
+  renderQuoteTabs();
+  // Switch away if needed
+  const visible = (_quotes || []).filter(q => !q._hiddenTab && !q._binned);
+  if (!visible.length) switchTab('dashboard');
   if (typeof renderQuotesAll  === 'function' && document.getElementById('quotes-all-content'))  renderQuotesAll();
   if (typeof renderProjects   === 'function' && document.getElementById('projects-content'))    renderProjects();
   if (typeof renderClients    === 'function' && document.getElementById('clients-content'))     renderClients();
   if (typeof renderDashboard  === 'function' && document.getElementById('db-content'))          renderDashboard();
-  // Close detail panel if open (it may be showing stale data)
   closeDetailPanel?.();
+  showToast('Quote moved to bin · Restored within 30 days', 3000);
 }
 
 // ── Batch select state ───────────────────────────────────────────────────────
@@ -10736,7 +10791,7 @@ function quotesAllExitSelect() {
 function _qaUpdateSelectionUI() {
   const n = _qaSelected.size;
   const delBtn = document.getElementById('qa-delete-selected');
-  if (delBtn) delBtn.textContent = 'Delete selected (' + n + ')';
+  if (delBtn) delBtn.textContent = 'Move to bin (' + n + ')';
   const mergeBtn = document.getElementById('qa-merge-btn');
   if (mergeBtn) mergeBtn.style.display = n === 2 ? '' : 'none';
   const allCb = document.getElementById('qa-cb-all');
@@ -10766,28 +10821,29 @@ function qaToggleAll(checked) {
 function batchDeleteQuotes() {
   if (!_qaSelected.size) return;
   const n = _qaSelected.size;
-  if (!confirm('Delete ' + n + ' quote' + (n !== 1 ? 's' : '') + '? This cannot be undone.')) return;
+  if (!confirm('Move ' + n + ' quote' + (n !== 1 ? 's' : '') + ' to the bin?\n\nThey will be permanently deleted after 30 days.')) return;
   const clients = loadClients();
-  // Convert selected keys to sorted indices (delete highest index first to avoid shifting)
-  const toDelete = [..._qaSelected].map(key => {
+  const now = Date.now();
+  [..._qaSelected].forEach(key => {
     const [ci, ji, qi] = key.split(':').map(Number);
-    return { ci, ji, qi };
-  }).sort((a, b) => b.qi - a.qi || b.ji - a.ji || b.ci - a.ci);
-
-  toDelete.forEach(({ ci, ji, qi }) => {
-    const ref = clients[ci]?.jobs?.[ji]?.quotes?.[qi]?.quoteRef || '';
-    clients[ci]?.jobs?.[ji]?.quotes?.splice(qi, 1);
-    // Close any open tab for this quote
+    const qq = clients[ci]?.jobs?.[ji]?.quotes?.[qi];
+    if (!qq) return;
+    const ref = qq.quoteRef || qq.fields?.quoteRef || '';
+    qq._binned = true; qq._binnedAt = now;
     const tab = _quotes.find(oq => (oq.fields?.quoteRef || '') === ref);
-    if (tab) _doCloseQuote(tab.id);
+    if (tab) {
+      _getRevisionFamily(tab).forEach(m => { m._binned = true; m._binnedAt = now; m._hiddenTab = true; });
+      if (window._flushQuoteNow) window._flushQuoteNow(tab).catch(() => {
+        if (window._saveQuoteToServer) window._saveQuoteToServer(tab);
+      });
+    }
   });
-
   saveClients(clients);
-  quotesAllExitSelect();
+  _persistSession(); renderQuoteTabs(); quotesAllExitSelect();
   if (typeof renderDashboard === 'function') renderDashboard();
   if (typeof renderClients   === 'function' && document.getElementById('clients-content'))  renderClients();
   if (typeof renderProjects  === 'function' && document.getElementById('projects-content')) renderProjects();
-  showToast(n + ' quote' + (n !== 1 ? 's' : '') + ' deleted');
+  showToast(n + ' quote' + (n !== 1 ? 's' : '') + ' moved to bin');
 }
 
 // ── Merge-as-revisions ────────────────────────────────────────────────────────
@@ -11024,6 +11080,17 @@ function renderQuotesAll() {
     }
   });
 
+  // Overlay _binned flag from in-memory _quotes (server state is authoritative)
+  rows.forEach(r => {
+    if (!r._sqId) {
+      const lq = (_quotes||[]).find(x => (x.fields?.quoteRef||'') === r.ref);
+      if (lq && lq._binned) r.qq._binned = true;
+    }
+  });
+  // Separate active rows from binned rows
+  const _binRows = rows.filter(r => r.qq?._binned);
+  rows = rows.filter(r => !r.qq?._binned);
+
   // Filter
   if (q) rows = rows.filter(r =>
     r.ref.toLowerCase().includes(q) ||
@@ -11064,8 +11131,9 @@ function renderQuotesAll() {
   const _famCount = new Set(rows.map(r => (r.clientIdx + ':' + r.jobIdx + ':' + (_revBaseName(r.ref) || r.ref)))).size;
   countEl.textContent = _famCount + ' quote' + (_famCount !== 1 ? 's' : '') + (rows.length > _famCount ? ' (' + rows.length + ' versions)' : '');
 
-  if (!rows.length) {
+  if (!rows.length && !_binRows.length) {
     el.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--muted)"><div style="font-size:32px;margin-bottom:12px">📋</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">No quotes yet</div><div style="font-size:13px">Quotes auto-save once you fill in the client name and start adding items.</div></div>';
+    window._quotesAllRows = [];
     return;
   }
 
@@ -11087,7 +11155,8 @@ function renderQuotesAll() {
   };
 
   const selectCol = _qaSelectMode ? '<th style="padding:10px 12px;width:36px"><input type="checkbox" id="qa-cb-all" onchange="qaToggleAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#007aff"></th>' : '';
-  el.innerHTML = '<table style="width:100%;border-collapse:collapse">' +
+  const _mainTableHtml = rows.length === 0 ? '' :
+    '<table style="width:100%;border-collapse:collapse">' +
     '<thead><tr style="border-bottom:2px solid var(--border);text-align:left">' +
     selectCol +
     '<th style="padding:10px 16px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Ref</th>' +
@@ -11100,11 +11169,7 @@ function renderQuotesAll() {
     '</tr></thead><tbody>' +
     rows.map((r, i) => {
       const baseRef = _revBaseName(r.ref) || r.ref;
-      // Determine if this row is a revision (has " Rev X" suffix)
       const isRevision = baseRef !== r.ref;
-      // Count siblings in same family from client book
-      const revSelHtml = '';
-
       const ss = STATUS_STYLES[r.status] || STATUS_STYLES.draft;
       const statusDot = '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:'+ss.color+'"><span style="width:7px;height:7px;border-radius:50%;background:'+ss.color+';display:inline-block"></span>'+ss.label+'</span>';
       const _createdTs = r.createdAt || r.saved;
@@ -11116,11 +11181,10 @@ function renderQuotesAll() {
         '<td style="padding:12px 16px;white-space:nowrap" onclick="event.stopPropagation()">' +
           '<button class="btn btn-secondary btn-sm" onclick="openQuoteFromAll(' + i + ')" style="margin-right:6px">Open</button>' +
           '<button class="btn btn-secondary btn-sm" onclick="openWizardDuplicate('+r.clientIdx+','+r.jobIdx+','+r.quoteIdx+')" style="margin-right:6px" title="Duplicate quote">⧉</button>' +
-          '<button class="btn btn-secondary btn-sm" onclick="deleteStoredQuote('+r.clientIdx+','+r.jobIdx+','+r.quoteIdx+',\''+esc(r.ref)+'\')" style="color:#ff3b30" title="Delete quote">✕</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="deleteStoredQuote('+r.clientIdx+','+r.jobIdx+','+r.quoteIdx+',\''+esc(r.ref)+'\')" style="color:#ff3b30" title="Move to bin">🗑</button>' +
         '</td>';
       const rowClick = _qaSelectMode ? 'onclick="qaToggleRow(\''+rowKey+'\')"' : 'onclick="openQuoteFromAll('+i+')"';
       const rowBg = isSelected ? 'background:var(--blue-bg)' : (isRevision ? 'background:var(--surface2)' : '');
-      // Show full ref for revisions, base ref for originals; add revision badge for revisions
       const revSuffix = isRevision ? r.ref.slice(baseRef.length).trim() : '';
       const refCell = isRevision
         ? '<span style="color:var(--muted);font-weight:400">↳ </span>' + esc(baseRef) + ' <span style="font-size:11px;font-weight:600;color:var(--accent);background:rgba(0,122,255,.12);padding:1px 6px;border-radius:4px">' + esc(revSuffix) + '</span>'
@@ -11137,6 +11201,82 @@ function renderQuotesAll() {
         '</tr>';
     }).join('') +
     '</tbody></table>';
+
+  // Build bin section from in-memory _quotes (grouped by base ref, deduped)
+  let _binSectionHtml = '';
+  if (_binRows.length) {
+    const _THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    const _nowMs = Date.now();
+    // Also auto-purge any in-memory binned quotes older than 30 days (silent, no confirm)
+    const _toAutoPurge = (_quotes||[]).filter(q => q._binned && q._binnedAt && (_nowMs - q._binnedAt) > _THIRTY_DAYS_MS);
+    if (_toAutoPurge.length) {
+      setTimeout(() => {
+        _toAutoPurge.forEach(q => {
+          if (!_quotes.find(x => x.id === q.id)) return;
+          const fam = _getRevisionFamily(q);
+          const refs2 = new Set(fam.map(m => m.fields?.quoteRef||'').filter(Boolean));
+          if (refs2.size) {
+            const cls = loadClients();
+            cls.forEach(c => (c.jobs||[]).forEach(j => { if(j.quotes) j.quotes = j.quotes.filter(qq => !refs2.has(qq.quoteRef||qq.fields?.quoteRef||'')); }));
+            saveClients(cls);
+          }
+          fam.forEach(m => { if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(m.id); });
+          _quotes = _quotes.filter(x => !fam.find(m => m.id === x.id));
+        });
+        _persistSession(); renderQuotesAll();
+      }, 0);
+    }
+    // Group visible binned rows by base ref (one row per quote family)
+    const _binFamilyMap = {};
+    _binRows.forEach(r => {
+      const base = _revBaseName(r.ref) || r.ref;
+      if (!_binFamilyMap[base]) _binFamilyMap[base] = { rows: [], earliest: r.qq._binnedAt || 0 };
+      _binFamilyMap[base].rows.push(r);
+      if ((r.qq._binnedAt||0) < _binFamilyMap[base].earliest || !_binFamilyMap[base].earliest) _binFamilyMap[base].earliest = r.qq._binnedAt||0;
+    });
+    // Also include any binned _quotes not represented in client book rows (e.g. server-only)
+    (_quotes||[]).filter(q => q._binned && !(_toAutoPurge.find(x=>x.id===q.id))).forEach(q => {
+      const ref = q.fields?.quoteRef || '—';
+      const base = _revBaseName(ref) || ref;
+      if (!_binFamilyMap[base]) {
+        _binFamilyMap[base] = { rows: [], earliest: q._binnedAt || 0, _memQ: q };
+      }
+    });
+    const _binFamilyKeys = Object.keys(_binFamilyMap);
+    const _binCount = _binFamilyKeys.length;
+    _binSectionHtml = '<div style="margin-top:32px;border-top:2px solid var(--border)">' +
+      '<div style="padding:12px 16px 10px;display:flex;align-items:center;gap:8px">' +
+        '<span style="font-size:13px;font-weight:700;color:var(--muted)">Bin</span>' +
+        '<span style="font-size:12px;font-weight:500;background:var(--surface2);color:var(--muted);border-radius:10px;padding:1px 8px">' + _binCount + '</span>' +
+        '<span style="font-size:11px;color:var(--muted);margin-left:auto">Permanently deleted after 30 days</span>' +
+      '</div>' +
+      '<table style="width:100%;border-collapse:collapse"><tbody>' +
+      _binFamilyKeys.map(base => {
+        const entry = _binFamilyMap[base];
+        const repRow = entry.rows[0];
+        const memQ = entry._memQ || (repRow?._sqId ? repRow.qq : (_quotes||[]).find(q => (q.fields?.quoteRef||'') === (repRow?.ref||'')));
+        const qid = memQ?.id || repRow?.qq?.id || '';
+        const clientName = repRow?.clientName || memQ?.fields?.clientName || '—';
+        const jobName = repRow?.jobName || memQ?.fields?.jobName || '—';
+        const binnedAt = entry.earliest ? new Date(entry.earliest).toLocaleDateString('en-AU', {day:'numeric',month:'short',year:'numeric'}) : '—';
+        const daysLeft = entry.earliest ? Math.max(0, Math.ceil(30 - (_nowMs - entry.earliest) / 86400000)) : '?';
+        const revCount = entry.rows.length - 1;
+        const refDisplay = esc(base) + (revCount > 0 ? ' <span style="font-size:11px;color:var(--muted)">+'+revCount+' rev</span>' : '');
+        return '<tr style="border-bottom:1px solid var(--border);opacity:.7">' +
+          '<td style="padding:10px 16px;font-size:13px;font-weight:700;font-family:monospace">' + refDisplay + '</td>' +
+          '<td style="padding:10px 16px;font-size:13px">' + esc(clientName) + '</td>' +
+          '<td style="padding:10px 16px;font-size:13px;color:var(--muted)">' + esc(jobName) + '</td>' +
+          '<td style="padding:10px 16px;font-size:12px;color:var(--muted)">Deleted ' + binnedAt + ' · <span style="color:' + (daysLeft <= 3 ? '#ff3b30' : 'var(--muted)') + '">' + daysLeft + 'd left</span></td>' +
+          '<td style="padding:10px 16px;white-space:nowrap;text-align:right" onclick="event.stopPropagation()">' +
+            (qid ? '<button class="btn btn-secondary btn-sm" onclick="restoreFromBin(\''+qid+'\')" style="margin-right:6px">Restore</button>' : '') +
+            (qid ? '<button class="btn btn-secondary btn-sm" onclick="permanentlyDeleteQuote(\''+qid+'\')" style="color:#ff3b30">Delete forever</button>' : '') +
+          '</td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+  }
+
+  el.innerHTML = _mainTableHtml + _binSectionHtml;
 
   // Store rows for open handler
   window._quotesAllRows = rows;
@@ -11342,7 +11482,7 @@ function projectCard(r) {
 
         const openFn = (clientIdx >= 0 && jobIdx >= 0) ? 'openProjQuote(\''+pjKey+'\','+clientIdx+','+jobIdx+','+qi+')' : '';
         const delBtn = (clientIdx >= 0 && jobIdx >= 0)
-          ? '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();deleteStoredQuote('+clientIdx+','+jobIdx+','+qi+',\''+esc(baseRef)+'\')" style="color:#ff3b30;flex-shrink:0" title="Delete quote">✕</button>'
+          ? '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();deleteStoredQuote('+clientIdx+','+jobIdx+','+qi+',\''+esc(baseRef)+'\')" style="color:#ff3b30;flex-shrink:0" title="Move to bin">🗑</button>'
           : '';
         const openBtn = (clientIdx >= 0 && jobIdx >= 0)
           ? '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();'+openFn+'" style="flex-shrink:0">Open</button>'
@@ -11518,7 +11658,7 @@ function openClientDetail(clientId) {
           + '</div>'
           + '<div style="display:flex;gap:6px;flex-shrink:0">'
             + '<button class="btn btn-secondary btn-sm" onclick="closeDetailPanel();loadAndSwitchQuote('+clientIdx+','+ji+','+qi+')">Open</button>'
-            + '<button class="btn btn-secondary btn-sm" onclick="deleteStoredQuote('+clientIdx+','+ji+','+qi+',\''+esc(qRef)+'\')" style="color:#ff3b30" title="Delete quote">✕</button>'
+            + '<button class="btn btn-secondary btn-sm" onclick="deleteStoredQuote('+clientIdx+','+ji+','+qi+',\''+esc(qRef)+'\')" style="color:#ff3b30" title="Move to bin">🗑</button>'
           + '</div>'
         + '</div>';
       }).join('');
@@ -11599,7 +11739,7 @@ function openProjectDetail(clientId, jobId) {
       + '</div>'
       + '<div style="display:flex;gap:6px;flex-shrink:0">'
         + '<button class="btn btn-secondary btn-sm" onclick="closeDetailPanel();loadAndSwitchQuote('+clientIdx+','+jobIdx+','+qi+')">Open</button>'
-        + '<button class="btn btn-secondary btn-sm" onclick="deleteStoredQuote('+clientIdx+','+jobIdx+','+qi+',\''+esc(qRef)+'\')" style="color:#ff3b30" title="Delete quote">✕</button>'
+        + '<button class="btn btn-secondary btn-sm" onclick="deleteStoredQuote('+clientIdx+','+jobIdx+','+qi+',\''+esc(qRef)+'\')" style="color:#ff3b30" title="Move to bin">🗑</button>'
       + '</div>'
     + '</div>';
   }).join('')
