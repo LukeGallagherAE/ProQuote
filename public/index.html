@@ -176,7 +176,7 @@ html.dark .tree-nav{background:var(--surface)}
 .tree-nav-par.active::before{color:var(--accent)}
 @media print{.tree-nav{display:none!important}}
 /* ── SUBITEM PANEL ── */
-#subitem-panel{position:fixed;left:64px;right:0;bottom:62px;height:0;background:var(--surface);border-top:none;z-index:150;display:flex;flex-direction:column;transition:height .2s ease;overflow:hidden}
+#subitem-panel{position:fixed;left:312px;right:0;bottom:62px;height:0;background:var(--surface);border-top:none;z-index:150;display:flex;flex-direction:column;transition:height .2s ease;overflow:hidden}
 #subitem-panel.open{height:280px;border-top:2px solid var(--accent)}
 .sip-header{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0}
 .sip-title{font-size:13px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -6074,22 +6074,13 @@ function closeSubitemPanel() {
   fullRender();
 }
 
-function _updatePanelBounds(panel) {
+function _updatePanelBounds(panel, overrideSbW) {
   if(!panel) return;
   const sb = document.getElementById('sidebar');
-  const saved = _loadSbLayout();
-  const preset = saved.preset || 'left';
-  const sbW = (!sb || sb.classList.contains('collapsed')) ? 0 : (parseInt(sb.style.width)||248);
-  if (preset === 'left') {
-    panel.style.left = (64 + sbW) + 'px';
-    panel.style.right = '0';
-  } else if (preset === 'right') {
-    panel.style.left = '64px';
-    panel.style.right = sbW + 'px';
-  } else {
-    panel.style.left = '64px';
-    panel.style.right = '0';
-  }
+  const collapsed = !sb || sb.classList.contains('collapsed');
+  const sbW = overrideSbW != null ? overrideSbW : (collapsed ? 0 : (sb.offsetWidth || 248));
+  panel.style.left = (64 + sbW) + 'px';
+  panel.style.right = '0';
 }
 
 function renderSubitemPanel() {
@@ -10306,6 +10297,7 @@ function initSidebarControls() {
       const main = document.querySelector('.main');
       if (main) { main.style.marginLeft = (64+newW)+'px'; main.style.marginRight = '0'; }
       _updateToggleBtn('left', sb.classList.contains('collapsed'), newW);
+      _updatePanelBounds(document.getElementById('subitem-panel'), newW);
     }
   });
   document.addEventListener('mouseup', () => {
