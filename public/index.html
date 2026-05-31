@@ -10859,22 +10859,23 @@ function openRolodex() {
 
 function deleteStoredQuote(clientIdx, jobIdx, quoteIdx, ref) {
   const label = ref ? '"' + ref + '"' : 'this quote';
+  const isRevision = ref && _revBaseName(ref) !== ref;
   if (!confirm('Move ' + label + ' to the bin?\n\nIt will be permanently deleted after 30 days.')) return;
   const clients = loadClients();
   const job = clients[clientIdx]?.jobs?.[jobIdx];
   if (!job?.quotes?.[quoteIdx]) return;
   const now = Date.now();
-  // Mark as binned in client book (keep the entry, just flag it)
+  // Mark as binned in client book
   job.quotes[quoteIdx]._binned = true;
   job.quotes[quoteIdx]._binnedAt = now;
   saveClients(clients);
-  // Mark all family members in memory as binned, hide tabs, save ALL to server
+  // If it's a revision, only bin that specific revision; if it's a base quote, bin the whole family
   const matchingTab = _quotes.find(oq => (oq.fields?.quoteRef || '') === ref);
   if (matchingTab) {
-    const family = _getRevisionFamily(matchingTab);
-    family.forEach(m => { m._binned = true; m._binnedAt = now; m._hiddenTab = true; });
+    const toDelete = isRevision ? [matchingTab] : _getRevisionFamily(matchingTab);
+    toDelete.forEach(m => { m._binned = true; m._binnedAt = now; m._hiddenTab = true; });
     if (window._flushQuoteNow) {
-      family.forEach(m => window._flushQuoteNow(m).catch(() => {
+      toDelete.forEach(m => window._flushQuoteNow(m).catch(() => {
         if (window._saveQuoteToServer) window._saveQuoteToServer(m);
       }));
     }
@@ -10958,9 +10959,10 @@ function batchDeleteQuotes() {
     if (!qq) return;
     const ref = qq.quoteRef || qq.fields?.quoteRef || '';
     qq._binned = true; qq._binnedAt = now;
+    const isRev = ref && _revBaseName(ref) !== ref;
     const tab = _quotes.find(oq => (oq.fields?.quoteRef || '') === ref);
     if (tab) {
-      const fam = _getRevisionFamily(tab);
+      const fam = isRev ? [tab] : _getRevisionFamily(tab);
       fam.forEach(m => { m._binned = true; m._binnedAt = now; m._hiddenTab = true; });
       if (window._flushQuoteNow) {
         fam.forEach(m => window._flushQuoteNow(m).catch(() => {
