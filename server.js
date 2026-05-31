@@ -149,9 +149,12 @@ async function seedUser() {
   }
 }
 
-// Run migration then start listening
-migrateAuth().then(() => seedUser()).then(() => {
-  app.listen(PORT, () => {
-    console.log(`ProQuote 2.1 running at http://localhost:${PORT}`);
-  });
+// Start listening immediately — don't block on DB migration
+app.listen(PORT, () => {
+  console.log(`ProQuote 2.1 running at http://localhost:${PORT}`);
+});
+
+// Run migration in the background after server is up
+migrateAuth().then(() => seedUser()).catch(err => {
+  console.error('[ProQuote] Startup migration failed:', err);
 });
