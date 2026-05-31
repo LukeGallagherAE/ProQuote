@@ -2536,7 +2536,8 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     } catch (e) { return false; }
   }
 
-  window._flushQuoteNow = function(quote) { return _putQuote(quote); };
+  window._flushQuoteNow    = function(quote) { return _putQuote(quote); };
+  window._flushStorageNow  = function() { return _flushStorage(); };
 
   window._saveQuoteToServer = function (quote) {
     if (!quote || !quote.id) return;
@@ -4536,33 +4537,22 @@ function openQuoteTabDropdown(e, qid) {
     const q = _quotes.find(oq => oq.id === qid);
     const ref = q?.fields?.quoteRef || '';
     const label = ref ? '"' + ref + '"' : 'this quote';
-    if (!confirm('Are you sure you want to delete ' + label + '?')) return;
-    if (!confirm('⚠️ This cannot be undone.\n\nThe quote will be permanently removed from your records.\n\nProceed?')) return;
-    // Remove from client book
-    const clients = loadClients();
-    let deleted = false;
-    outer: for (let ci = 0; ci < clients.length; ci++) {
-      const client = clients[ci];
-      for (let ji = 0; ji < (client.jobs||[]).length; ji++) {
-        const job = client.jobs[ji];
-        for (let qi = 0; qi < (job.quotes||[]).length; qi++) {
-          if ((job.quotes[qi].quoteRef || '') === ref) {
-            job.quotes.splice(qi, 1);
-            deleted = true;
-            break outer;
-          }
-        }
-      }
-    }
-    if (deleted) saveClients(clients);
-    // Close the tab
-    _doCloseQuote(qid);
-    // Re-render affected views
+    if (!confirm('Delete ' + label + '?\n\nThis will permanently remove the quote and cannot be undone.')) return;
+    // Delete the whole revision family from server + memory
+    const ids = (q ? _getRevisionFamily(q) : []).map(m => m.id);
+    if (!ids.length) ids.push(qid);
+    _hardDeleteQuotes(ids);
+    // Navigate away if the deleted quote was active
+    const visible = _quotes.filter(q => !q._hiddenTab && !q._binned);
+    if (!visible.length) switchTab('dashboard');
+    else if (ids.includes(_activeQuoteId)) loadQuoteState(visible[0].id);
+    renderQuoteTabs();
     if (typeof renderQuotesAll === 'function' && document.getElementById('quotes-all-content'))  renderQuotesAll();
     if (typeof renderProjects  === 'function' && document.getElementById('projects-content'))    renderProjects();
     if (typeof renderClients   === 'function' && document.getElementById('clients-content'))     renderClients();
     if (typeof renderDashboard === 'function' && document.getElementById('db-content'))          renderDashboard();
     closeDetailPanel?.();
+    showToast('Quote deleted', 2000);
   });
 
   [revItem, dupItem, closeItem, deleteItem].forEach(item => drop.appendChild(item));
@@ -4609,6 +4599,30 @@ function closeQuoteTab(qid) {
   }
 
   document.getElementById('closeQuoteModal').style.display = 'flex';
+}
+
+// Hard-delete one or more quotes by ID: removes from memory, client book, and server.
+// Pass individual revision IDs — the caller decides the scope (single rev vs whole family).
+function _hardDeleteQuotes(ids) {
+  const idSet = new Set(ids);
+  // Capture refs before removal
+  const refs = new Set(ids.map(id => _quotes.find(x => x.id === id)?.fields?.quoteRef || '').filter(Boolean));
+  // Remove from in-memory array
+  _quotes = _quotes.filter(q => !idSet.has(q.id));
+  // Remove from client book
+  if (refs.size) {
+    const clients = loadClients();
+    let changed = false;
+    clients.forEach(c => (c.jobs||[]).forEach(j => {
+      const before = (j.quotes||[]).length;
+      j.quotes = (j.quotes||[]).filter(qq => !refs.has(qq.quoteRef || qq.fields?.quoteRef || ''));
+      if (j.quotes.length !== before) changed = true;
+    }));
+    if (changed) saveClients(clients);
+  }
+  // Delete from server (pending_deletes gives retry on failure)
+  ids.forEach(id => window._deleteQuoteFromServer?.(id));
+  _persistSession();
 }
 
 function _doCloseQuote(qid) {
@@ -4699,33 +4713,12 @@ function _binRestore(qid, ref, ci, ji, qi) {
 
 function _binDelete(qid, ref, ci, ji, qi) {
   if (!confirm('Permanently delete this quote? This cannot be undone.')) return;
-  // Remove from client book by exact index
-  const clients = loadClients();
-  if (ci >= 0 && ji >= 0 && qi >= 0 && clients[ci]?.jobs?.[ji]?.quotes?.[qi] != null) {
-    clients[ci].jobs[ji].quotes.splice(qi, 1);
-    saveClients(clients);
-  } else if (ref) {
-    // Fall back to ref-based removal
-    clients.forEach(c => (c.jobs||[]).forEach(j => {
-      if (j.quotes) j.quotes = j.quotes.filter(qq => (qq.quoteRef||qq.fields?.quoteRef||'') !== ref);
-    }));
-    saveClients(clients);
-  }
-  // Remove from _quotes + server
-  const q = qid ? _quotes.find(q => q.id === qid) : _quotes.find(q => (q.fields?.quoteRef||'') === ref);
-  if (q) {
-    const family = _getRevisionFamily(q);
-    const refs = new Set(family.map(m => m.fields?.quoteRef||'').filter(Boolean));
-    // Also sweep client book by ref to catch any mismatched indices
-    if (refs.size) {
-      const cls2 = loadClients();
-      cls2.forEach(c => (c.jobs||[]).forEach(j => { if(j.quotes) j.quotes = j.quotes.filter(qq => !refs.has(qq.quoteRef||qq.fields?.quoteRef||'')); }));
-      saveClients(cls2);
-    }
-    family.forEach(m => { if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(m.id); });
-    _quotes = _quotes.filter(q => !family.find(m => m.id === q.id));
-  }
-  _persistSession(); renderQuotesAll();
+  // Find all IDs to delete (whole family)
+  const q = qid ? _quotes.find(x => x.id === qid) : _quotes.find(x => (x.fields?.quoteRef||'') === ref);
+  const ids = q ? _getRevisionFamily(q).map(m => m.id) : (qid ? [qid] : []);
+  _hardDeleteQuotes(ids);
+  if (window._flushStorageNow) window._flushStorageNow();
+  renderQuotesAll();
   showToast('Quote permanently deleted', 2000);
 }
 
@@ -9291,6 +9284,12 @@ function goBack() {
 }
 
 function switchTab(tab) {
+  // Flush active quote to server immediately when navigating away from quote view
+  if (_activeTab === 'quote' && tab !== 'quote' && _activeQuoteId) {
+    saveActiveQuoteState();
+    const _aqFlush = _quotes.find(q => q.id === _activeQuoteId);
+    if (_aqFlush && window._flushQuoteNow) window._flushQuoteNow(_aqFlush).catch(() => {});
+  }
   // Track previous tab for back-button (only list/global pages count as "back" destinations)
   const listTabs = ['dashboard','quotes-all','clients','projects'];
   const isQuoteTool = tab === 'quote' || tab === 'bom' || tab === 'tracker' || tab === 'fittings' || tab === 'revisions';
@@ -10882,6 +10881,8 @@ function deleteStoredQuote(clientIdx, jobIdx, quoteIdx, ref) {
     }
   }
   _persistSession();
+  // Flush settings immediately so bin state survives an instant refresh
+  if (window._flushStorageNow) window._flushStorageNow();
   renderQuoteTabs();
   // Switch away if needed
   const visible = (_quotes || []).filter(q => !q._hiddenTab && !q._binned);
@@ -10891,7 +10892,7 @@ function deleteStoredQuote(clientIdx, jobIdx, quoteIdx, ref) {
   if (typeof renderClients    === 'function' && document.getElementById('clients-content'))     renderClients();
   if (typeof renderDashboard  === 'function' && document.getElementById('db-content'))          renderDashboard();
   closeDetailPanel?.();
-  showToast('Quote moved to bin · Restored within 30 days', 3000);
+  showToast('Quote moved to bin · Restore within 30 days', 3000);
 }
 
 // ── Batch select state ───────────────────────────────────────────────────────
@@ -10973,7 +10974,9 @@ function batchDeleteQuotes() {
     }
   });
   saveClients(clients);
-  _persistSession(); renderQuoteTabs(); quotesAllExitSelect();
+  _persistSession();
+  if (window._flushStorageNow) window._flushStorageNow();
+  renderQuoteTabs(); quotesAllExitSelect();
   if (typeof renderDashboard === 'function') renderDashboard();
   if (typeof renderClients   === 'function' && document.getElementById('clients-content'))  renderClients();
   if (typeof renderProjects  === 'function' && document.getElementById('projects-content')) renderProjects();
@@ -11182,10 +11185,13 @@ function renderQuotesAll() {
   // This covers revisions that were never saved to the client book
   (_quotes || []).forEach(sq => {
     const _ref = sq.fields?.quoteRef || '';
-    if (!_ref || _seenRefsAll.has(_ref)) return;
+    // Include empty-ref quotes using a unique placeholder; skip exact-match duplicates
+    const _key = _ref || ('__id__' + sq.id);
+    if (_seenRefsAll.has(_ref || _key)) return;
+    if (_ref) _seenRefsAll.add(_ref);
     const total = _calcQuoteTotal(sq);
     rows.push({
-      ref: _ref,
+      ref: _ref || '(no ref)',
       clientName: sq.fields?.clientName || '—',
       clientId: null,
       jobName: sq.fields?.jobName || '—',
@@ -13447,13 +13453,13 @@ function init(){
       }
     } catch(e) {}
   }
-  // Restore the last-active quote as the visible open tab (no placeholder creation)
+  // Restore the last-active quote as the visible open tab (skip binned quotes)
   if (_quotes.length) {
     const _savedActiveId = localStorage.getItem('proquote_active_id');
-    const _targetQ = (_savedActiveId && _quotes.find(q => q.id === _savedActiveId))
-                  || _quotes[_quotes.length - 1];
+    const _targetQ = (_savedActiveId && _quotes.find(q => q.id === _savedActiveId && !q._binned))
+                  || _quotes.filter(q => !q._binned).pop();
     if (_targetQ) {
-      _getRevisionFamily(_targetQ).forEach(m => { m._hiddenTab = false; });
+      _getRevisionFamily(_targetQ).forEach(m => { if (!m._binned) m._hiddenTab = false; });
       _activeQuoteId = _targetQ.id;
       _restoreFields(_targetQ.fields || {});
       S.sections = JSON.parse(JSON.stringify(_targetQ.sections || []));
@@ -14348,13 +14354,13 @@ window._initStorage().then(() => {
       }
     }
     const savedActiveId = localStorage.getItem('proquote_active_id');
-    const targetQ = (savedActiveId && _quotes.find(q => q.id === savedActiveId))
-                 || _quotes[_quotes.length - 1];
+    const targetQ = (savedActiveId && _quotes.find(q => q.id === savedActiveId && !q._binned))
+                 || _quotes.filter(q => !q._binned).pop();
     if (targetQ && targetQ.id !== _activeQuoteId) {
-      _getRevisionFamily(targetQ).forEach(m => { m._hiddenTab = false; });
+      _getRevisionFamily(targetQ).forEach(m => { if (!m._binned) m._hiddenTab = false; });
       loadQuoteState(targetQ.id);
     } else if (targetQ) {
-      _getRevisionFamily(targetQ).forEach(m => { m._hiddenTab = false; });
+      _getRevisionFamily(targetQ).forEach(m => { if (!m._binned) m._hiddenTab = false; });
     }
     try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e) {}
     loadProfile();
