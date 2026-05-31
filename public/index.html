@@ -13845,15 +13845,52 @@ async function submitPassword() {
     }
     // Store token in native localStorage
     if (window._nativeSetToken) window._nativeSetToken(data.token);
-    // Reload storage with new token then refresh all data-driven UI
-    await window._initStorage();
-    // Re-run data loaders that ran at init() time (before we had a token)
+    // Show the app immediately — don't block on data fetch
     try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e){}
     loadProfile();
     loadCompanyLogo();
     initStagedMarkupUI();
     document.getElementById('landing').style.display = 'none';
     setTimeout(() => switchTab('dashboard'), 50);
+    // Load quotes + settings from server in the background, then refresh UI
+    window._initStorage().then(() => {
+      try {
+        const raw = localStorage.getItem('proquote_session_quotes');
+        if (!raw) return;
+        const restored = JSON.parse(raw);
+        if (!Array.isArray(restored) || !restored.length) return;
+        const existingIds = new Set(_quotes.map(q => q.id));
+        for (const q of restored) {
+          if (!existingIds.has(q.id)) {
+            for (const s of (q.sections||[])) {
+              if (s.id >= _id) _id = s.id + 1;
+              for (const p of (s.parents||[])) {
+                if (p.id >= _id) _id = p.id + 1;
+                for (const sub of (p.subitems||[])) { if (sub.id >= _id) _id = sub.id + 1; }
+              }
+            }
+            _quotes.push({ ...q, _hiddenTab: true });
+          }
+        }
+        const savedActiveId = localStorage.getItem('proquote_active_id');
+        const targetQ = (savedActiveId && _quotes.find(q => q.id === savedActiveId))
+                     || _quotes[_quotes.length - 1];
+        if (targetQ && targetQ.id !== _activeQuoteId) {
+          _getRevisionFamily(targetQ).forEach(m => { m._hiddenTab = false; });
+          loadQuoteState(targetQ.id);
+        } else if (targetQ) {
+          _getRevisionFamily(targetQ).forEach(m => { m._hiddenTab = false; });
+        }
+        try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e) {}
+        loadProfile();
+        loadCompanyLogo();
+        renderQuoteTabs();
+        if (_activeTab === 'dashboard')  renderDashboard();
+        if (_activeTab === 'quotes-all') renderQuotesAll();
+        if (_activeTab === 'clients')    renderClients();
+        if (_activeTab === 'projects')   renderProjects();
+      } catch(e) { console.warn('[ProQuote] Post-login refresh failed:', e); }
+    }).catch(() => {});
   } catch(e) {
     if (errEl) errEl.textContent = 'Connection error — try again';
     if (btn) { btn.disabled = false; btn.textContent = 'Sign In →'; }
