@@ -1934,6 +1934,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         <button id="qa-merge-btn" onclick="openMergeWizard()" style="display:none;padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">⇄ Merge as revisions</button>
         <button id="qa-delete-selected" onclick="batchDeleteQuotes()" style="display:none;padding:7px 14px;background:#ff3b30;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Move to bin (0)</button>
         <button id="qa-select-btn" onclick="quotesAllEnterSelect()" style="padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Select</button>
+        <button onclick="document.getElementById('qa-bin-section').scrollIntoView({behavior:'smooth'});renderQuotesAll()" style="padding:7px 14px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" title="Go to bin">🗑 Bin <span id="qa-bin-count"></span></button>
         <button onclick="openWizard()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           New Quote
@@ -11335,85 +11336,88 @@ function renderQuotesAll() {
     }).join('') +
     '</tbody></table>';
 
-  // Build bin section — from client-book _binRows AND any binned _quotes not in client book
-  let _binSectionHtml = '';
+  // Build bin section — always rendered so the Bin button always has a target
   const _THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
   const _nowMs = Date.now();
   const _anyBinnedInMemory = (_quotes||[]).some(q => q._binned);
-  if (_binRows.length || _anyBinnedInMemory) {
-    // Auto-purge any in-memory binned quotes older than 30 days
-    const _toAutoPurge = (_quotes||[]).filter(q => q._binned && q._binnedAt && (_nowMs - q._binnedAt) > _THIRTY_DAYS_MS);
-    if (_toAutoPurge.length) {
-      setTimeout(() => {
-        _toAutoPurge.forEach(q => {
-          if (!_quotes.find(x => x.id === q.id)) return;
-          const fam = _getRevisionFamily(q);
-          const refs2 = new Set(fam.map(m => m.fields?.quoteRef||'').filter(Boolean));
-          if (refs2.size) {
-            const cls = loadClients();
-            cls.forEach(c => (c.jobs||[]).forEach(j => { if(j.quotes) j.quotes = j.quotes.filter(qq => !refs2.has(qq.quoteRef||qq.fields?.quoteRef||'')); }));
-            saveClients(cls);
-          }
-          fam.forEach(m => { if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(m.id); });
-          _quotes = _quotes.filter(x => !fam.find(m => m.id === x.id));
-        });
-        _persistSession(); renderQuotesAll();
-      }, 0);
-    }
-    // Group by base ref (one row per quote family)
-    const _binFamilyMap = {};
-    _binRows.forEach(r => {
-      const base = _revBaseName(r.ref) || r.ref;
-      if (!_binFamilyMap[base]) _binFamilyMap[base] = { rows: [], earliest: r.qq._binnedAt || 0 };
-      _binFamilyMap[base].rows.push(r);
-      if ((r.qq._binnedAt||0) < _binFamilyMap[base].earliest || !_binFamilyMap[base].earliest) _binFamilyMap[base].earliest = r.qq._binnedAt||0;
-    });
-    // Include binned _quotes not in client book rows
-    (_quotes||[]).filter(q => q._binned && !(_toAutoPurge.find(x=>x.id===q.id))).forEach(q => {
-      const ref = q.fields?.quoteRef || '—';
-      const base = _revBaseName(ref) || ref;
-      if (!_binFamilyMap[base]) {
-        _binFamilyMap[base] = { rows: [], earliest: q._binnedAt || 0, _memQ: q };
-      }
-    });
-    const _binFamilyKeys = Object.keys(_binFamilyMap);
-    const _binCount = _binFamilyKeys.length;
-    _binSectionHtml = '<div style="margin-top:32px;border-top:2px solid var(--border)">' +
-      '<div style="padding:12px 16px 10px;display:flex;align-items:center;gap:8px">' +
-        '<span style="font-size:13px;font-weight:700;color:var(--muted)">Bin</span>' +
-        '<span style="font-size:12px;font-weight:500;background:var(--surface2);color:var(--muted);border-radius:10px;padding:1px 8px">' + _binCount + '</span>' +
-        '<span style="font-size:11px;color:var(--muted);margin-left:auto">Permanently deleted after 30 days</span>' +
-      '</div>' +
-      '<table style="width:100%;border-collapse:collapse"><tbody>' +
-      _binFamilyKeys.map(base => {
-        const entry = _binFamilyMap[base];
-        const repRow = entry.rows[0];
-        const memQ = entry._memQ || (repRow?._sqId ? repRow.qq : (_quotes||[]).find(q => (q.fields?.quoteRef||'') === (repRow?.ref||'')));
-        const qid = memQ?.id || '';
-        const ci = repRow?.clientIdx ?? -1;
-        const ji = repRow?.jobIdx ?? -1;
-        const qi = repRow?.quoteIdx ?? -1;
-        const ref = repRow?.ref || base;
-        const clientName = repRow?.clientName || memQ?.fields?.clientName || '—';
-        const jobName = repRow?.jobName || memQ?.fields?.jobName || '—';
-        const binnedAt = entry.earliest ? new Date(entry.earliest).toLocaleDateString('en-AU', {day:'numeric',month:'short',year:'numeric'}) : '—';
-        const daysLeft = entry.earliest ? Math.max(0, Math.ceil(30 - (_nowMs - entry.earliest) / 86400000)) : '?';
-        const revCount = entry.rows.length - 1;
-        const refDisplay = esc(base) + (revCount > 0 ? ' <span style="font-size:11px;color:var(--muted)">+'+revCount+' rev</span>' : '');
-        const safeRef = ref.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-        return '<tr style="border-bottom:1px solid var(--border);opacity:.7">' +
-          '<td style="padding:10px 16px;font-size:13px;font-weight:700;font-family:monospace">' + refDisplay + '</td>' +
-          '<td style="padding:10px 16px;font-size:13px">' + esc(clientName) + '</td>' +
-          '<td style="padding:10px 16px;font-size:13px;color:var(--muted)">' + esc(jobName) + '</td>' +
-          '<td style="padding:10px 16px;font-size:12px;color:var(--muted)">Deleted ' + binnedAt + ' · <span style="color:' + (daysLeft <= 3 ? '#ff3b30' : 'var(--muted)') + '">' + daysLeft + 'd left</span></td>' +
-          '<td style="padding:10px 16px;white-space:nowrap;text-align:right" onclick="event.stopPropagation()">' +
-            '<button class="btn btn-secondary btn-sm" onclick="_binRestore(\''+qid+'\',\''+safeRef+'\','+ci+','+ji+','+qi+')" style="margin-right:6px">Restore</button>' +
-            '<button class="btn btn-secondary btn-sm" onclick="_binDelete(\''+qid+'\',\''+safeRef+'\','+ci+','+ji+','+qi+')" style="color:#ff3b30">Delete forever</button>' +
-          '</td>' +
-        '</tr>';
-      }).join('') +
-      '</tbody></table></div>';
+  // Auto-purge any in-memory binned quotes older than 30 days
+  const _toAutoPurge = (_anyBinnedInMemory || _binRows.length)
+    ? (_quotes||[]).filter(q => q._binned && q._binnedAt && (_nowMs - q._binnedAt) > _THIRTY_DAYS_MS)
+    : [];
+  if (_toAutoPurge.length) {
+    setTimeout(() => {
+      _toAutoPurge.forEach(q => {
+        if (!_quotes.find(x => x.id === q.id)) return;
+        const fam = _getRevisionFamily(q);
+        const refs2 = new Set(fam.map(m => m.fields?.quoteRef||'').filter(Boolean));
+        if (refs2.size) {
+          const cls = loadClients();
+          cls.forEach(c => (c.jobs||[]).forEach(j => { if(j.quotes) j.quotes = j.quotes.filter(qq => !refs2.has(qq.quoteRef||qq.fields?.quoteRef||'')); }));
+          saveClients(cls);
+        }
+        fam.forEach(m => { if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(m.id); });
+        _quotes = _quotes.filter(x => !fam.find(m => m.id === x.id));
+      });
+      _persistSession(); renderQuotesAll();
+    }, 0);
   }
+  // Group by base ref (one row per quote family)
+  const _binFamilyMap = {};
+  _binRows.forEach(r => {
+    const base = _revBaseName(r.ref) || r.ref;
+    if (!_binFamilyMap[base]) _binFamilyMap[base] = { rows: [], earliest: r.qq._binnedAt || 0 };
+    _binFamilyMap[base].rows.push(r);
+    if ((r.qq._binnedAt||0) < _binFamilyMap[base].earliest || !_binFamilyMap[base].earliest) _binFamilyMap[base].earliest = r.qq._binnedAt||0;
+  });
+  // Include binned _quotes not in client book rows
+  (_quotes||[]).filter(q => q._binned && !(_toAutoPurge.find(x=>x.id===q.id))).forEach(q => {
+    const ref = q.fields?.quoteRef || '—';
+    const base = _revBaseName(ref) || ref;
+    if (!_binFamilyMap[base]) _binFamilyMap[base] = { rows: [], earliest: q._binnedAt || 0, _memQ: q };
+  });
+  const _binFamilyKeys = Object.keys(_binFamilyMap);
+  const _binCount = _binFamilyKeys.length;
+  // Update the Bin button badge in the header
+  const _binBadge = document.getElementById('qa-bin-count');
+  if (_binBadge) _binBadge.textContent = _binCount > 0 ? '(' + _binCount + ')' : '';
+  const _binSectionHtml = '<div id="qa-bin-section" style="margin-top:32px;border-top:2px solid var(--border)">' +
+    '<div style="padding:12px 16px 10px;display:flex;align-items:center;gap:8px">' +
+      '<span style="font-size:13px;font-weight:700;color:var(--muted)">Bin</span>' +
+      (_binCount > 0 ? '<span style="font-size:12px;font-weight:500;background:var(--surface2);color:var(--muted);border-radius:10px;padding:1px 8px">' + _binCount + '</span>' : '') +
+      '<span style="font-size:11px;color:var(--muted);margin-left:auto">Permanently deleted after 30 days</span>' +
+    '</div>' +
+    (_binCount === 0
+      ? '<div style="padding:20px 16px;font-size:13px;color:var(--muted)">Your bin is empty.</div>'
+      : '<table style="width:100%;border-collapse:collapse"><tbody>' +
+        _binFamilyKeys.map(base => {
+          const entry = _binFamilyMap[base];
+          const repRow = entry.rows[0];
+          const memQ = entry._memQ || (repRow?._sqId ? repRow.qq : (_quotes||[]).find(q => (q.fields?.quoteRef||'') === (repRow?.ref||'')));
+          const qid = memQ?.id || '';
+          const ci = repRow?.clientIdx ?? -1;
+          const ji = repRow?.jobIdx ?? -1;
+          const qi = repRow?.quoteIdx ?? -1;
+          const ref = repRow?.ref || base;
+          const clientName = repRow?.clientName || memQ?.fields?.clientName || '—';
+          const jobName = repRow?.jobName || memQ?.fields?.jobName || '—';
+          const binnedAt = entry.earliest ? new Date(entry.earliest).toLocaleDateString('en-AU', {day:'numeric',month:'short',year:'numeric'}) : '—';
+          const daysLeft = entry.earliest ? Math.max(0, Math.ceil(30 - (_nowMs - entry.earliest) / 86400000)) : '?';
+          const revCount = entry.rows.length - 1;
+          const refDisplay = esc(base) + (revCount > 0 ? ' <span style="font-size:11px;color:var(--muted)">+'+revCount+' rev</span>' : '');
+          const safeRef = ref.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+          return '<tr style="border-bottom:1px solid var(--border);opacity:.7">' +
+            '<td style="padding:10px 16px;font-size:13px;font-weight:700;font-family:monospace">' + refDisplay + '</td>' +
+            '<td style="padding:10px 16px;font-size:13px">' + esc(clientName) + '</td>' +
+            '<td style="padding:10px 16px;font-size:13px;color:var(--muted)">' + esc(jobName) + '</td>' +
+            '<td style="padding:10px 16px;font-size:12px;color:var(--muted)">Deleted ' + binnedAt + ' · <span style="color:' + (daysLeft <= 3 ? '#ff3b30' : 'var(--muted)') + '">' + daysLeft + 'd left</span></td>' +
+            '<td style="padding:10px 16px;white-space:nowrap;text-align:right" onclick="event.stopPropagation()">' +
+              '<button class="btn btn-secondary btn-sm" onclick="_binRestore(\''+qid+'\',\''+safeRef+'\','+ci+','+ji+','+qi+')" style="margin-right:6px">Restore</button>' +
+              '<button class="btn btn-secondary btn-sm" onclick="_binDelete(\''+qid+'\',\''+safeRef+'\','+ci+','+ji+','+qi+')" style="color:#ff3b30">Delete forever</button>' +
+            '</td>' +
+          '</tr>';
+        }).join('') +
+        '</tbody></table>') +
+    '</div>';
 
   el.innerHTML = _mainTableHtml + _binSectionHtml;
 
