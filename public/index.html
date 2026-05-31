@@ -247,7 +247,8 @@ html.dark ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.38)}
 .sec-group{margin-bottom:28px;overflow:visible}
 .sec-flat-hdr{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--surface);border:1px solid var(--border);border-top:3px solid transparent;border-radius:10px;margin-bottom:6px;position:sticky;top:0;z-index:15;box-shadow:0 4px 16px rgba(0,0,0,.08)}
 .sec-body{border-radius:10px;border:1px solid var(--border);overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.05)}
-.sec-cat-hdr{padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:9px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sec-cat-hdr{padding:5px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:9px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+.sec-cat-tile{border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:8px}
 .sec-cat-hdr:not(:first-child){border-top:1px solid var(--border)}
 .sfh-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .sfh-name{font-size:13px;font-weight:700;background:transparent;border:1px solid transparent;border-radius:4px;padding:2px 6px;flex:1;color:var(--text);font-family:inherit}
@@ -542,9 +543,9 @@ html.dark .sidebar.sb-floating{box-shadow:0 12px 48px rgba(0,0,0,.5)!important;}
 .sidebar.sb-horiz #sb-sidebar-content > div{margin:0;}
 .sidebar.sb-horiz .sh{margin-bottom:6px!important;}
 .sidebar-toggle{
-  position:fixed;right:248px;top:50%;transform:translateY(-50%);
+  position:fixed;left:312px;right:auto;top:50%;transform:translateY(-50%);
   z-index:250;background:var(--surface);border:1px solid var(--border);
-  border-right:none;border-radius:6px 0 0 6px;
+  border-left:none;border-radius:0 6px 6px 0;
   padding:10px 5px;cursor:pointer;color:var(--muted);
   font-size:11px;line-height:1;
   transition:right .2s ease,left .2s ease,top .2s ease,bottom .2s ease,background .12s;
@@ -1635,7 +1636,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   <div class="nav-version" id="nav-build-stamp">ProQuote</div>
 </nav>
 <div id="rail-flyout" style="display:none"></div>
-<button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" style="left:312px" title="Collapse sidebar">◀</button>
+<button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" style="left:312px;right:auto" title="Collapse sidebar">◀</button>
 <div id="tn-expand-tab" onclick="toggleTreeNavSidebar()" title="Show sections panel">▶</div>
 <!-- ── ACTIVE QUOTE TAB ── -->
 <div id="page-quote" class="tab-page active" style="margin-left:0;height:auto;overflow:visible"><div class="layout">
@@ -6111,7 +6112,10 @@ function renderSubitemPanel() {
   const ac = par.activeCats || {supply:true,wire:true,install:true};
   panel.innerHTML =
     '<div class="sip-header">'
-      + '<div class="sip-title">' + esc(par.name || 'Untitled') + '<span style="font-weight:400;color:var(--muted);margin-left:8px;font-size:11px">' + esc(sec.name || '') + '</span></div>'
+      + '<div style="display:flex;flex-direction:column;min-width:0;flex:1;gap:2px">'
+        + '<div class="sip-title">' + esc(par.name || 'Untitled') + '<span style="font-weight:400;color:var(--muted);margin-left:8px;font-size:11px">' + esc(sec.name || '') + '</span></div>'
+        + '<textarea class="parent-desc" id="sipd-'+par.id+'" rows="1" placeholder="Add description…" oninput="onParentDescInput('+_subPanelSid+','+par.id+',this);var el=document.getElementById(\'pd-\'+'+par.id+');if(el)el.value=this.value;" style="font-size:11px;min-height:0;margin:0">'+esc(par.description||'')+'</textarea>'
+      + '</div>'
       + '<div class="swi-pills" style="flex-shrink:0">'
         + '<button class="swi-pill'+(ac.supply?'':' off')+'" onclick="toggleActiveCat('+_subPanelSid+','+_subPanelPid+',\'supply\')" title="Toggle Supply cost">S</button>'
         + '<button class="swi-pill'+(ac.wire?'':' off')+'" onclick="toggleActiveCat('+_subPanelSid+','+_subPanelPid+',\'wire\')" title="Toggle Wire cost">W</button>'
@@ -6156,14 +6160,20 @@ function renderSection(sec,si){
     if(!catGroups.length || catGroups[catGroups.length-1].cat !== cat) catGroups.push({cat, items:[]});
     catGroups[catGroups.length-1].items.push(par);
   });
-  const catColors = {supply:'#007aff',wire:'#34c759',install:'#ff9500'};
   const bodyHtml = catGroups.map(g => {
+    const catColor = g.cat ? getCatColor(g.cat) : null;
     const catLabel = g.cat ? g.cat.charAt(0).toUpperCase()+g.cat.slice(1) : '';
-    const catDot = g.cat && catColors[g.cat] ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+catColors[g.cat]+'"></span>' : '';
+    const catDot = catColor ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+catColor+';flex-shrink:0"></span>' : '';
     const catHdrHtml = catLabel
-      ? '<div class="sec-cat-hdr">'+catDot+'<span>'+esc(catLabel)+'</span></div>'
+      ? '<div class="sec-cat-hdr" style="color:'+catColor+';background:'+catColor+'0d">'
+          +catDot+'<span>'+esc(catLabel)+'</span>'
+        +'</div>'
       : '';
-    return catHdrHtml + g.items.map((par,pi)=>renderParent(sec.id,par,pi,sortedParents.length)).join('');
+    const borderStyle = catColor ? 'border-color:'+catColor+'44;border-left:3px solid '+catColor+';border-radius:3px 6px 6px 3px' : '';
+    return '<div class="sec-cat-tile" style="'+borderStyle+'">'
+      + catHdrHtml
+      + g.items.map((par,pi)=>renderParent(sec.id,par,pi,sortedParents.length)).join('')
+      +'</div>';
   }).join('');
 
   return '<div class="sec-group" id="sec-'+sec.id+'">'
