@@ -1654,11 +1654,6 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     </div>
     <div id="sb-tab-jobdetails" class="sb-tab-content sb-hidden">
       <div id="sb-sidebar-content">
-      <!-- Revision notes banner — shown only when viewing a revision -->
-      <div id="rev-notes-banner" class="rev-notes-banner" style="display:none">
-        <div class="rev-notes-label" id="rev-banner-label">↪ Rev B — Changes from Rev A</div>
-        <div id="rev-diff-list"></div>
-      </div>
       <div>
         <div class="sh" style="margin-bottom:10px">Job details</div>
         <div style="display:flex;flex-direction:column;gap:8px">
@@ -1749,6 +1744,11 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       </div>
     </div>
     <div id="sb-tab-changelog" class="sb-tab-content sb-hidden">
+      <!-- Revision diff banner — shown only when viewing a revision -->
+      <div id="rev-notes-banner" class="rev-notes-banner" style="display:none;margin:8px 10px 4px">
+        <div class="rev-notes-label" id="rev-banner-label">↪ Rev B — Changes from Rev A</div>
+        <div id="rev-diff-list"></div>
+      </div>
       <div id="sb-changelog-list" style="flex:1;overflow-y:auto;padding:4px 0"></div>
       <div style="padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:6px">
         <input id="sb-changelog-input" placeholder="Add a note…" style="flex:1;font-size:11px" onkeydown="if(event.key==='Enter')addChangelogEntry()">
@@ -6033,7 +6033,7 @@ function switchSbTab(tab) {
     if(content) content.classList.toggle('sb-hidden', t!==tab);
   });
   if(tab==='sections') renderTreeNav();
-  if(tab==='changelog') renderChangelogTab();
+  if(tab==='changelog') { renderChangelogTab(); updateRevisionBanner(); }
   if(tab==='schedule') switchTab('fittings');
 }
 
@@ -10293,28 +10293,27 @@ function initSidebarControls() {
     e.preventDefault(); _wr=true; _wx=e.clientX; _ww=sb.offsetWidth;
     resizeW.classList.add('sb-resizing');
     sb.style.transition='none';
+    const _mainEl = document.querySelector('.main');
+    if (_mainEl) _mainEl.style.transition = 'none';
     document.body.style.cursor='ew-resize';
     document.body.style.userSelect='none';
   });
   document.addEventListener('mousemove', e => {
     if(!_wr) return;
-    const _rs = _loadSbLayout();
-    const _rp = _rs.preset || 'left';
-    const newW = Math.max(180, Math.min(540, _rp === 'left' ? _ww + (e.clientX - _wx) : _ww + (_wx - e.clientX)));
+    const newW = Math.max(180, Math.min(540, _ww + (e.clientX - _wx)));
     sb.style.width = newW + 'px';
     if (!sb.classList.contains('sb-floating')) {
       const main = document.querySelector('.main');
-      if (_rp === 'left') {
-        if (main) { main.style.marginLeft = (64+newW)+'px'; main.style.marginRight = '0'; }
-      }
-      // Update toggle button position live during resize
-      _updateToggleBtn(_rp, sb.classList.contains('collapsed'));
+      if (main) { main.style.marginLeft = (64+newW)+'px'; main.style.marginRight = '0'; }
+      _updateToggleBtn('left', sb.classList.contains('collapsed'));
     }
   });
   document.addEventListener('mouseup', () => {
     if(!_wr) return; _wr=false;
     resizeW.classList.remove('sb-resizing');
     sb.style.transition='';
+    const _mainEl = document.querySelector('.main');
+    if (_mainEl) _mainEl.style.transition = '';
     document.body.style.cursor=''; document.body.style.userSelect='';
     const s=_loadSbLayout(); s.width=sb.offsetWidth; _saveSbLayout(s);
   });
