@@ -6133,12 +6133,12 @@ function renderSections(){
 function selectSection(sid){
   const _num = Number(sid);
   if(_activeSectionId===_num){
+    // Clicking the active section header — deselect it and close panel
+    if(_subPanelPid!==null){ syncDOM(); _subPanelPid=null; _subPanelSid=null; }
     _activeSectionId=null;
-    // Deselecting the active section — close panel
-    if(_subPanelPid!==null){ _subPanelPid=null; _subPanelSid=null; }
   } else {
     // Switching to a different section — close panel if it belongs to another section
-    if(_subPanelPid!==null && _subPanelSid!==_num){ _subPanelPid=null; _subPanelSid=null; }
+    if(_subPanelPid!==null && _subPanelSid!==_num){ syncDOM(); _subPanelPid=null; _subPanelSid=null; }
     _activeSectionId=_num;
   }
   localStorage.setItem('pq_active_section', String(_activeSectionId));
@@ -6170,7 +6170,7 @@ function renderTreeNav(){
     const parItems = collapsed ? '' : pars.map(par => {
       const label = par.name || 'Untitled';
       const isActive = par.id == _subPanelPid;
-      return `<div class="tree-nav-par${isActive?' active':''}" onclick="selectSection('${sec.id}');openSubitemPanel('${sec.id}','${par.id}')" title="${label.replace(/'/g,"&#39;")}">${label}</div>`;
+      return `<div class="tree-nav-par${isActive?' active':''}" onclick="openSubitemPanel('${sec.id}','${par.id}')" title="${label.replace(/'/g,"&#39;")}">${label}</div>`;
     }).join('');
     const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;margin-right:6px"></span>`;
     return `<div class="tn-sec-group"><div class="tree-nav-section${isActiveSection?' tn-sec-active':''}" title="${(sec.name||'').replace(/'/g,"&#39;")}" style="display:flex;align-items:center">${dot}<span class="tn-sec-label" onclick="selectSection('${sec.id}')" style="flex:1">${sec.name||'Untitled section'}</span><span class="tn-toggle" onclick="event.stopPropagation();toggleTreeSection('${sec.id}')" style="padding:4px 6px">${collapsed?'▶':'▾'}</span></div>${parItems}</div>`;
@@ -6243,18 +6243,39 @@ function scrollToParent(pid){
 function openSubitemPanel(sid, pid) {
   const _sid = Number(sid), _pid = Number(pid);
   if (_subPanelPid === _pid) { closeSubitemPanel(); return; }
-  syncTextFields();
+  syncDOM(); // capture any typed values from the outgoing panel before switching
   _subPanelPid = _pid;
   _subPanelSid = _sid;
+  _activeSectionId = _sid; // keep section selected when clicking a parent
   _skipNextSync = true;
   panelOnlyRender();
+  _updatePanelIndicators();
 }
 
 function closeSubitemPanel() {
+  if (_subPanelPid !== null) syncDOM(); // capture typed values before closing
   _subPanelPid = null;
   _subPanelSid = null;
   _skipNextSync = true;
   panelOnlyRender();
+  _updatePanelIndicators();
+}
+
+function _updatePanelIndicators() {
+  // Surgically update in-panel class + arrow direction on parent rows
+  // so we don't need a full renderSections() just to flip an arrow
+  document.querySelectorAll('.parent-item.in-panel').forEach(el => {
+    el.classList.remove('in-panel');
+    const arr = el.querySelector('.par-arrow');
+    if (arr) { arr.textContent = '▸'; arr.style.color = 'var(--muted)'; }
+  });
+  if (_subPanelPid === null) return;
+  const el = document.getElementById('par-' + _subPanelPid);
+  if (el) {
+    el.classList.add('in-panel');
+    const arr = el.querySelector('.par-arrow');
+    if (arr) { arr.textContent = '▾'; arr.style.color = 'var(--accent)'; }
+  }
 }
 
 function _updatePanelBounds(panel, overrideSbW) {
@@ -6446,8 +6467,13 @@ function renderParent(sid,par,pi,total){
   // Time badge
   const timeBadge = _labStr ? '<span style="font-size:9px;color:var(--muted);white-space:nowrap">⏱ '+_labStr+'</span>' : '<span></span>';
 
-  // Sub-item count button
-  const subCountBtn = '<button onclick="event.stopPropagation();openSubitemPanel(\''+sid+'\',\''+par.id+'\')" style="font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid '+(_inPanel?'var(--accent)':'var(--border)')+';background:'+(_inPanel?'rgba(200,160,74,.1)':'var(--surface2)')+';color:'+(_inPanel?'var(--accent)':'var(--muted)')+';cursor:pointer;white-space:nowrap">'+subCount+' item'+(subCount!==1?'s':'')+'</button>';
+  // Sub-item count button + S/W/I indicators
+  const _swiHtml = '<span style="display:inline-flex;gap:2px;margin-left:3px">'
+    + '<span style="font-size:8px;font-weight:700;padding:1px 3px;border-radius:2px;background:'+(ac.supply?'rgba(200,160,74,.18)':'var(--surface2)')+';color:'+(ac.supply?'var(--accent)':'var(--border2)')+'">S</span>'
+    + '<span style="font-size:8px;font-weight:700;padding:1px 3px;border-radius:2px;background:'+(ac.wire?'rgba(100,160,255,.15)':'var(--surface2)')+';color:'+(ac.wire?'#64a0ff':'var(--border2)')+'">W</span>'
+    + '<span style="font-size:8px;font-weight:700;padding:1px 3px;border-radius:2px;background:'+(ac.install?'rgba(100,210,120,.15)':'var(--surface2)')+';color:'+(ac.install?'#5cb85c':'var(--border2)')+'">I</span>'
+    + '</span>';
+  const subCountBtn = '<button onclick="event.stopPropagation();openSubitemPanel(\''+sid+'\',\''+par.id+'\')" style="font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid '+(_inPanel?'var(--accent)':'var(--border)')+';background:'+(_inPanel?'rgba(200,160,74,.1)':'var(--surface2)')+';color:'+(_inPanel?'var(--accent)':'var(--muted)')+';cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center">'+subCount+' item'+(subCount!==1?'s':'')+_swiHtml+'</button>';
 
   const totalSpan = par.lumpSum
     ? '<span class="ptotal tot"><span class="ptotal-lbl">Price</span><input type="number" id="plump-'+par.id+'" value="'+(par.lumpPrice||0)+'" min="0" step="0.01" onchange="setParentLumpPrice('+par.id+',this.value)" onclick="event.stopPropagation()" placeholder="0.00" style="width:78px;text-align:right;font-size:12px;font-weight:700;padding:2px 4px;border:1.5px solid var(--accent);border-radius:4px;background:var(--surface);font-family:\'IBM Plex Mono\',monospace;color:var(--accent)"></span>'
@@ -6462,7 +6488,7 @@ function renderParent(sid,par,pi,total){
   (par.optional ? '<div style="position:absolute;inset:0;border:2px dashed rgba(255,165,0,.35);border-radius:4px;pointer-events:none"></div>' : '')+
     '<div class="parent-header" onclick="if(!([\'INPUT\',\'TEXTAREA\',\'BUTTON\',\'SELECT\'].includes(event.target.tagName)||event.target.closest(\'.ph-actions\')))openSubitemPanel(\''+sid+'\',\''+par.id+'\')">'+
       parDragHandle+
-      '<span style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;color:'+(_inPanel?'var(--accent)':'var(--muted)')+';flex-shrink:0">'+(_inPanel?'▾':'▸')+'</span>'+
+      '<span class="par-arrow" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;color:'+(_inPanel?'var(--accent)':'var(--muted)')+';flex-shrink:0">'+(_inPanel?'▾':'▸')+'</span>'+
       catInline+
       '<div style="min-width:0;display:flex;flex-direction:column;justify-content:center">'+
         '<div style="display:flex;align-items:baseline;gap:0">'+
