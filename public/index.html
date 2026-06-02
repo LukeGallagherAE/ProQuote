@@ -6132,10 +6132,14 @@ function renderSections(){
 
 function selectSection(sid){
   const _num = Number(sid);
-  if(_activeSectionId===_num){ _activeSectionId=null; }
-  else {
+  if(_activeSectionId===_num){
+    _activeSectionId=null;
+    // Deselecting the active section — close panel
+    if(_subPanelPid!==null){ _subPanelPid=null; _subPanelSid=null; }
+  } else {
+    // Switching to a different section — close panel if it belongs to another section
+    if(_subPanelPid!==null && _subPanelSid!==_num){ _subPanelPid=null; _subPanelSid=null; }
     _activeSectionId=_num;
-    if(_subPanelPid!==null){ const sec=S.sections.find(s=>s.id==_subPanelSid); if(!sec||!sec.parents.find(p=>p.id==_subPanelPid)){ _subPanelPid=null;_subPanelSid=null; } }
   }
   localStorage.setItem('pq_active_section', String(_activeSectionId));
   _skipNextSync=true;
