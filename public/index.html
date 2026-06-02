@@ -1719,12 +1719,6 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         </div>
       </div>
       <hr class="div">
-      <div>
-        <div class="sh" style="margin-bottom:8px">Sections</div>
-        <div id="sidebarNav" style="display:flex;flex-direction:column;gap:3px"></div>
-        <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="addSection()">+ Add section</button>
-      </div>
-      <hr class="div">
       <div class="field">
         <label style="display:flex;align-items:center;justify-content:space-between">
           Quote notes
@@ -6175,7 +6169,9 @@ function renderTreeNav(){
       return `<div class="tree-nav-par${isActive?' active':''}" onclick="openSubitemPanel('${sec.id}','${par.id}')" title="${label.replace(/'/g,"&#39;")}">${label}</div>`;
     }).join('');
     const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;margin-right:6px"></span>`;
-    return `<div class="tn-sec-group"><div class="tree-nav-section${isActiveSection?' tn-sec-active':''}" title="${(sec.name||'').replace(/'/g,"&#39;")}" style="display:flex;align-items:center">${dot}<span class="tn-sec-label" onclick="selectSection('${sec.id}')" style="flex:1">${sec.name||'Untitled section'}</span><span class="tn-toggle" onclick="event.stopPropagation();toggleTreeSection('${sec.id}')" style="padding:4px 6px">${collapsed?'▶':'▾'}</span></div>${parItems}</div>`;
+    const secTotal = calcSection(sec).total;
+    const secTotalStr = secTotal > 0 ? `<span style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap;flex-shrink:0;margin-right:2px">${fmt(secTotal)}</span>` : '';
+    return `<div class="tn-sec-group"><div class="tree-nav-section${isActiveSection?' tn-sec-active':''}" title="${(sec.name||'').replace(/'/g,"&#39;")}" style="display:flex;align-items:center">${dot}<span class="tn-sec-label" onclick="selectSection('${sec.id}')" style="flex:1">${sec.name||'Untitled section'}</span>${secTotalStr}<span class="tn-toggle" onclick="event.stopPropagation();toggleTreeSection('${sec.id}')" style="padding:4px 6px">${collapsed?'▶':'▾'}</span></div>${parItems}</div>`;
   }).join('');
 }
 
