@@ -6244,12 +6244,17 @@ function openSubitemPanel(sid, pid) {
   const _sid = Number(sid), _pid = Number(pid);
   if (_subPanelPid === _pid) { closeSubitemPanel(); return; }
   syncDOM(); // capture any typed values from the outgoing panel before switching
+  const sectionChanging = _activeSectionId !== _sid;
   _subPanelPid = _pid;
   _subPanelSid = _sid;
   _activeSectionId = _sid; // keep section selected when clicking a parent
   _skipNextSync = true;
-  panelOnlyRender();
-  _updatePanelIndicators();
+  if (sectionChanging) {
+    fullRender(); // section content must be rendered before panel/arrows are useful
+  } else {
+    panelOnlyRender();
+    _updatePanelIndicators();
+  }
 }
 
 function closeSubitemPanel() {
