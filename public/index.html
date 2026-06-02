@@ -1687,7 +1687,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       <div>
         <div class="sh" style="margin-bottom:10px">Pricing</div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <div class="field"><label>Labour sell rate ($/hr)</label><input type="number" id="labourRate" value="100" min="0" oninput="clearTimeout(window._lrDeb);window._lrDeb=setTimeout(()=>{syncDOM();fullRender();},300)"></div>
+          <div class="field"><label>Labour sell rate ($/hr)</label><input type="number" id="labourRate" value="100" min="0" oninput="clearTimeout(window._lrDeb);window._lrDeb=setTimeout(()=>{syncDOM();_skipNextSync=true;fullRender();},300)"></div>
           <div class="field"><label>Labour cost rate ($/hr)</label><input type="number" id="labourCostRate" value="75" min="0" oninput="renderTotals();scheduleSave()"></div>
           <div class="field">
             <label>Default markup %</label>
@@ -3131,7 +3131,7 @@ function applyTemplate(sid, pid, template) {
     cat: s.cat || 'supply'
   }));
   closeTemplateDrop();
-  fullRender();
+  _skipNextSync = true; fullRender();
 }
 
 function closeTemplateDrop() {
@@ -3432,7 +3432,7 @@ function duplicateParent(sid,pid) {
   S.sections[idx].parents.push(clone); fullRender();
   setTimeout(()=>document.getElementById('sec-'+S.sections[idx].id)?.scrollIntoView({behavior:'smooth',block:'start'}),80);
 }
-function addSubitem(sid,pid,cat) { const p=getP(sid,pid); if(p){p.subitems.push(newSubitem(cat||'supply'));fullRender();} }
+function addSubitem(sid,pid,cat) { const p=getP(sid,pid); if(p){p.subitems.push(newSubitem(cat||'supply'));_skipNextSync=true;fullRender();} }
 function removeSubitem(sid,pid,subid) {
   const p=getP(sid,pid); if(!p) return;
   p.subitems=p.subitems.filter(s=>s.id!==subid); fullRender();
@@ -3442,14 +3442,14 @@ function moveSubitem(sid,pid,subid,dir) {
   const p=getP(sid,pid); if(!p) return;
   const i=p.subitems.findIndex(s=>s.id===subid),to=i+dir;
   if(to<0||to>=p.subitems.length) return;
-  [p.subitems[i],p.subitems[to]]=[p.subitems[to],p.subitems[i]]; fullRender();
+  [p.subitems[i],p.subitems[to]]=[p.subitems[to],p.subitems[i]]; _skipNextSync=true; fullRender();
 }
 function duplicateSubitem(sid,pid,subid) {
   syncDOM();
   const p=getP(sid,pid); if(!p) return;
   const i=p.subitems.findIndex(s=>s.id===subid); if(i===-1) return;
   const clone={...p.subitems[i],id:uid()};
-  p.subitems.splice(i+1,0,clone); fullRender();
+  p.subitems.splice(i+1,0,clone); _skipNextSync=true; fullRender();
 }
 function moveSubitemTo(sid,pid,subid) {
   syncDOM();
@@ -3469,7 +3469,7 @@ function moveSubitemTo(sid,pid,subid) {
   srcPar.subitems=srcPar.subitems.filter(s=>s.id!==subid);
   if(!srcPar.subitems.length) srcPar.subitems.push(newSubitem('supply'));
   items[idx].par.subitems.push({...sub,id:uid()});
-  fullRender();
+  _skipNextSync=true; fullRender();
 }
 function onParentNameInput(sid, pid, val) {
   // Update name in state immediately
@@ -3602,7 +3602,7 @@ function setItemCat(parId, value) {
   for (const s of S.sections) { p = s.parents.find(x => x.id === parId); if (p) break; }
   if (!p) return;
   p.category = value || '';
-  fullRender();
+  _skipNextSync = true; fullRender();
 }
 
 function toggleSubCat(sid,pid,subid) {
@@ -3615,10 +3615,10 @@ function toggleActiveCat(sid,pid,cat) {
   syncDOM();
   const p=getP(sid,pid); if(!p) return;
   if(!p.activeCats) p.activeCats={supply:true,wire:true,install:true};
-  p.activeCats[cat]=!p.activeCats[cat]; fullRender();
+  p.activeCats[cat]=!p.activeCats[cat]; _skipNextSync=true; fullRender();
 }
 function toggleParent(sid,pid) { const p=getP(sid,pid); if(p){p.collapsed=!p.collapsed;fullRender();} }
-function toggleLumpSum(sid,pid) { syncDOM(); const p=getP(sid,pid); if(p){p.lumpSum=!p.lumpSum;fullRender();} }
+function toggleLumpSum(sid,pid) { syncDOM(); const p=getP(sid,pid); if(p){p.lumpSum=!p.lumpSum; _skipNextSync=true; fullRender();} }
 
 function openParentSettingsMenu(sid,pid,btn) {
   document.querySelectorAll('.par-settings-dd').forEach(m=>m.remove());
@@ -3836,7 +3836,7 @@ function toggleOptional(sid, pid) {
   const s = S.sections.find(s => s.id === sid); if (!s) return;
   const par = s.parents.find(p => p.id === pid); if (!par) return;
   par.optional = !par.optional;
-  fullRender();
+  _skipNextSync = true; fullRender();
 }
 
 function showParentMenu(sid,pid,btn) {
@@ -4059,6 +4059,17 @@ function fullRender(){
     clearTimeout(window._revBannerDeb);
     window._revBannerDeb=setTimeout(updateRevisionBanner,500);
     setTimeout(()=>{updatePublishBadge();},50);
+    scheduleSave();
+  });
+}
+function panelOnlyRender(){
+  // Lighter render for panel open/close — skips expensive section rebuild
+  if(_renderPending)return;
+  _renderPending=true;
+  requestAnimationFrame(function(){
+    _renderPending=false;
+    _skipNextSync=false;
+    renderTreeNav();renderSubitemPanel();
     scheduleSave();
   });
 }
@@ -6232,14 +6243,14 @@ function openSubitemPanel(sid, pid) {
   _subPanelPid = _pid;
   _subPanelSid = _sid;
   _skipNextSync = true;
-  fullRender();
+  panelOnlyRender();
 }
 
 function closeSubitemPanel() {
   _subPanelPid = null;
   _subPanelSid = null;
   _skipNextSync = true;
-  fullRender();
+  panelOnlyRender();
 }
 
 function _updatePanelBounds(panel, overrideSbW) {
@@ -6283,9 +6294,9 @@ function renderSubitemPanel() {
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:10px;margin-left:auto;flex-shrink:0">'
         + '<span style="font-size:12px;font-weight:700;font-family:\'IBM Plex Mono\',monospace;color:var(--accent)">' + fmt(c.total) + '</span>'
-        + '<button onclick="syncDOM();addSubitem(\'' + _subPanelSid + '\',\'' + _subPanelPid + '\',\'supply\')" style="padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text)">+ Supply</button>'
-        + '<button onclick="syncDOM();addSubitem(\'' + _subPanelSid + '\',\'' + _subPanelPid + '\',\'wire\')" style="padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text)">+ Wire</button>'
-        + '<button onclick="syncDOM();addSubitem(\'' + _subPanelSid + '\',\'' + _subPanelPid + '\',\'install\')" style="padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text)">+ Install</button>'
+        + '<button onclick="syncDOM();addSubitem(' + _subPanelSid + ',' + _subPanelPid + ',\'supply\')" style="padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text)">+ Supply</button>'
+        + '<button onclick="syncDOM();addSubitem(' + _subPanelSid + ',' + _subPanelPid + ',\'wire\')" style="padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text)">+ Wire</button>'
+        + '<button onclick="syncDOM();addSubitem(' + _subPanelSid + ',' + _subPanelPid + ',\'install\')" style="padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text)">+ Install</button>'
         + '<button onclick="closeSubitemPanel()" style="padding:3px 8px;font-size:13px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);line-height:1">✕</button>'
       + '</div>'
     + '</div>'
@@ -6494,7 +6505,7 @@ function renderSubitem(sid,pid,par,sub){
   const unitPriceCell = !hasItem
     ? '<div style="display:flex;flex-direction:row;align-items:center;gap:2px;min-width:0">'
         +'<input type="number" id="scp-'+sub.id+'" value="'+(sub.customPrice||0)+'" min="0" placeholder="0" step="0.01" onchange="setSubCustomPrice('+sub.id+',this.value)" style="flex:1;min-width:0;height:22px;font-size:10px;padding:2px 3px;text-align:right" title="Unit price">'
-        +'<input type="text" id="scu-'+sub.id+'" value="'+esc(sub.customUnit||'EA')+'" onchange="syncDOM();fullRender()" style="width:22px;height:22px;font-size:9px;padding:1px 2px;text-align:center;color:var(--muted)" title="Unit">'
+        +'<input type="text" id="scu-'+sub.id+'" value="'+esc(sub.customUnit||'EA')+'" onchange="syncDOM();_skipNextSync=true;fullRender()" style="width:22px;height:22px;font-size:9px;padding:1px 2px;text-align:center;color:var(--muted)" title="Unit">'
       +'</div>'
     : '<span class="nc mat" style="font-size:10px;text-align:right">'+Number(unitPrice).toFixed(2)+'</span>';
 
