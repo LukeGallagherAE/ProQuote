@@ -190,6 +190,8 @@ html.dark .tree-nav{background:var(--surface)}
 .par-item-hint:hover{background:var(--border);color:var(--text)}
 .parent-item.in-panel{border-left:3px solid var(--accent)}
 .parent-item.in-panel>.parent-header{background:rgba(200,160,74,.06)!important}
+.par-arrow{transition:transform .18s ease,color .18s ease;display:flex;align-items:center;justify-content:center;width:16px;height:16px;font-size:10px;color:var(--muted);flex-shrink:0}
+.parent-item.in-panel .par-arrow{transform:rotate(90deg);color:var(--accent)}
 @media print{#subitem-panel{display:none!important}}
 
 .sh{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
@@ -6267,20 +6269,11 @@ function closeSubitemPanel() {
 }
 
 function _updatePanelIndicators() {
-  // Surgically update in-panel class + arrow direction on parent rows
-  // so we don't need a full renderSections() just to flip an arrow
-  document.querySelectorAll('.parent-item.in-panel').forEach(el => {
-    el.classList.remove('in-panel');
-    const arr = el.querySelector('.par-arrow');
-    if (arr) { arr.textContent = '▸'; arr.style.color = 'var(--muted)'; }
-  });
+  // Toggle .in-panel on parent rows — CSS handles arrow rotation + colour
+  document.querySelectorAll('.parent-item.in-panel').forEach(el => el.classList.remove('in-panel'));
   if (_subPanelPid === null) return;
   const el = document.getElementById('par-' + _subPanelPid);
-  if (el) {
-    el.classList.add('in-panel');
-    const arr = el.querySelector('.par-arrow');
-    if (arr) { arr.textContent = '▾'; arr.style.color = 'var(--accent)'; }
-  }
+  if (el) el.classList.add('in-panel');
 }
 
 function _updatePanelBounds(panel, overrideSbW) {
@@ -6493,7 +6486,7 @@ function renderParent(sid,par,pi,total){
   (par.optional ? '<div style="position:absolute;inset:0;border:2px dashed rgba(255,165,0,.35);border-radius:4px;pointer-events:none"></div>' : '')+
     '<div class="parent-header" onclick="if(!([\'INPUT\',\'TEXTAREA\',\'BUTTON\',\'SELECT\'].includes(event.target.tagName)||event.target.closest(\'.ph-actions\')))openSubitemPanel(\''+sid+'\',\''+par.id+'\')">'+
       parDragHandle+
-      '<span class="par-arrow" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;color:'+(_inPanel?'var(--accent)':'var(--muted)')+';flex-shrink:0">'+(_inPanel?'▾':'▸')+'</span>'+
+      '<span class="par-arrow">▶</span>'+
       catInline+
       '<div style="min-width:0;display:flex;flex-direction:column;justify-content:center">'+
         '<div style="display:flex;align-items:baseline;gap:0">'+
