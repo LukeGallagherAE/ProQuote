@@ -1702,7 +1702,20 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
             </div>
             <button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="applyMarkupAll()">Apply to all lines</button>
           </div>
-          <div class="field"><label>Deposit (%)</label><input type="number" id="depositAmount" value="20" placeholder="e.g. 20" min="0" max="100" step="1" oninput="scheduleSave()"></div>
+          <div class="field">
+            <label style="display:flex;align-items:center;justify-content:space-between">
+              <span>Deposit (%)</span>
+              <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:400;font-size:11px">
+                <input type="checkbox" id="showDepositSection" checked onchange="scheduleSave()" style="width:13px;height:13px;accent-color:var(--accent);cursor:pointer;margin:0">
+                Show on export
+              </label>
+            </label>
+            <div style="display:flex;gap:4px;align-items:center">
+              <input type="number" id="depositAmount" value="20" placeholder="e.g. 20" min="0" max="100" step="1" oninput="scheduleSave()" style="flex:1">
+              <button onclick="setDepositToMaterials()" title="Set deposit equal to material sell value" style="flex-shrink:0;padding:4px 8px;border-radius:var(--rs);border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-size:10px;white-space:nowrap;font-family:inherit">Mat cost</button>
+            </div>
+            <div id="depositMatNote" style="font-size:10px;color:var(--muted);margin-top:3px;display:none"></div>
+          </div>
           <div class="field" style="border-top:1px solid var(--border);padding-top:8px;margin-top:2px">
             <label style="display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer">
               <span>Grand total override</span>
@@ -1815,6 +1828,11 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     <div class="tot-tile" id="tOptWrap" data-tile-id="t-opt" onclick="toggleTotTile('t-opt')" title="Click to hide/show" style="display:none;background:rgba(255,165,0,.08);border-color:rgba(255,165,0,.4);border-style:dashed">
       <span class="tl" style="color:rgba(200,120,0,.9)">Optional</span>
       <span class="tv" id="tOpt" style="color:#d97706;font-size:13px">$0.00</span>
+    </div>
+    <!-- Rounding gain -->
+    <div class="tot-tile" id="tRoundWrap" style="display:none;background:rgba(52,199,89,.08);border-color:rgba(52,199,89,.3);border-style:dashed">
+      <span class="tl" style="color:rgba(52,199,89,.85)">Round gain</span>
+      <span class="tv" id="tRound" style="color:#34c759;font-size:13px">$0.00</span>
     </div>
     <!-- Excl. GST — indigo -->
     <div class="tot-tile tot-tile-indigo" data-tile-id="t-excl" onclick="toggleTotTile('t-excl')" title="Click to hide/show" style="margin-left:8px"><span class="tl">Excl. GST<span id="tSubOverrideBadge" style="display:none;margin-left:5px;font-size:8px;background:rgba(99,102,241,.2);border-radius:3px;padding:1px 4px;letter-spacing:.4px">OVERRIDE</span></span><span class="tv" id="tSub">$0.00</span></div>
@@ -2281,6 +2299,13 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
           <div class="field"><label>Labour sell ($/hr)</label><input id="pLabourSell" type="number" value="100" min="0" oninput="saveProfile()"></div>
           <div class="field"><label>Labour cost ($/hr)</label><input id="pLabourCost" type="number" value="75" min="0" oninput="saveProfile()"></div>
           <div class="field"><label>Deposit (%)</label><input id="pDeposit" type="number" value="20" min="0" max="100" step="1" oninput="saveProfile()"></div>
+          <div class="field" style="margin-top:8px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+              <input type="checkbox" id="pRoundUp5" onchange="saveProfile();window._pRoundUp5=this.checked;fullRender()" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;margin:0">
+              <span>Round items up to nearest $5</span>
+            </label>
+            <div style="font-size:10px;color:var(--muted);margin-top:3px">Rounds each line item up to the next $5. Never down.</div>
+          </div>
         </div>
 
         <!-- Item Categories -->
@@ -2830,6 +2855,8 @@ function _captureFields() {
   ids.forEach(id => { const el = document.getElementById(id); if(el) fields[id] = el.value||''; });
   const gtActive = document.getElementById('grandTotalActive');
   if (gtActive) fields.grandTotalActive = gtActive.checked ? '1' : '';
+  const sds = document.getElementById('showDepositSection');
+  if (sds) fields.showDepositSection = sds.checked ? '1' : '';
   return fields;
 }
 
@@ -2850,6 +2877,8 @@ function _restoreFields(fields) {
     const wrap = document.getElementById('grand-total-value-wrap');
     if (wrap) wrap.style.display = gtActive.checked ? '' : 'none';
   }
+  const sds = document.getElementById('showDepositSection');
+  if (sds) sds.checked = (fields.showDepositSection === undefined) ? true : !!fields.showDepositSection;
 }
 
 function saveActiveQuoteState() {
@@ -3221,29 +3250,34 @@ function calcParent(par) {
     const base=(par.lumpPrice||0)*(par.qty||1);
     const disc=Math.min(Math.max(par.discount||0,0),100)/100;
     const discAmt=base*disc;
-    return {matSell:0,labSell:0,total:base-discAmt,discAmt,base};
+    const raw=base-discAmt;
+    const total=_isRoundUp5()?Math.ceil(raw/5)*5:raw;
+    return {matSell:0,labSell:0,total,discAmt,base,roundGain:total-raw};
   }
   let matSell=0,labSell=0;
   for (const sub of par.subitems) { const c=calcSub(sub,par); matSell+=c.matSell; labSell+=c.labSell; }
   const base=(matSell+labSell)*par.qty;
   const disc=Math.min(Math.max(par.discount||0,0),100)/100;
   const discAmt=base*disc;
-  return {matSell:matSell*par.qty,labSell:labSell*par.qty,total:base-discAmt,discAmt,base};
+  const raw=base-discAmt;
+  const total=_isRoundUp5()?Math.ceil(raw/5)*5:raw;
+  return {matSell:matSell*par.qty,labSell:labSell*par.qty,total,discAmt,base,roundGain:total-raw};
 }
 function calcSection(sec) {
-  let m=0,l=0,t=0,optT=0;
+  let m=0,l=0,t=0,optT=0,rg=0;
   for (const p of sec.parents) {
     const c=calcParent(p);
+    rg+=(c.roundGain||0);
     if (p.optional) { optT+=c.total; }
     else { m+=c.matSell; l+=c.labSell; t+=c.total; }
   }
-  return {matSell:m,labSell:l,total:t,optTotal:optT};
+  return {matSell:m,labSell:l,total:t,optTotal:optT,roundGain:rg};
 }
 function lcr() { return parseFloat(document.getElementById('labourCostRate')?.value||75); }
 
 function calcAll() {
-  let m=0,l=0,t=0,optT=0;
-  for (const s of S.sections) { const c=calcSection(s); m+=c.matSell; l+=c.labSell; t+=c.total; optT+=c.optTotal||0; }
+  let m=0,l=0,t=0,optT=0,rg=0;
+  for (const s of S.sections) { const c=calcSection(s); m+=c.matSell; l+=c.labSell; t+=c.total; optT+=c.optTotal||0; rg+=(c.roundGain||0); }
   // Cost calculations for profit
   const mins = calcLabourMins();
   const labourCost = (mins / 60) * lcr();   // what labour costs us
@@ -3262,7 +3296,7 @@ function calcAll() {
   const totalProfit = matProfit + labourProfit;
   const totalCost = matCost + labourCost;
   const profitPct = totalCost > 0 ? (totalProfit / totalCost * 100) : 0;
-  return {matSell:m, labSell:l, total:t, optTotal:optT, matCost, labourCost, matProfit, labourProfit, totalProfit, totalCost, profitPct};
+  return {matSell:m, labSell:l, total:t, optTotal:optT, matCost, labourCost, matProfit, labourProfit, totalProfit, totalCost, profitPct, roundGain:rg};
 }
 function calcLabourMins() {
   let mins=0;
@@ -4017,6 +4051,18 @@ function onGrandTotalToggle(active){
 }
 function onGrandTotalInput(){
   renderTotals();
+  scheduleSave();
+}
+function setDepositToMaterials() {
+  syncDOM();
+  const t = calcAll();
+  if (!t.total) return;
+  const totalIncGst = t.total * 1.1;
+  const pct = Math.round((t.matSell / totalIncGst) * 1000) / 10; // 1 decimal
+  const el = document.getElementById('depositAmount');
+  if (el) el.value = pct;
+  const note = document.getElementById('depositMatNote');
+  if (note) { note.textContent = 'Materials: ' + fmt(t.matSell) + ' = ' + pct + '% of total inc. GST'; note.style.display = ''; }
   scheduleSave();
 }
 function setMarkup(v){document.getElementById('defaultMarkup').value=v;document.querySelectorAll('.mc').forEach(c=>c.classList.toggle('active',parseInt(c.textContent)===v));}
@@ -6062,6 +6108,12 @@ function renderTotals(){
     if(t.optTotal>0){ optEl.textContent=fmt(t.optTotal); if(optWrap) optWrap.style.display=''; }
     else { if(optWrap) optWrap.style.display='none'; }
   }
+  const roundWrap = document.getElementById('tRoundWrap');
+  const roundEl = document.getElementById('tRound');
+  if (roundWrap && roundEl) {
+    if ((t.roundGain||0) > 0) { roundEl.textContent = fmt(t.roundGain); roundWrap.style.display = ''; }
+    else { roundWrap.style.display = 'none'; }
+  }
   // Grand total override
   const gtActive = document.getElementById('grandTotalActive');
   const gtVal = document.getElementById('grandTotalValue');
@@ -6172,7 +6224,10 @@ function renderTreeNav(){
     const secTotal = calcSection(sec).total;
     const secTotalStr = secTotal > 0 ? `<span style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap;flex-shrink:0;margin-right:2px">${fmt(secTotal)}</span>` : '';
     return `<div class="tn-sec-group"><div class="tree-nav-section${isActiveSection?' tn-sec-active':''}" title="${(sec.name||'').replace(/'/g,"&#39;")}" style="display:flex;align-items:center">${dot}<span class="tn-sec-label" onclick="selectSection('${sec.id}')" style="flex:1">${sec.name||'Untitled section'}</span>${secTotalStr}<span class="tn-toggle" onclick="event.stopPropagation();toggleTreeSection('${sec.id}')" style="padding:4px 6px">${collapsed?'▶':'▾'}</span></div>${parItems}</div>`;
-  }).join('');
+  }).join('')
+  + '<div style="padding:8px 10px;border-top:1px dashed var(--border);margin-top:4px">'
+  + '<button class="btn btn-secondary btn-sm" style="width:100%" onclick="syncDOM();addSection()">+ Add section</button>'
+  + '</div>';
 }
 
 function scrollToSection(sid){
@@ -6933,6 +6988,7 @@ function saveProfile(){
   try{
     const data = {};
     PROFILE_IDS.forEach(id => { const el = document.getElementById(id); if(el) data[id] = el.value; });
+    const ru5 = document.getElementById('pRoundUp5'); if(ru5) data.pRoundUp5 = ru5.checked ? '1' : '';
     localStorage.setItem('proquote_profile', JSON.stringify(data));
   }catch(e){}
 }
@@ -6942,12 +6998,14 @@ function loadProfile(){
     if(!raw) return;
     const data = JSON.parse(raw);
     PROFILE_IDS.forEach(id => { if(data[id]!=null){ const el = document.getElementById(id); if(el) el.value = data[id]; } });
+    const ru5 = document.getElementById('pRoundUp5'); if(ru5) { ru5.checked = !!data.pRoundUp5; window._pRoundUp5 = !!data.pRoundUp5; }
   }catch(e){}
   // Restore T&C PDF status
   updateTCPdfStatus();
 }
 function profileVal(id){ return document.getElementById(id)?.value || ''; }
 function profileRate(id, fallback){ const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? String(fallback) : String(v); }
+function _isRoundUp5(){ return !!(window._pRoundUp5); }
 
 // ── T&C PDF ───────────────────────────────────────────────────────────────────
 function updateTCPdfStatus() {
@@ -8129,7 +8187,7 @@ function doPrint(){
     const totalIncGst = (reqOnly + optTotal) * 1.1;
     const depositDollar = depositPct>0 ? totalIncGst * depositPct/100 : 0;
     const depositLine = depositPct>0
-      ? '<div style="font-size:12px;font-weight:700;color:#007aff;margin-bottom:6px">Deposit required: '+depositPct+'% ($'+depositDollar.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2})+')</div>'
+      ? '<div id="pdf-deposit-line" data-pct="'+depositPct+'" style="font-size:12px;font-weight:700;color:#007aff;margin-bottom:6px">Deposit required: '+depositPct+'% ($'+depositDollar.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2})+')</div>'
       : '';
     const policyPct = depositPct>0 ? depositPct+'%' : '10–30%';
     const optLine = optTotal > 0
@@ -8138,18 +8196,21 @@ function doPrint(){
         +'<span id="pdf-opt-amt" style="font-size:13px;font-weight:600;font-family:monospace;color:#b06000">$'+Number(optTotal).toFixed(2)+'</span>'
         +'</div>'
       : '<div id="pdf-opt-line" style="display:none"></div>';
+    const _showDeposit = document.getElementById('showDepositSection')?.checked !== false;
     return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;margin-top:16px;margin-bottom:28px">'
-      +'<div>'
-        +'<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Deposit &amp; Payment</div>'
-        +depositLine
-        +'<div style="font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:6px">A deposit of '+policyPct+' is required to acquire materials and secure your booking.</div>'
-        +(()=>{
-            const bn=profileVal('pBankName'), bsb=profileVal('pBankBSB'), bacc=profileVal('pBankAcc');
-            if(bn||bsb||bacc) return '<div style="font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:3px"><strong>Payment Method</strong> — EFT'+(bn?'<br>Account Name: '+bn:'')+(bsb?'<br>BSB: '+bsb:'')+(bacc?'<br>Account No: '+bacc:'')+'</div>';
-            return '<div style="font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:3px"><strong>Payment Method</strong> — Please contact us for payment details.</div>';
-          })()
-        +(optTotal>0?'<div style="font-size:11px;color:#b06000;margin-top:8px;padding:8px;background:#fffbf0;border:1px solid #ffe9a0;border-radius:6px">☑ Optional items are pre-selected. Uncheck any to remove from total.</div>':'')
-      +'</div>'
+      +(_showDeposit
+        ? '<div>'
+            +'<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Deposit &amp; Payment</div>'
+            +depositLine
+            +'<div style="font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:6px">A deposit of '+policyPct+' is required to acquire materials and secure your booking.</div>'
+            +(()=>{
+                const bn=profileVal('pBankName'), bsb=profileVal('pBankBSB'), bacc=profileVal('pBankAcc');
+                if(bn||bsb||bacc) return '<div style="font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:3px"><strong>Payment Method</strong> — EFT'+(bn?'<br>Account Name: '+bn:'')+(bsb?'<br>BSB: '+bsb:'')+(bacc?'<br>Account No: '+bacc:'')+'</div>';
+                return '<div style="font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:3px"><strong>Payment Method</strong> — Please contact us for payment details.</div>';
+              })()
+            +(optTotal>0?'<div style="font-size:11px;color:#b06000;margin-top:8px;padding:8px;background:#fffbf0;border:1px solid #ffe9a0;border-radius:6px">☑ Optional items are pre-selected. Uncheck any to remove from total.</div>':'')
+          +'</div>'
+        : '<div></div>')
       +'<div>'
         +optLine
         +'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">'
@@ -8213,6 +8274,12 @@ function doPrint(){
     +'  var ex=document.getElementById("pdf-excl");if(ex)ex.textContent=fmt(total);'
     +'  var gi=document.getElementById("pdf-gst");if(gi)gi.textContent=fmt(gst);'
     +'  var ti=document.getElementById("pdf-inc");if(ti)ti.textContent=fmt(inc);'
+    +'  var dep=document.getElementById("pdf-deposit-line");'
+    +'  if(dep){'
+    +'    var depPct=parseFloat(dep.dataset.pct||0);'
+    +'    var depAmt=inc*depPct/100;'
+    +'    dep.textContent="Deposit required: "+depPct+"% ($"+depAmt.toLocaleString("en-AU",{minimumFractionDigits:2,maximumFractionDigits:2})+")";'
+    +'  }'
     +'  var optLine=document.getElementById("pdf-opt-line");'
     +'  if(optLine)optLine.style.display=optSum>0?"":"none";'
     +'  var optAmt=document.getElementById("pdf-opt-amt");'
