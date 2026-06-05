@@ -1867,25 +1867,37 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 <div id="page-dashboard" class="tab-page" style="display:none">
   <style>
   .db-page{max-width:1100px;margin:0 auto;padding:28px 24px}
-  .db-section-title{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
-  /* Stats row */
-  .db-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:28px}
-  @media(max-width:860px){.db-stats{grid-template-columns:repeat(3,1fr)}}
-  .db-stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:4px}
-  .db-stat-val{font-size:22px;font-weight:700;color:var(--text);font-family:'IBM Plex Mono',monospace;line-height:1.1}
-  .db-stat-val.accent{color:var(--accent)}
-  .db-stat-val.warn{color:#d97706}
-  .db-stat-lbl{font-size:11px;font-weight:600;color:var(--muted)}
+  /* Header */
+  .db-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:12px}
+  .db-title{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.5px;margin:0}
+  .db-subtitle{font-size:12px;color:var(--muted);margin-top:4px}
+  .db-new-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;background:var(--accent);color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s;white-space:nowrap;flex-shrink:0}
+  .db-new-btn:hover{opacity:.85}
+  /* KPI strip — 5 tiles single row */
+  .db-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+  @media(max-width:920px){.db-kpis{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:560px){.db-kpis{grid-template-columns:repeat(2,1fr)}}
+  .db-kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:4px}
+  .db-kpi-val{font-size:22px;font-weight:700;color:var(--text);font-family:'IBM Plex Mono',monospace;line-height:1.15}
+  .db-kpi-lbl{font-size:11px;font-weight:600;color:var(--muted)}
+  .db-kpi.k-pipeline .db-kpi-val{color:var(--accent)}
+  .db-kpi.k-approved{border-color:rgba(52,199,89,.3);background:rgba(52,199,89,.05)}
+  .db-kpi.k-approved .db-kpi-val{color:#34c759}
+  .db-kpi.k-profit{border-color:rgba(52,199,89,.18);background:rgba(52,199,89,.03)}
+  .db-kpi.k-profit .db-kpi-val{color:#34c759}
+  .db-kpi.k-awaiting{cursor:default}
+  .db-kpi.k-awaiting.has-items{border-color:rgba(255,159,10,.35);background:rgba(255,159,10,.07);cursor:pointer}
+  .db-kpi.k-awaiting.has-items .db-kpi-val{color:#d97706}
   /* Two-column layout */
-  .db-cols{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+  .db-cols{display:grid;grid-template-columns:1.15fr 1fr;gap:16px}
   @media(max-width:780px){.db-cols{grid-template-columns:1fr}}
   /* Cards */
   .db-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
-  .db-card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid var(--border)}
+  .db-card-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px 11px;border-bottom:1px solid var(--border)}
   .db-card-head h3{font-size:13px;font-weight:700;color:var(--text)}
-  .db-card-empty{padding:24px 16px;text-align:center;color:var(--muted);font-size:12px}
-  /* Quote rows inside cards */
-  .db-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);transition:background .1s}
+  .db-card-empty{padding:20px 16px;text-align:center;color:var(--muted);font-size:12px}
+  /* Quote rows */
+  .db-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer}
   .db-row:last-child{border-bottom:none}
   .db-row:hover{background:var(--surface2)}
   .db-row-main{flex:1;min-width:0}
@@ -1908,9 +1920,10 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   .db-open-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer}
   .db-open-row:last-child{border-bottom:none}
   .db-open-row:hover{background:var(--surface2)}
-  .db-open-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0}
+  .db-open-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
   /* Attention row */
-  .db-attn-row{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)}
+  .db-attn-row{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+  .db-attn-row:hover{background:var(--surface2)}
   .db-attn-row:last-child{border-bottom:none}
   .db-attn-icon{font-size:14px;flex-shrink:0;margin-top:1px}
   .db-attn-body{flex:1;min-width:0}
@@ -1919,6 +1932,11 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   .db-open-btn{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;transition:background .1s}
   .db-open-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
   html.dark .db-open-btn{background:var(--surface2);border-color:var(--border2)}
+  /* Empty state with CTA */
+  .db-empty-cta{padding:32px 16px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px}
+  .db-empty-cta-icon{font-size:26px;opacity:.35}
+  .db-empty-cta-title{font-size:13px;font-weight:600;color:var(--text)}
+  .db-empty-cta-sub{font-size:11px;color:var(--muted)}
   </style>
   <div class="db-page">
     <div id="db-content"><!-- populated by renderDashboard() --></div>
@@ -2360,6 +2378,20 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
             </div>
           </div>
 
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div style="max-width:1100px;margin:16px auto 0">
+      <div style="background:var(--surface);border:1px solid rgba(255,59,48,.3);border-radius:12px;padding:18px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#ff3b30;margin-bottom:14px">Danger Zone</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">Delete all quotes &amp; client data</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Permanently removes all saved quotes, clients, and projects. Cannot be undone.</div>
+          </div>
+          <button onclick="deleteAllQuotes()" style="padding:8px 16px;background:rgba(255,59,48,.1);color:#ff3b30;border:1px solid rgba(255,59,48,.3);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">Delete all quotes</button>
         </div>
       </div>
     </div>
@@ -9528,6 +9560,19 @@ function switchTab(tab) {
   if (tab === 'profile') { renderCategorySettings(); renderZonePresets(); initStagedMarkupUI(); _populateAccountPanel(); }
 }
 
+function deleteAllQuotes() {
+  if (!confirm('Delete ALL quotes, clients, and projects?\n\nThis cannot be undone.')) return;
+  try { localStorage.removeItem('proquote_clients'); } catch(e) {}
+  try { localStorage.removeItem('proquote_session_quotes'); } catch(e) {}
+  try { localStorage.removeItem('proquote_active_id'); } catch(e) {}
+  if (typeof _quotes !== 'undefined') { _quotes.length = 0; }
+  if (typeof _activeQuoteId !== 'undefined') { window._activeQuoteId = null; }
+  if (typeof scheduleSave === 'function') scheduleSave();
+  if (typeof renderQuoteTabs === 'function') renderQuoteTabs();
+  renderDashboard();
+  if (typeof showToast === 'function') showToast('All quotes deleted');
+}
+
 // ── Dashboard ────────────────────────────────────────────────────────────────
 function renderDashboard() {
   const el = document.getElementById('db-content');
@@ -9535,51 +9580,35 @@ function renderDashboard() {
 
   const clients = loadClients();
 
-  // ── Flatten all quotes from localStorage ──────────────────────────────────
-  const allQuotes = []; // { quote, clientName, clientId, jobName, jobId, clientIdx, jobIdx, quoteIdx }
+  const allQuotes = [];
   clients.forEach((cl, ci) => {
     (cl.jobs || []).forEach((job, ji) => {
       (job.quotes || []).forEach((q, qi) => {
-        allQuotes.push({
-          quote: q,
-          clientName: cl.name || cl.company || 'Unknown',
-          clientId: cl.id,
-          jobName: job.name || '',
-          jobId: job.id,
-          clientIdx: ci,
-          jobIdx: ji,
-          quoteIdx: qi
-        });
+        allQuotes.push({ quote: q, clientName: cl.name || cl.company || 'Unknown', clientId: cl.id, jobName: job.name || '', jobId: job.id, clientIdx: ci, jobIdx: ji, quoteIdx: qi });
       });
     });
   });
 
-  // ── Overlay live in-memory status so changes made in the quote view are
-  //    immediately reflected here without needing a page reload.
   const _lsm = _liveStatusMap();
   allQuotes.forEach(r => {
     const ref = r.quote.quoteRef || r.quote.fields?.quoteRef;
     if (ref && _lsm[ref]) Object.assign(r.quote, _lsm[ref]);
   });
 
-  // ── Helper: quote status ──────────────────────────────────────────────────
   function quoteStatus(q) {
-    if (q._approvedAt)     return 'approved';
-    if (q._emailSentAt)    return 'emailed';
-    if (q._publishedAt)    return 'published';
+    if (q._approvedAt) return 'approved';
+    if (q._emailSentAt) return 'emailed';
+    if (q._publishedAt) return 'published';
     return 'draft';
   }
-
-  function statusBadge(status) {
-    const labels = { draft:'Draft', published:'Published', emailed:'Emailed', approved:'Approved' };
-    return `<span class="db-badge ${status}">${labels[status] || status}</span>`;
+  function statusBadge(st) {
+    const L = { draft:'Draft', published:'Published', emailed:'Emailed', approved:'Approved' };
+    return `<span class="db-badge ${st}">${L[st] || st}</span>`;
   }
 
-  // ── Stats ─────────────────────────────────────────────────────────────────
-  const totalQuotes   = allQuotes.length;
-  const totalClients  = clients.length;
+  const totalQuotes = allQuotes.length;
+  const totalClients = clients.length;
   const totalProjects = clients.reduce((n, cl) => n + (cl.jobs || []).length, 0);
-  // Ensure every quote has a computed _total and _profit (fill in from sections if missing)
   allQuotes.forEach(r => {
     const qq = r.quote;
     if ((!qq._total || !qq._profit) && qq.sections?.length) {
@@ -9588,15 +9617,21 @@ function renderDashboard() {
       if (!qq._profit && computed.profit !== 0) qq._profit = computed.profit;
     }
   });
-  const pipelineVal   = allQuotes.reduce((s, r) => s + (parseFloat(r.quote._total) || 0), 0);
-  const totalProfit   = allQuotes.reduce((s, r) => s + (parseFloat(r.quote._profit) || 0), 0);
-  const approvedVal   = allQuotes.filter(r => r.quote._approvedAt).reduce((s, r) => s + (parseFloat(r.quote._total) || 0), 0);
-  const awaitingApproval = allQuotes.filter(r => {
-    const q = r.quote;
-    return (q._emailSentAt || q._publishedAt) && !q._approvedAt;
-  }).length;
+  const pipelineVal = allQuotes.reduce((s, r) => s + (parseFloat(r.quote._total) || 0), 0);
+  const totalProfit = allQuotes.reduce((s, r) => s + (parseFloat(r.quote._profit) || 0), 0);
+  const approvedVal = allQuotes.filter(r => r.quote._approvedAt).reduce((s, r) => s + (parseFloat(r.quote._total) || 0), 0);
+  const awaitingApproval = allQuotes.filter(r => (r.quote._emailSentAt || r.quote._publishedAt) && !r.quote._approvedAt).length;
 
-  // ── Recent activity: last 8 by quoteDate ─────────────────────────────────
+  const fmtVal = v => typeof fmt === 'function' ? fmt(v) : '$' + v.toFixed(2);
+
+  // Date + meta subtitle
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const metaParts = [];
+  if (totalClients > 0) metaParts.push(`${totalClients} client${totalClients !== 1 ? 's' : ''}`);
+  if (totalProjects > 0) metaParts.push(`${totalProjects} project${totalProjects !== 1 ? 's' : ''}`);
+
+  // Recent quotes (last 8)
   const recentSorted = [...allQuotes].sort((a, b) => {
     const da = a.quote.quoteDate || a.quote._publishedAt || '';
     const db_ = b.quote.quoteDate || b.quote._publishedAt || '';
@@ -9605,57 +9640,47 @@ function renderDashboard() {
 
   function recentRow(r) {
     const q = r.quote;
-    const status = quoteStatus(q);
-    const val = typeof fmt === 'function' ? fmt(parseFloat(q._total) || 0) : ('$' + (parseFloat(q._total) || 0).toFixed(2));
+    const val = fmtVal(parseFloat(q._total) || 0);
     const sub = [r.clientName, r.jobName].filter(Boolean).join(' · ');
-    return `<div class="db-row" style="cursor:pointer" onclick="loadAndSwitchQuote(${r.clientIdx},${r.jobIdx},${r.quoteIdx})">
+    return `<div class="db-row" onclick="loadAndSwitchQuote(${r.clientIdx},${r.jobIdx},${r.quoteIdx})">
       <div class="db-row-main">
         <div class="db-row-ref">${esc(q.quoteRef || '—')}</div>
         <div class="db-row-sub" title="${esc(sub)}">${esc(sub)}</div>
       </div>
-      ${statusBadge(status)}
+      ${statusBadge(quoteStatus(q))}
       <div class="db-row-val">${esc(val)}</div>
     </div>`;
   }
 
   const recentHTML = recentSorted.length
     ? recentSorted.map(recentRow).join('')
-    : `<div class="db-card-empty">No quotes yet</div>`;
+    : `<div class="db-empty-cta">
+        <div class="db-empty-cta-icon">📋</div>
+        <div class="db-empty-cta-title">No quotes yet</div>
+        <div class="db-empty-cta-sub">Create your first quote to get started</div>
+        <button onclick="openWizard()" style="margin-top:6px;padding:7px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ New Quote</button>
+      </div>`;
 
-  // ── Needs attention ───────────────────────────────────────────────────────
+  // Needs attention
   const NOW = Date.now();
   const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
   const attentionItems = [];
-
   allQuotes.forEach(r => {
     const q = r.quote;
-    const status = quoteStatus(q);
-    // Emailed > 3 days, not yet approved
     if (q._emailSentAt && !q._approvedAt) {
       const sentMs = new Date(q._emailSentAt).getTime();
       if (NOW - sentMs > THREE_DAYS) {
         const daysAgo = Math.floor((NOW - sentMs) / 86400000);
-        attentionItems.push({
-          icon: '📬',
-          title: `${esc(q.quoteRef || 'Quote')} — awaiting approval`,
-          sub: `${esc(r.clientName)}${r.jobName ? ' · ' + esc(r.jobName) : ''} · Emailed ${daysAgo} day${daysAgo !== 1 ? 's' : ''} ago`,
-          r
-        });
+        attentionItems.push({ icon:'📬', title:`${esc(q.quoteRef || 'Quote')} — awaiting approval`, sub:`${esc(r.clientName)}${r.jobName ? ' · '+esc(r.jobName) : ''} · Emailed ${daysAgo} day${daysAgo!==1?'s':''} ago`, r });
       }
     }
-    // Edited after publish/email
     if (q._editedAfterPublish && (q._publishedAt || q._emailSentAt)) {
-      attentionItems.push({
-        icon: '✏️',
-        title: `${esc(q.quoteRef || 'Quote')} — edited after publishing`,
-        sub: `${esc(r.clientName)}${r.jobName ? ' · ' + esc(r.jobName) : ''} · Client may have a different version`,
-        r
-      });
+      attentionItems.push({ icon:'✏️', title:`${esc(q.quoteRef || 'Quote')} — edited after publishing`, sub:`${esc(r.clientName)}${r.jobName ? ' · '+esc(r.jobName) : ''} · Client may have a different version`, r });
     }
   });
 
   function attnRow(item) {
-    return `<div class="db-attn-row" style="cursor:pointer" onclick="loadAndSwitchQuote(${item.r.clientIdx},${item.r.jobIdx},${item.r.quoteIdx})">
+    return `<div class="db-attn-row" onclick="loadAndSwitchQuote(${item.r.clientIdx},${item.r.jobIdx},${item.r.quoteIdx})">
       <span class="db-attn-icon">${item.icon}</span>
       <div class="db-attn-body">
         <div class="db-attn-title">${item.title}</div>
@@ -9666,21 +9691,18 @@ function renderDashboard() {
 
   const attnHTML = attentionItems.length
     ? attentionItems.map(attnRow).join('')
-    : `<div class="db-card-empty">Nothing needs attention right now</div>`;
+    : `<div class="db-card-empty">Nothing needs attention</div>`;
 
-  // ── Open (in-memory) quotes ───────────────────────────────────────────────
+  // Open (in-memory) quotes
   function openQuoteRow(q, isActive) {
     const ref = q.fields?.quoteRef || 'Untitled';
     const client = q.fields?.clientName || '';
     const job = q.fields?.jobName || '';
     const sub = [client, job].filter(Boolean).join(' · ');
     const tot = q.fields?._total ?? q._total ?? null;
-    const val = tot != null ? (typeof fmt === 'function' ? fmt(parseFloat(tot) || 0) : '$' + (parseFloat(tot)||0).toFixed(2)) : '';
-    const dot = isActive
-      ? 'background:var(--accent)'
-      : 'background:var(--muted)';
+    const val = tot != null ? fmtVal(parseFloat(tot) || 0) : '';
     return `<div class="db-open-row" onclick="switchToQuote('${q.id}');switchTab('quote')" title="Switch to ${esc(ref)}">
-      <div class="db-open-dot" style="${dot}"></div>
+      <div class="db-open-dot" style="background:${isActive ? 'var(--accent)' : 'var(--muted)'}"></div>
       <div class="db-row-main">
         <div class="db-row-ref">${esc(ref)}</div>
         ${sub ? `<div class="db-row-sub">${esc(sub)}</div>` : ''}
@@ -9695,91 +9717,61 @@ function renderDashboard() {
     ? openTabs.map(q => openQuoteRow(q, q.id === _activeQuoteId)).join('')
     : `<div class="db-card-empty">No open quotes</div>`;
 
-  // ── Render ────────────────────────────────────────────────────────────────
   el.innerHTML = `
-    <div style="margin-bottom:6px;display:flex;align-items:center;gap:10px">
-      <h1 style="font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.5px;flex:1">Dashboard</h1>
-      <button onclick="openWizard()" style="display:flex;align-items:center;gap:6px;padding:8px 16px;background:#007aff;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+    <!-- Header -->
+    <div class="db-header">
+      <div>
+        <h1 class="db-title">Dashboard</h1>
+        <div class="db-subtitle">${dateStr}${metaParts.length ? ' &nbsp;·&nbsp; ' + metaParts.join(' · ') : ''}</div>
+      </div>
+      <button onclick="openWizard()" class="db-new-btn">
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New Quote
       </button>
     </div>
 
-    <!-- Stats row -->
-    <div class="db-stats" style="margin-top:18px;grid-template-columns:repeat(4,1fr)">
-      <div class="db-stat">
-        <div class="db-stat-val">${totalQuotes}</div>
-        <div class="db-stat-lbl">${totalQuotes === 1 ? 'Quote' : 'Total quotes'}</div>
+    <!-- KPI strip -->
+    <div class="db-kpis">
+      <div class="db-kpi">
+        <div class="db-kpi-val">${totalQuotes}</div>
+        <div class="db-kpi-lbl">Total quotes</div>
       </div>
-      <div class="db-stat">
-        <div class="db-stat-val accent">${typeof fmt === 'function' ? fmt(pipelineVal) : '$' + pipelineVal.toFixed(2)}</div>
-        <div class="db-stat-lbl">Pipeline (ex GST)</div>
+      <div class="db-kpi k-pipeline">
+        <div class="db-kpi-val">${fmtVal(pipelineVal)}</div>
+        <div class="db-kpi-lbl">Pipeline (ex GST)</div>
       </div>
-      <div class="db-stat" style="border-color:rgba(52,199,89,.3);background:rgba(52,199,89,.05)">
-        <div class="db-stat-val" style="color:#34c759">${typeof fmt === 'function' ? fmt(approvedVal) : '$' + approvedVal.toFixed(2)}</div>
-        <div class="db-stat-lbl">✓ Approved value</div>
+      <div class="db-kpi k-approved">
+        <div class="db-kpi-val">${fmtVal(approvedVal)}</div>
+        <div class="db-kpi-lbl">Approved value</div>
       </div>
-      <div class="db-stat${awaitingApproval > 0 ? '' : ''}" onclick="if(${awaitingApproval}>0){const s=document.getElementById('quotes-all-sort');if(s)s.value='pending';switchTab('quotes-all');}" style="${awaitingApproval > 0 ? 'cursor:pointer;border-color:rgba(255,159,10,.35);background:rgba(255,159,10,.07)' : ''}">
-        <div class="db-stat-val${awaitingApproval > 0 ? ' warn' : ''}">${awaitingApproval}</div>
-        <div class="db-stat-lbl">Awaiting approval${awaitingApproval > 0 ? ' →' : ''}</div>
+      <div class="db-kpi k-profit">
+        <div class="db-kpi-val">${fmtVal(totalProfit)}</div>
+        <div class="db-kpi-lbl">Est. profit</div>
       </div>
-    </div>
-    <!-- Second stats row -->
-    <div class="db-stats" style="margin-top:8px;grid-template-columns:repeat(4,1fr)">
-      <div class="db-stat">
-        <div class="db-stat-val">${totalClients}</div>
-        <div class="db-stat-lbl">Clients</div>
-      </div>
-      <div class="db-stat">
-        <div class="db-stat-val">${totalProjects}</div>
-        <div class="db-stat-lbl">Projects</div>
-      </div>
-      <div class="db-stat" style="border-color:rgba(52,199,89,.2);background:rgba(52,199,89,.03)">
-        <div class="db-stat-val" style="color:#34c759;font-size:16px">${typeof fmt === 'function' ? fmt(totalProfit) : '$' + totalProfit.toFixed(2)}</div>
-        <div class="db-stat-lbl">Est. profit</div>
-      </div>
-      <div class="db-stat">
-        <div class="db-stat-val" style="font-size:16px">${allQuotes.filter(r=>r.quote._approvedAt).length}</div>
-        <div class="db-stat-lbl">Approved quotes</div>
+      <div class="db-kpi k-awaiting${awaitingApproval > 0 ? ' has-items' : ''}" onclick="if(${awaitingApproval}>0){const s=document.getElementById('quotes-all-sort');if(s)s.value='pending';switchTab('quotes-all');}">
+        <div class="db-kpi-val">${awaitingApproval}</div>
+        <div class="db-kpi-lbl">Awaiting approval${awaitingApproval > 0 ? ' →' : ''}</div>
       </div>
     </div>
 
     <!-- Main two-column area -->
     <div class="db-cols">
-      <!-- Recent activity -->
-      <div>
-        <div class="db-section-title">Recent activity</div>
-        <div class="db-card">
-          <div class="db-card-head">
-            <h3>Last modified quotes</h3>
-            <button class="db-open-btn" onclick="switchTab('quotes-all')">View all →</button>
-          </div>
-          ${recentHTML}
+      <div class="db-card">
+        <div class="db-card-head">
+          <h3>Recent Quotes</h3>
+          <button class="db-open-btn" onclick="switchTab('quotes-all')">View all →</button>
         </div>
+        ${recentHTML}
       </div>
 
-      <!-- Right column: open quotes + attention -->
-      <div style="display:flex;flex-direction:column;gap:20px">
-        <!-- Open quotes -->
-        <div>
-          <div class="db-section-title">Open quotes</div>
-          <div class="db-card">
-            <div class="db-card-head">
-              <h3>Working quotes</h3>
-            </div>
-            ${openQuotesHTML}
-          </div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="db-card">
+          <div class="db-card-head"><h3>Working Quotes</h3></div>
+          ${openQuotesHTML}
         </div>
-
-        <!-- Needs attention -->
-        <div>
-          <div class="db-section-title">Needs attention</div>
-          <div class="db-card">
-            <div class="db-card-head">
-              <h3>Action required</h3>
-            </div>
-            ${attnHTML}
-          </div>
+        <div class="db-card">
+          <div class="db-card-head"><h3>Needs Attention</h3></div>
+          ${attnHTML}
         </div>
       </div>
     </div>
