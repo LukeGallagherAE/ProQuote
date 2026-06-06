@@ -8276,27 +8276,33 @@ function doPrint(){
   +'</div>'
 
   +'</div>' // /padding
-  +'<scr'+'ipt>window.onload=()=>window.print();<\/script>'
   +'</body></html>');
 
-  // ── pdfRecalc JS (for interactive optional checkboxes) ──────────────────
+  // ── Print bar + pdfRecalc JS — written inline before </body> ─────────────
   const reqTotal = useOverride ? overrideExGst : calcAll().total - (calcAll().optTotal||0);
-  const pdfRecalcScript =
-    '<script>'
+  const hasOpts = (calcAll().optTotal||0) > 0;
+  const pdfInteractiveBlock =
+    '<style>@media print{#pdf-print-bar{display:none!important}}</style>'
+    +'<div id="pdf-print-bar" style="position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#1a1a1a;display:flex;align-items:center;justify-content:space-between;padding:10px 24px;box-shadow:0 -2px 12px rgba(0,0,0,.35)">'
+      +(hasOpts?'<span style="font-size:12px;color:#999">Toggle optional items, then print.</span>':'<span></span>')
+      +'<button onclick="window.print()" style="padding:9px 22px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:-apple-system,Helvetica,sans-serif">🖨&nbsp; Print / Save PDF</button>'
+    +'</div>'
+    +'<div style="height:60px"></div>'
+    +'<scr'+'ipt>'
     +'var _reqTotal='+reqTotal.toFixed(2)+';'
     +'function pdfRecalc(){'
     +'  var cbs=document.querySelectorAll(".opt-cb");'
     +'  var optSum=0;'
     +'  cbs.forEach(function(cb){'
     +'    var row=cb.closest("tr");'
-    +'    var amtCell=row.querySelector(".opt-amt");'
+    +'    var amtCell=row&&row.querySelector(".opt-amt");'
     +'    if(cb.checked){'
     +'      optSum+=parseFloat(cb.dataset.amt)||0;'
     +'      if(amtCell)amtCell.style.opacity="1";'
-    +'      row.style.opacity="1";'
+    +'      if(row)row.style.opacity="1";'
     +'    } else {'
     +'      if(amtCell)amtCell.style.opacity=".3";'
-    +'      row.style.opacity=".4";'
+    +'      if(row)row.style.opacity=".4";'
     +'    }'
     +'  });'
     +'  var total=_reqTotal+optSum;'
@@ -8318,7 +8324,7 @@ function doPrint(){
     +'  if(optAmt)optAmt.textContent=fmt(optSum);'
     +'}'
     +'<\/script>';
-  pw.document.write(pdfRecalcScript);
+  pw.document.write(pdfInteractiveBlock);
   pw.document.close();closeModal();
   // ── Mark quote as published ──────────────────────────────────────────────
   (function(){
