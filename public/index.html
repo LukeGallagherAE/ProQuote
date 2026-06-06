@@ -8266,6 +8266,49 @@ function doPrint(_captureOnly){
     +'<span>'+esc(ref)+' · '+esc(dateStr)+'</span>'
   +'</div>'
 
+  // ── APPROVE / DECLINE ──
+  +(function(){
+    const _srv = window.location.origin;
+    const _isLocal = /localhost|127\.0\.0\.1/.test(_srv);
+    const _rBase = _srv+'/api/quote-response?ref='+encodeURIComponent(ref)+'&client='+encodeURIComponent(client||'')+'&action=';
+    const _approveHref = _isLocal
+      ? 'mailto:'+esc(email||'luke@adonaielectrical.com')+'?subject=APPROVED: '+encodeURIComponent(ref)+'&body=Hi,+I+approve+quote+'+encodeURIComponent(ref)+'.'
+      : _rBase+'approve';
+    const _declineHref = _isLocal
+      ? 'mailto:'+esc(email||'luke@adonaielectrical.com')+'?subject=DECLINED: '+encodeURIComponent(ref)+'&body=Hi,+I+decline+quote+'+encodeURIComponent(ref)+'.'
+      : _rBase+'decline';
+    return '<div id="qr-section" style="margin:36px 0 8px;padding:28px 32px;background:#f7f9fc;border:1px solid #dde4ef;border-radius:12px;text-align:center">'
+      +'<div style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#8895a7;margin-bottom:10px">Your decision</div>'
+      +'<div style="font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:6px">Ready to proceed with this quote?</div>'
+      +'<div style="font-size:12px;color:#8895a7;margin-bottom:22px">Click below to let us know — we\'ll get back to you promptly.</div>'
+      +'<div style="display:flex;justify-content:center;gap:16px;flex-wrap:wrap">'
+        +'<button onclick="qrRespond(\'approve\')" data-href="'+_approveHref+'" id="qr-approve" style="padding:12px 32px;background:#34c759;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.2px">✓ Approve Quote</button>'
+        +'<button onclick="qrRespond(\'decline\')" data-href="'+_declineHref+'" id="qr-decline" style="padding:12px 32px;background:#fff;color:#ff3b30;border:2px solid #ff3b30;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">✗ Decline Quote</button>'
+      +'</div>'
+    +'</div>'
+    +'<scr'+'ipt>'
+    +'function qrRespond(action){'
+    +'  var btn=document.getElementById("qr-"+action);'
+    +'  var href=btn.dataset.href;'
+    +'  var sec=document.getElementById("qr-section");'
+    // If mailto fallback just open it
+    +'  if(href.indexOf("mailto:")==0){window.location.href=href;return;}'
+    // Server fetch
+    +'  btn.disabled=true;btn.textContent=action==="approve"?"Sending…":"Sending…";'
+    +'  fetch(href,{mode:"cors"}).then(function(r){if(!r.ok)throw new Error();'
+    +'    sec.innerHTML="<div style=\'padding:28px;text-align:center\'>'
+    +'<div style=\'font-size:32px;margin-bottom:12px\'>"+(action==="approve"?"✅":"❌")+"</div>'
+    +'<div style=\'font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:6px\'>"+(action==="approve"?"Quote Approved!":"Quote Declined")+"</div>'
+    +'<div style=\'font-size:13px;color:#888\'>Thank you — we\'ve been notified and will be in touch soon.</div></div>";'
+    +'  }).catch(function(){'
+    // Fallback to mailto on failure
+    +'    window.location.href="mailto:"+((href.match(/client=([^&]*)/)||["",""])[1]||"")+"?subject="+(action==="approve"?"APPROVED":"DECLINED")+": "+(href.match(/ref=([^&]*)/)||["",""])[1];'
+    +'    btn.disabled=false;btn.textContent=action==="approve"?"✓ Approve Quote":"✗ Decline Quote";'
+    +'  });'
+    +'}'
+    +'<\/script>';
+  })()
+
   +'</div>' // /padding
   +'</body></html>');
 

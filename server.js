@@ -37,6 +37,63 @@ const _buildDate = (() => {
 app.get('/api/health',     (req, res) => res.json({ ok: true, built: _buildDate.toISOString() }));
 app.get('/api/build-info', (req, res) => res.json({ built: _buildDate.toISOString() }));
 
+// ── Quote approve/decline — public, no auth ───────────────────────────────────
+app.get('/api/quote-response', async (req, res) => {
+  const { action, ref, client } = req.query;
+  if (!action || !ref) return res.status(400).send('Missing action or ref');
+
+  const isApprove = action === 'approve';
+  const actionLabel = isApprove ? 'APPROVED ✓' : 'DECLINED ✗';
+  const actionColor = isApprove ? '#34c759' : '#ff3b30';
+  const icon        = isApprove ? '✅' : '❌';
+
+  // Send notification email to business owner
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const { Resend } = require('resend');
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const owner = process.env.GMAIL_USER || 'luke@adonaielectrical.com';
+      const fromAddr = `ProQuote <${owner}>`;
+      await resend.emails.send({
+        from:    fromAddr,
+        to:      [owner],
+        subject: `Quote ${actionLabel}: ${ref}${client ? ' — ' + client : ''}`,
+        html: `<!DOCTYPE html><html><body style="font-family:-apple-system,Arial,sans-serif;font-size:14px;color:#1a1a1a;padding:24px">
+          <div style="font-size:36px;margin-bottom:16px">${icon}</div>
+          <h2 style="margin:0 0 8px;color:${actionColor}">${actionLabel}</h2>
+          <p style="margin:0 0 4px"><strong>Quote:</strong> ${ref}</p>
+          ${client ? `<p style="margin:0 0 16px"><strong>Client:</strong> ${client}</p>` : '<br>'}
+          <p style="color:#888;font-size:12px">Sent via ProQuote — quote response button</p>
+        </body></html>`,
+      });
+    } catch(e) {
+      console.error('[ProQuote] Quote response email error:', e.message);
+    }
+  }
+
+  // CORS headers so the exported HTML file can fetch this endpoint
+  res.set('Access-Control-Allow-Origin', '*');
+
+  // Return thank-you page
+  res.send(`<!DOCTYPE html><html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quote Response</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,Arial,sans-serif;background:#f5f5f7;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}</style>
+</head>
+<body>
+  <div style="background:#fff;border-radius:16px;padding:48px 40px;text-align:center;max-width:420px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08)">
+    <div style="font-size:56px;margin-bottom:20px">${icon}</div>
+    <h1 style="font-size:22px;font-weight:800;color:${actionColor};margin-bottom:10px">${isApprove ? 'Quote Approved!' : 'Quote Declined'}</h1>
+    <p style="font-size:14px;color:#555;line-height:1.6;margin-bottom:24px">
+      ${isApprove
+        ? `Thank you for approving <strong>${ref}</strong>. We've been notified and will be in touch shortly to confirm next steps.`
+        : `We've received your response for <strong>${ref}</strong>. We'll be in touch if you'd like to discuss any changes.`}
+    </p>
+    <p style="font-size:11px;color:#aaa">You can close this window.</p>
+  </div>
+</body></html>`);
+});
+
 // Serve the app for any non-API route (SPA fallback)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
