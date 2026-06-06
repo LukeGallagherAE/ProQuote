@@ -7536,12 +7536,7 @@ function closeEmailPreview() {
 
 function captureQuoteHTML() {
   window._lastQuoteHTML = '';
-  const _realOpen = window.open;
-  window.open = function() {
-    const _fakeDoc = { write:()=>{}, close:()=>{}, open:()=>{} };
-    return { document: _fakeDoc, focus:()=>{}, close:()=>{} };
-  };
-  try { doPrint(); } catch(e) { console.error('PDF capture error:', e); } finally { window.open = _realOpen; }
+  try { doPrint(true); } catch(e) { console.error('PDF capture error:', e); }
   return window._lastQuoteHTML;
 }
 
@@ -7640,7 +7635,7 @@ function doPrintExport(){
   doPrint();
 }
 
-function doPrint(){
+function doPrint(_captureOnly){
   syncDOM();
   const v=id=>document.getElementById(id)?.value||'';
   // Load company logo for PDF header
@@ -7897,13 +7892,9 @@ function doPrint(){
     }).join('');
   }
 
-    const pw=window.open('','_blank');
-  if(!pw){alert('Pop-up blocked! Please allow pop-ups for this page and try again.');return;}
-
-  // Capture the HTML being written to the popup so the email route can use it
+  // Build HTML in-memory — no popup needed; blob URL opens in new tab
   window._lastQuoteHTML = '';
-  const _origWrite = pw.document.write.bind(pw.document);
-  pw.document.write = function(s){ window._lastQuoteHTML += (s||''); _origWrite(s); };
+  const pw = { document: { write(s){ window._lastQuoteHTML += (s||''); }, close(){} } };
 
   const allCatsOrderedPdf = [...ITEM_CATS, ..._customCats];
   const catOrderPdf2 = cat => { const i=allCatsOrderedPdf.indexOf(cat||''); return i===-1?allCatsOrderedPdf.length:i; };
@@ -8325,7 +8316,20 @@ function doPrint(){
     +'}'
     +'<\/script>';
   pw.document.write(pdfInteractiveBlock);
-  pw.document.close();closeModal();
+  pw.document.close();
+  if (!_captureOnly) {
+    const _blob = new Blob([window._lastQuoteHTML], {type:'text/html'});
+    const _burl = URL.createObjectURL(_blob);
+    // Download file
+    const _a = document.createElement('a');
+    _a.href = _burl;
+    _a.download = 'Quote-' + (ref||'export').replace(/[^a-zA-Z0-9\-_.]/g,'-') + '.html';
+    document.body.appendChild(_a); _a.click(); document.body.removeChild(_a);
+    // Also open in new tab for immediate interaction
+    window.open(_burl, '_blank');
+    setTimeout(() => URL.revokeObjectURL(_burl), 120000);
+    closeModal();
+  }
   // ── Mark quote as published ──────────────────────────────────────────────
   (function(){
     const ts = Date.now();
