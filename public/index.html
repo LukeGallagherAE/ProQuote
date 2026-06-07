@@ -4259,6 +4259,8 @@ function newQuoteTabDirect() {
   _quotes.push(nq);
   loadQuoteState(nq.id);
   addSection('');
+  _persistSession();
+  if (window._flushQuoteNow) window._flushQuoteNow(nq);
   renderQuoteTabs();
 }
 
@@ -4732,6 +4734,7 @@ function _hardDeleteQuotes(ids) {
   // Delete from server (pending_deletes gives retry on failure)
   ids.forEach(id => window._deleteQuoteFromServer?.(id));
   _persistSession();
+  if (window._flushStorageNow) window._flushStorageNow();
 }
 
 function _doCloseQuote(qid) {
@@ -6141,6 +6144,8 @@ function wizCreate() {
     _wizDuplicateFromRef = '';
     closeWizard();
     saveQuoteToClientBook({ ...fields, sections: copiedSections });
+    _persistSession();
+    if (window._flushQuoteNow) window._flushQuoteNow(nq);
     if (_activeTab !== 'quote') switchTab('quote');
     fullRender();
     renderQuoteTabs();
@@ -6161,6 +6166,8 @@ function wizCreate() {
   zones.forEach(z => addSection(z));
 
   closeWizard();
+  _persistSession();
+  if (window._flushQuoteNow) window._flushQuoteNow(nq);
   if (_activeTab !== 'quote') switchTab('quote');
   fullRender();
   renderQuoteTabs();
