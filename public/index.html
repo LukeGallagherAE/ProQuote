@@ -11122,6 +11122,16 @@ function _qaUpdateSelectionUI() {
   if (allCb && window._quotesAllRows) allCb.checked = n > 0 && n === window._quotesAllRows.length;
 }
 
+function qaToggleFamily(baseRef, fi) {
+  window._qaExpanded = window._qaExpanded || new Set();
+  const nowExpanded = !window._qaExpanded.has(baseRef);
+  if (nowExpanded) window._qaExpanded.add(baseRef); else window._qaExpanded.delete(baseRef);
+  // Show/hide revision rows without a full re-render
+  document.querySelectorAll('.qa-fam-' + fi).forEach(el => { el.style.display = nowExpanded ? '' : 'none'; });
+  const btn = document.getElementById('qa-tog-' + fi);
+  if (btn) { btn.textContent = nowExpanded ? '▾' : '▸'; btn.title = nowExpanded ? 'Collapse revisions' : 'Expand revisions'; }
+}
+
 function qaToggleRow(key) {
   if (_qaSelected.has(key)) _qaSelected.delete(key);
   else _qaSelected.add(key);
@@ -11487,6 +11497,12 @@ function renderQuotesAll() {
     draft:     {color:'var(--muted)', label:'Draft'},
   };
 
+  // Count revisions per base ref so we can show the badge and toggle
+  const _revCounts = {};
+  rows.forEach(r => { const b = _revBaseName(r.ref)||r.ref; if (b !== r.ref) _revCounts[b] = (_revCounts[b]||0)+1; });
+  window._qaExpanded = window._qaExpanded || new Set();
+  let _qafi = -1; // family index — one per non-revision row
+
   const selectCol = _qaSelectMode ? '<th style="padding:10px 12px;width:36px"><input type="checkbox" id="qa-cb-all" onchange="qaToggleAll(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#007aff"></th>' : '';
   const _mainTableHtml = rows.length === 0 ? '' :
     '<table style="width:100%;border-collapse:collapse">' +
@@ -11503,6 +11519,11 @@ function renderQuotesAll() {
     rows.map((r, i) => {
       const baseRef = _revBaseName(r.ref) || r.ref;
       const isRevision = baseRef !== r.ref;
+      const revCount = _revCounts[baseRef] || 0;
+      if (!isRevision) _qafi++;
+      const fi = _qafi;
+      const isExpanded = window._qaExpanded.has(baseRef);
+
       const ss = STATUS_STYLES[r.status] || STATUS_STYLES.draft;
       const statusDot = '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:'+ss.color+'"><span style="width:7px;height:7px;border-radius:50%;background:'+ss.color+';display:inline-block"></span>'+ss.label+'</span>';
       const _createdTs = r.createdAt || r.saved;
@@ -11517,16 +11538,40 @@ function renderQuotesAll() {
           '<button class="btn btn-secondary btn-sm" onclick="deleteStoredQuote('+r.clientIdx+','+r.jobIdx+','+r.quoteIdx+',\''+esc(r.ref)+'\')" style="color:#ff3b30" title="Move to bin">🗑</button>' +
         '</td>';
       const rowClick = _qaSelectMode ? 'onclick="qaToggleRow(\''+rowKey+'\')"' : 'onclick="openQuoteFromAll('+i+')"';
+
+      // Revision rows start hidden; toggle shows/hides them without re-render
+      const isHidden = isRevision && !isExpanded;
       const rowBg = isSelected ? 'background:var(--blue-bg)' : (isRevision ? 'background:var(--surface2)' : '');
-      const revSuffix = isRevision ? r.ref.slice(baseRef.length).trim() : '';
-      const refCell = isRevision
-        ? '<span style="color:var(--muted);font-weight:400">↳ </span>' + esc(baseRef) + ' <span style="font-size:11px;font-weight:600;color:var(--accent);background:rgba(0,122,255,.12);padding:1px 6px;border-radius:4px">' + esc(revSuffix) + '</span>'
-        : esc(r.ref);
-      return '<tr style="border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer;'+rowBg+'" '+rowClick+' onmouseover="this.style.background=\''+(isSelected?'var(--blue-bg)':isRevision?'var(--surface2)':'var(--surface2)')+'\';" onmouseout="this.style.background=\''+(isSelected?'var(--blue-bg)':isRevision?'var(--surface2)':'')+'\';">' +
+      const rowStyle = 'border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer;' + rowBg + (isHidden ? ';display:none' : '');
+      const trClass = isRevision ? ('qa-fam-' + fi) : '';
+
+      // Ref cell
+      let refCell;
+      if (isRevision) {
+        const revSuffix = r.ref.slice(baseRef.length).trim();
+        refCell =
+          '<span style="display:inline-flex;align-items:center;gap:6px;padding-left:26px">' +
+          '<span style="color:var(--muted);font-size:11px">↳</span>' +
+          '<span style="font-size:11px;font-weight:700;color:var(--accent);background:rgba(0,122,255,.12);padding:2px 7px;border-radius:4px">' + esc(revSuffix) + '</span>' +
+          '</span>';
+      } else {
+        const safeBase = baseRef.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const togBtn = revCount > 0
+          ? '<button onclick="event.stopPropagation();qaToggleFamily(\''+safeBase+'\','+fi+')" id="qa-tog-'+fi+'" title="'+(isExpanded?'Collapse':'Expand')+' revisions" style="flex-shrink:0;width:18px;height:18px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0;line-height:1;border-radius:3px;transition:color .1s">'+(isExpanded?'▾':'▸')+'</button> '
+          : '<span style="display:inline-block;width:20px"></span>';
+        const revBadge = revCount > 0
+          ? ' <span onclick="event.stopPropagation();qaToggleFamily(\''+safeBase+'\','+fi+')" style="cursor:pointer;font-size:10px;font-weight:600;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1px 7px;margin-left:5px;white-space:nowrap;vertical-align:middle">' + revCount + ' rev'+(revCount>1?'s':'')+'</span>'
+          : '';
+        refCell = '<span style="display:inline-flex;align-items:center">' + togBtn + '<span>' + esc(r.ref) + revBadge + '</span></span>';
+      }
+
+      return '<tr' + (trClass ? ' class="'+trClass+'"' : '') + ' style="'+rowStyle+'" '+rowClick+
+        ' onmouseover="this.style.background=\''+(isSelected?'var(--blue-bg)':'var(--surface2)')+'\';"' +
+        ' onmouseout="this.style.background=\''+(isSelected?'var(--blue-bg)':isRevision?'var(--surface2)':'')+'\';">' +
         cbCell +
         '<td style="padding:12px 16px;font-size:13px;font-weight:700;font-family:monospace">' + refCell + '</td>' +
-        '<td style="padding:12px 16px;font-size:13px">' + esc(r.clientName) + '</td>' +
-        '<td style="padding:12px 16px;font-size:13px;color:var(--muted)">' + esc(r.jobName) + (r.jobNumber ? ' <span style="font-size:11px">#'+esc(r.jobNumber)+'</span>' : '') + '</td>' +
+        '<td style="padding:12px 16px;font-size:13px">' + (isRevision ? '' : esc(r.clientName)) + '</td>' +
+        '<td style="padding:12px 16px;font-size:13px;color:var(--muted)">' + (isRevision ? '' : esc(r.jobName) + (r.jobNumber ? ' <span style="font-size:11px">#'+esc(r.jobNumber)+'</span>' : '')) + '</td>' +
         '<td style="padding:12px 16px;font-size:12px;color:var(--muted)">' + savedStr + '</td>' +
         '<td style="padding:12px 16px;font-size:13px;font-weight:700;text-align:right;font-family:monospace;color:var(--text)">' + (r.total ? '$' + r.total.toLocaleString('en-AU', {minimumFractionDigits:2,maximumFractionDigits:2}) : '<span style="color:var(--muted)">—</span>') + '</td>' +
         '<td style="padding:12px 16px">' + statusDot + '</td>' +
