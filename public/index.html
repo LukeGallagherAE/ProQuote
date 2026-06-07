@@ -14560,68 +14560,81 @@ window._initStorage().then(() => {
   } catch(e) { console.warn('[ProQuote] Post-init refresh failed:', e); setSaveStatus('synced'); }
 }).catch(() => { setSaveStatus('synced'); });
 
-// ── ONE-TIME CLEANUP: remove all Q-2026-001 quotes ──────────────────────
+// ── ONE-TIME CLEANUP: remove all Q-2026-001 quotes (including revisions) ─
 (function _cleanup2026001() {
+  function _is2026001(ref) {
+    const r = (ref || '').toLowerCase();
+    return r.includes('2026-001') || r.includes('2026001');
+  }
   setTimeout(async () => {
     try {
+      // 1. Purge from in-memory _quotes regardless of server state
+      let removed = 0;
+      if (typeof _quotes !== 'undefined') {
+        const before = _quotes.length;
+        _quotes = _quotes.filter(q => !_is2026001(q.fields?.quoteRef || q.quoteRef || ''));
+        removed = before - _quotes.length;
+      }
+      // 2. Purge from localStorage session blob
+      try {
+        const raw = window._nativeLS.getItem('proquote_session_quotes');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const cleaned = parsed.filter(q => !_is2026001(q.fields?.quoteRef || q.quoteRef || ''));
+          if (cleaned.length !== parsed.length) {
+            window._nativeLS.setItem('proquote_session_quotes', JSON.stringify(cleaned));
+            localStorage.setItem('proquote_session_quotes', JSON.stringify(cleaned));
+          }
+        }
+      } catch(e) {}
+      // 3. Purge from client book
+      try {
+        const clients = JSON.parse(localStorage.getItem('proquote_clients') || '[]');
+        clients.forEach(c => (c.jobs||[]).forEach(j => {
+          if (j.quotes) j.quotes = j.quotes.filter(q => !_is2026001(q.quoteRef || q.fields?.quoteRef || ''));
+        }));
+        localStorage.setItem('proquote_clients', JSON.stringify(clients));
+      } catch(e) {}
+      // 4. Re-render tabs/dashboard after in-memory purge
+      if (removed > 0) {
+        // If the deleted quote was active, navigate away
+        const activeStillExists = _quotes.find(q => q.id === _activeQuoteId && !q._binned);
+        if (!activeStillExists) {
+          const first = _quotes.filter(q => !q._binned && !q._hiddenTab)[0];
+          if (first) { _activeQuoteId = first.id; }
+          else switchTab('dashboard');
+        }
+        if (typeof renderQuoteTabs === 'function') renderQuoteTabs();
+        if (typeof renderDashboard === 'function' && document.getElementById('db-content')) renderDashboard();
+        if (typeof renderQuotesAll === 'function' && document.getElementById('quotes-all-content')) renderQuotesAll();
+        if (typeof showToast === 'function') showToast('Cleared ' + removed + ' old test quote(s)', 3000);
+      }
+      // 5. Delete from server
       const token = window._nativeLS && window._nativeLS.getItem('pq_jwt');
       if (!token) return;
       const res = await fetch('/api/quotes', { headers: { Authorization: 'Bearer ' + token } });
       if (!res.ok) return;
       const rows = await res.json();
       const targets = rows.filter(r => {
-        const n = (r.name || '').toLowerCase();
         let ref = '';
-        try { const d = typeof r.data === 'string' ? JSON.parse(r.data) : r.data; ref = (d?.fields?.quoteRef || '').toLowerCase(); } catch(e) {}
-        return n.includes('2026-001') || n.includes('2026001') || ref.includes('2026-001') || ref.includes('2026001');
+        try { const d = typeof r.data === 'string' ? JSON.parse(r.data) : r.data; ref = d?.fields?.quoteRef || ''; } catch(e) {}
+        return _is2026001(r.name || '') || _is2026001(ref);
       });
-      if (!targets.length) {
-        console.log('[ProQuote] Cleanup: no 2026-001 quotes found on server.');
-        return;
-      }
-      console.log('[ProQuote] Cleanup: found', targets.length, 'quote(s) to delete:', targets.map(r=>r.name));
-      // Register IDs as pending-deletes FIRST so _initStorage always filters them out
+      if (!targets.length) return;
       try {
         const pd = JSON.parse(window._nativeLS.getItem('proquote_pending_deletes') || '[]');
         targets.forEach(r => { if (!pd.includes(r.id)) pd.push(r.id); });
         window._nativeLS.setItem('proquote_pending_deletes', JSON.stringify(pd));
       } catch(e) {}
-      // Delete from server — retry up to 3 times per quote
-      let allOk = true;
       for (const r of targets) {
-        let ok = false;
-        for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+        for (let attempt = 0; attempt < 3; attempt++) {
           const d = await fetch('/api/quotes/' + r.id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
-          ok = d.ok || d.status === 404;
-          if (!ok) await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+          if (d.ok || d.status === 404) break;
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
         }
-        console.log('[ProQuote] Cleanup:', ok ? '✓' : '✗ FAILED', r.id, r.name);
-        if (!ok) allOk = false;
-      }
-      // Purge from in-memory _quotes
-      const badIds = new Set(targets.map(r => r.id));
-      if (typeof _quotes !== 'undefined') _quotes = _quotes.filter(q => !badIds.has(q.id));
-      // Purge from client book
-      try {
-        const clients = JSON.parse(localStorage.getItem('proquote_clients') || '[]');
-        clients.forEach(c => (c.jobs||[]).forEach(j => {
-          if (j.quotes) j.quotes = j.quotes.filter(q => {
-            const qr = (q.quoteRef || q.fields?.quoteRef || '').toLowerCase();
-            return !qr.includes('2026-001') && !qr.includes('2026001');
-          });
-        }));
-        localStorage.setItem('proquote_clients', JSON.stringify(clients));
-      } catch(e) {}
-      if (typeof renderQuoteTabs === 'function') renderQuoteTabs();
-      if (typeof renderQuotesAll === 'function' && document.getElementById('quotes-all-content')) renderQuotesAll();
-      if (allOk) {
-        console.log('[ProQuote] Cleanup complete — all', targets.length, 'quote(s) deleted from server.');
-        if (typeof showToast === 'function') showToast('Removed ' + targets.length + ' old test quote(s)', 3000);
-      } else {
-        console.warn('[ProQuote] Cleanup: some deletes failed — will retry on next load.');
       }
     } catch(e) { console.warn('[ProQuote] Cleanup error:', e); }
-  }, 4000);
+  }, 3000);
 })();
 // ── END ONE-TIME CLEANUP ─────────────────────────────────────────────────
 
