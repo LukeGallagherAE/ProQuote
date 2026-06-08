@@ -1967,6 +1967,8 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         <button id="qa-merge-btn" onclick="openMergeWizard()" style="display:none;padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">⇄ Merge as revisions</button>
         <button id="qa-delete-selected" onclick="batchDeleteQuotes()" style="display:none;padding:7px 14px;background:#ff3b30;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Move to bin (0)</button>
         <button id="qa-select-btn" onclick="quotesAllEnterSelect()" style="padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Select</button>
+        <button onclick="exportAllQuotes()" style="padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" title="Export all quotes as a JSON backup">↓ Export</button>
+        <button onclick="importQuotes()" style="padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" title="Import quotes from a ProQuote export file">↑ Import</button>
         <button onclick="document.getElementById('qa-bin-section').scrollIntoView({behavior:'smooth'});renderQuotesAll()" style="padding:7px 14px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" title="Go to bin">🗑 Bin <span id="qa-bin-count"></span></button>
         <button onclick="openWizard()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -11120,6 +11122,89 @@ function _qaUpdateSelectionUI() {
   if (mergeBtn) mergeBtn.style.display = n === 2 ? '' : 'none';
   const allCb = document.getElementById('qa-cb-all');
   if (allCb && window._quotesAllRows) allCb.checked = n > 0 && n === window._quotesAllRows.length;
+}
+
+function exportAllQuotes() {
+  const quotes = (_quotes || []).filter(q => !q._binned);
+  if (!quotes.length) { showToast('No quotes to export', 2000); return; }
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    quotes,
+    clients: loadClients(),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'proquote-quotes-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  showToast('Exported ' + quotes.length + ' quote' + (quotes.length !== 1 ? 's' : ''));
+}
+
+function importQuotes() {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.json';
+  inp.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      // Accept {version, quotes, clients} or plain array
+      const incoming = Array.isArray(data) ? data : (Array.isArray(data?.quotes) ? data.quotes : null);
+      if (!incoming) { alert('Not a valid ProQuote export file.'); return; }
+
+      const existingRefs = new Set((_quotes||[]).map(q => q.fields?.quoteRef || '').filter(Boolean));
+      let added = 0, skipped = 0;
+
+      incoming.forEach(q => {
+        if (!q || typeof q !== 'object') return;
+        const ref = q.fields?.quoteRef || q.quoteRef || '';
+        if (ref && existingRefs.has(ref)) { skipped++; return; }
+        if (ref) existingRefs.add(ref);
+        // Re-assign ID to avoid collisions; keep as hidden tab
+        const nq = {
+          ...q,
+          id: 'q-imp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          _hiddenTab: true,
+          _importedAt: Date.now(),
+        };
+        // Re-stamp section / parent / subitem IDs to avoid collisions with existing data
+        let _nextId = Date.now();
+        (nq.sections || []).forEach(sec => {
+          sec.id = ++_nextId;
+          (sec.parents || []).forEach(par => {
+            par.id = ++_nextId;
+            (par.subitems || []).forEach(sub => { sub.id = ++_nextId; });
+          });
+        });
+        _quotes.push(nq);
+        if (window._flushQuoteNow) window._flushQuoteNow(nq);
+        added++;
+      });
+
+      // Also merge any clients from the export that don't already exist
+      if (data?.clients && Array.isArray(data.clients)) {
+        const existingClientIds = new Set(loadClients().map(c => String(c.id)));
+        const newClients = data.clients.filter(c => !existingClientIds.has(String(c.id)));
+        if (newClients.length) {
+          const merged = [...newClients, ...loadClients()];
+          saveClients(merged);
+        }
+      }
+
+      _persistSession();
+      renderQuotesAll();
+      renderQuoteTabs();
+      const msg = added + ' quote' + (added !== 1 ? 's' : '') + ' imported' + (skipped ? ' · ' + skipped + ' skipped (ref already exists)' : '');
+      showToast(msg, 4000);
+    } catch(err) {
+      alert('Could not import: ' + err.message);
+    }
+  };
+  document.body.appendChild(inp); inp.click(); document.body.removeChild(inp);
 }
 
 function qaToggleFamily(baseRef, fi) {
