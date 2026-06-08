@@ -1970,6 +1970,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         <button onclick="exportAllQuotes()" style="padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" title="Export all quotes as a JSON backup">↓ Export</button>
         <button onclick="importQuotes()" style="padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" title="Import quotes from a ProQuote export file">↑ Import</button>
         <button onclick="forceReloadFromServer()" style="padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" title="Clear local cache and reload all quotes fresh from server">⟳ Sync</button>
+        <button onclick="rebuildClientsFromQuotes()" style="padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" title="Scan all quotes and create clients/projects from entered data">👥 Build Clients</button>
         <button onclick="document.getElementById('qa-bin-section').scrollIntoView({behavior:'smooth'});renderQuotesAll()" style="padding:7px 14px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" title="Go to bin">🗑 Bin <span id="qa-bin-count"></span></button>
         <button onclick="openWizard()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -4375,14 +4376,13 @@ function deleteRevision(qid) {
   const family = _getRevisionFamily(q);
   if (family.length <= 1) { showToast('Cannot delete the only version', 2000); return; }
   const idx = family.findIndex(x => x.id === qid);
+  const remaining = family.filter(x => x.id !== qid);
   if (!confirm('Delete Rev ' + _revLetter(idx) + '? This cannot be undone.')) return;
   saveActiveQuoteState();
   _quotes = _quotes.filter(x => x.id !== qid);
-  if (_activeQuoteId === qid) {
-    const remaining = family.filter(x => x.id !== qid);
-    loadQuoteState(remaining[0].id);
-  }
+  if (_activeQuoteId === qid) loadQuoteState(remaining[0].id);
   if (window._deleteQuoteFromServer) window._deleteQuoteFromServer(qid);
+  _renumberRevisionFamily(remaining);
   _persistSession();
   renderQuoteTabs();
   updateRevLabel();
@@ -4451,6 +4451,7 @@ function deleteSelectedRevisions() {
     loadQuoteState(remaining[0].id);
   }
 
+  _renumberRevisionFamily(remaining);
   _revSelections.clear();
   _persistSession();
   renderQuoteTabs();
@@ -5464,7 +5465,38 @@ function openWizardDuplicateActive() {
 
 function _revBaseName(ref) {
   // Strip " Rev X" (single letter) or legacy " Revision (N)" suffix
-  return (ref || '').replace(/\s+Rev\s+[A-Z]\s*$/i, '').replace(/\s+Revision\s*\(\d+\)\s*$/i, '').trim();
+  return (ref || '').replace(/\s+Rev\s+[A-Z]+\s*$/i, '').replace(/\s+Revision\s*\(\d+\)\s*$/i, '').trim();
+}
+
+// After deleting one or more revisions, renumber the survivors so their
+// quoteRef values stay consecutive (e.g. A, C → A, B).
+// `family` must be the SURVIVING members sorted by _createdAt (oldest first).
+function _renumberRevisionFamily(family) {
+  if (!family || family.length <= 1) return;
+  const baseRef = _revBaseName(family[0]._parentRef || family[0].fields?.quoteRef || '');
+  family.forEach((q, i) => {
+    const expected = i === 0 ? baseRef : baseRef + ' Rev ' + _revLetter(i);
+    const oldRef = q.fields?.quoteRef || '';
+    if (q.fields && oldRef !== expected) {
+      _renameQuoteInClientBook(oldRef, expected);
+      q.fields.quoteRef = expected;
+      if (window._flushQuoteNow) window._flushQuoteNow(q);
+    }
+    if (i > 0) q._parentRef = baseRef;
+  });
+}
+
+// Update the quoteRef of a stored client-book snapshot (so no orphaned old refs).
+function _renameQuoteInClientBook(oldRef, newRef) {
+  if (!oldRef || !newRef || oldRef === newRef) return;
+  const clients = loadClients();
+  let changed = false;
+  clients.forEach(c => (c.jobs || []).forEach(j => {
+    (j.quotes || []).forEach(snap => {
+      if (snap.quoteRef === oldRef) { snap.quoteRef = newRef; changed = true; }
+    });
+  }));
+  if (changed) saveClients(clients);
 }
 
 function _revLetter(idx) {
@@ -6877,8 +6909,9 @@ function saveQuoteToClientBook(d) {
   if (!storeRef || !(d.clientName || '').trim()) return;
   const storeData = { ...d };
 
+  const _normName = s => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const clients = loadClients();
-  let client = clients.find(c => c.name.toLowerCase() === (storeData.clientName||'').toLowerCase());
+  let client = clients.find(c => _normName(c.name) === _normName(storeData.clientName));
   if (!client) {
     client = { id: Date.now(), name: storeData.clientName, phone: storeData.clientPhone||'', email: storeData.clientEmail||'', company:'', notes:'', address: storeData.siteAddr||'', jobs: [] };
     clients.unshift(client);
@@ -6886,7 +6919,7 @@ function saveQuoteToClientBook(d) {
     if (storeData.clientPhone) client.phone = storeData.clientPhone;
     if (storeData.clientEmail) client.email = storeData.clientEmail;
   }
-  let job = client.jobs?.find(j => j.name?.toLowerCase() === (storeData.jobName||'').toLowerCase());
+  let job = client.jobs?.find(j => _normName(j.name) === _normName(storeData.jobName));
   if (!job) {
     job = { id: Date.now()+1, name: storeData.jobName||'Unnamed job', address: storeData.siteAddr||'', quotes: [] };
     if (!client.jobs) client.jobs = [];
@@ -7665,9 +7698,19 @@ async function confirmSendEmail() {
     const data = await res.json();
     if (res.ok) {
       showToast('✅ Quote emailed to ' + to, 5000);
+      if (data.viewLink) {
+        // Show a dismissable banner with the live quote link
+        setTimeout(() => {
+          const msg = '🔗 Live quote link (share anytime): ' + data.viewLink;
+          if (confirm(msg + '\n\nCopy link to clipboard?')) {
+            navigator.clipboard?.writeText(data.viewLink).catch(() => {});
+          }
+        }, 800);
+      }
       const aq = _quotes.find(q => q.id === _activeQuoteId);
       if (aq) {
         aq._emailSentAt = Date.now();
+        if (data.viewLink) aq._viewLink = data.viewLink;
         _persistSession();
         updatePublishBadge();
         saveActiveQuoteState();
@@ -11314,6 +11357,31 @@ async function forceReloadFromServer() {
   } catch(err) {
     console.error('[ProQuote] forceReloadFromServer:', err);
     showToast('Sync failed: ' + err.message, 4000);
+  }
+}
+
+async function rebuildClientsFromQuotes() {
+  const token = window._nativeLS && window._nativeLS.getItem('pq_jwt');
+  if (!token) { showToast('Not signed in', 2000); return; }
+  showToast('Building clients from quotes…', 4000);
+  try {
+    const res = await fetch('/api/rebuild-clients', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    if (!res.ok) { showToast('Rebuild failed', 3000); return; }
+    // Refresh client cache after rebuild
+    const cRes = await fetch('/api/clients', { headers: { Authorization: 'Bearer ' + token } });
+    if (cRes.ok) {
+      const cls = await cRes.json();
+      window._clientsCache = Array.isArray(cls) ? cls : [];
+      window._nativeLS.setItem('proquote_clients', JSON.stringify(window._clientsCache));
+    }
+    if (typeof renderClients  === 'function') renderClients();
+    if (typeof renderDashboard === 'function') renderDashboard();
+    showToast('✓ Clients rebuilt from quote data', 4000);
+  } catch(e) {
+    showToast('Rebuild failed: ' + e.message, 3000);
   }
 }
 

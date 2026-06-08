@@ -96,6 +96,32 @@ app.get('/api/quote-response', async (req, res) => {
 </body></html>`);
 });
 
+// ── Hosted interactive quote view (public, no auth) ───────────────────────────
+// The email includes a link like /q/<token> that serves the interactive HTML.
+app.get('/q/:token', async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      "SELECT html FROM quote_links WHERE token = $1 AND (expires_at IS NULL OR expires_at > NOW())",
+      [req.params.token]
+    );
+    if (!rows.length) {
+      return res.status(404).send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Link expired</title></head>
+        <body style="font-family:-apple-system,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
+          <div style="text-align:center;color:#555">
+            <div style="font-size:40px;margin-bottom:16px">🔗</div>
+            <h2 style="margin:0 0 8px">Quote link not found</h2>
+            <p style="margin:0;font-size:14px">This link may have expired or is invalid.</p>
+          </div>
+        </body></html>`);
+    }
+    res.set('Content-Type', 'text/html');
+    res.send(rows[0].html);
+  } catch (err) {
+    console.error('GET /q/:token:', err);
+    res.status(500).send('Server error');
+  }
+});
+
 // Serve the app for any non-API route (SPA fallback)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -213,6 +239,26 @@ app.listen(PORT, () => {
   console.log(`ProQuote 2.1 running at http://localhost:${PORT}`);
 });
 
+// ── Manual rebuild: POST /api/rebuild-clients ─────────────────────────────────
+// Allows the user to trigger a client/job backfill from the UI at any time.
+app.post('/api/rebuild-clients', async (req, res) => {
+  const { requireAuth: _reqAuth } = require('./middleware/requireAuth');
+  // Inline auth check
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const jwt = require('jsonwebtoken');
+  let userId;
+  try { userId = jwt.verify(token, process.env.JWT_SECRET || 'proquote-secret-change-me').userId; } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  try {
+    await migrateQuotesToClients();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('POST /api/rebuild-clients:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Clients/Jobs migration ────────────────────────────────────────────────────
 // Creates the clients and jobs tables, then migrates any existing proquote_clients
 // JSON blob (stored in the settings table) into the new relational tables.
@@ -251,6 +297,18 @@ async function migrateClients() {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_clients_user ON clients(user_id)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_user ON jobs(user_id)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_client ON jobs(client_id, user_id)`);
+
+    // Table for hosted interactive quote HTML links
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS quote_links (
+        token      TEXT PRIMARY KEY,
+        user_id    INTEGER REFERENCES users(id),
+        html       TEXT NOT NULL,
+        ref        TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '90 days'
+      )
+    `);
 
     // 2. Migrate any proquote_clients blobs from the settings table
     const { rows } = await db.query(

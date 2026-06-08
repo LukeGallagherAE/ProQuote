@@ -2,6 +2,7 @@ const express    = require('express');
 const router     = express.Router();
 const path       = require('path');
 const fs         = require('fs');
+const crypto     = require('crypto');
 const db         = require('../db');
 const { Resend } = require('resend');
 const { mergeTCPdf } = require('./pdf');
@@ -82,6 +83,18 @@ router.post('/', async (req, res) => {
   const subject = customSubject || ['Quote', ref, jobName ? '— ' + jobName : ''].filter(Boolean).join(' ');
 
   try {
+    // Store interactive HTML and generate a shareable link
+    const token    = crypto.randomBytes(24).toString('hex');
+    const baseUrl  = process.env.RAILWAY_PUBLIC_DOMAIN
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+      : (process.env.BASE_URL || `${req.protocol}://${req.get('host')}`);
+    const viewLink = `${baseUrl}/q/${token}`;
+
+    await db.query(
+      'INSERT INTO quote_links (token, user_id, html, ref) VALUES ($1,$2,$3,$4)',
+      [token, req.user.userId, html, ref || null]
+    ).catch(e => console.error('[ProQuote] Failed to store quote link:', e.message));
+
     let pdf = await generatePDF(html);
 
     // Append T&C PDF (with logo watermark) if the user has one stored
@@ -91,13 +104,20 @@ router.post('/', async (req, res) => {
     const fromAddress = `Adonai Electrical <${process.env.GMAIL_USER || 'Luke@adonaielectrical.com'}>`;
     const pdfFilename = [ref || 'Quote', clientName].filter(Boolean).join(' - ') + '.pdf';
 
+    // Append the interactive link to the email body
+    const bodyWithLink = (customBody ? customBody + '\n\n' : '')
+      + '──────────────────────────────\n'
+      + 'View and respond to this quote online:\n'
+      + viewLink + '\n'
+      + '──────────────────────────────';
+
     // Send quote to client
     const { error: sendErr } = await resend.emails.send({
       from:        fromAddress,
       to:          [to],
       subject,
-      html:        buildHTMLEmail(customBody),
-      text:        customBody || '',
+      html:        buildHTMLEmail(bodyWithLink),
+      text:        bodyWithLink,
       attachments: [{ filename: pdfFilename, content: pdf }],
     });
 
@@ -131,7 +151,7 @@ router.post('/', async (req, res) => {
       </body></html>`,
     });
 
-    res.json({ ok: true });
+    res.json({ ok: true, viewLink });
   } catch (err) {
     console.error('Email send error:', err.message);
     res.status(500).json({ error: err.message });
