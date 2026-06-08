@@ -2713,8 +2713,8 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         if (clientsRes && clientsRes.ok) {
           const cls = await clientsRes.json();
           window._clientsCache = Array.isArray(cls) ? cls : [];
-          // Mirror to native LS for offline fallback
-          window._nativeLS.setItem('proquote_clients', JSON.stringify(window._clientsCache));
+          // Mirror to native LS for offline fallback (best-effort — quota may be exceeded)
+          try { window._nativeLS.setItem('proquote_clients', JSON.stringify(window._clientsCache)); } catch(e) {}
         } else {
           // Fallback: use native LS data (offline or migration pending)
           try { window._clientsCache = JSON.parse(window._nativeLS.getItem('proquote_clients') || '[]'); } catch(e) { window._clientsCache = []; }
@@ -4396,6 +4396,17 @@ function deleteRevision(qid) {
 // ── Batch-delete revisions ────────────────────────────────────────────────────
 let _revSelections = new Set();
 
+function _onRevTileClick(qid, tile, event) {
+  if (_revSelections.size > 0) {
+    const newState = !_revSelections.has(qid);
+    const cb = tile.querySelector('.rev-tile-cb');
+    if (cb) cb.checked = newState;
+    toggleRevSelection(qid, newState);
+  } else {
+    loadRevisionCard(qid);
+  }
+}
+
 function toggleRevSelection(qid, checked) {
   if (checked) _revSelections.add(qid);
   else _revSelections.delete(qid);
@@ -5934,7 +5945,7 @@ function renderRevisions() {
     }
 
     const lockBadge = q._locked ? '<span title="Locked — read only" style="margin-left:5px;font-size:11px;opacity:.7">🔒</span>' : '';
-    return `<div class="rev-tile${isActive ? ' rev-tile-active' : ''}${q._locked ? ' rev-tile-locked' : ''}" id="rev-tile-${q.id}" onclick="loadRevisionCard('${q.id}')">
+    return `<div class="rev-tile${isActive ? ' rev-tile-active' : ''}${q._locked ? ' rev-tile-locked' : ''}" id="rev-tile-${q.id}" onclick="_onRevTileClick('${q.id}',this,event)">
       <input type="checkbox" class="rev-tile-cb" data-qid="${q.id}" onclick="event.stopPropagation();toggleRevSelection('${q.id}',this.checked)" title="Select for batch delete">
       <span class="rev-tile-badge${isActive ? ' rev-current' : ''}">Rev ${letter}${lockBadge}</span>
       <span class="rev-tile-ref">${escHtml(q.fields?.quoteRef || '')}</span>
@@ -6300,6 +6311,11 @@ function renderSections(){
   wrap.innerHTML = renderSection(sec, si);
 }
 
+function _treeNavSecClick(sid) {
+  selectSection(sid);
+  setTimeout(() => scrollToSection(sid), 60);
+}
+
 function selectSection(sid){
   const _num = Number(sid);
   if(_activeSectionId===_num){
@@ -6345,7 +6361,7 @@ function renderTreeNav(){
     const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;margin-right:6px"></span>`;
     const secTotal = calcSection(sec).total;
     const secTotalStr = secTotal > 0 ? `<span style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);white-space:nowrap;flex-shrink:0;margin-right:2px">${fmt(secTotal)}</span>` : '';
-    return `<div class="tn-sec-group"><div class="tree-nav-section${isActiveSection?' tn-sec-active':''}" title="${(sec.name||'').replace(/'/g,"&#39;")}" style="display:flex;align-items:center">${dot}<span class="tn-sec-label" onclick="selectSection('${sec.id}')" style="flex:1">${sec.name||'Untitled section'}</span>${secTotalStr}<span class="tn-toggle" onclick="event.stopPropagation();toggleTreeSection('${sec.id}')" style="padding:4px 6px">${collapsed?'▶':'▾'}</span></div>${parItems}</div>`;
+    return `<div class="tn-sec-group"><div class="tree-nav-section${isActiveSection?' tn-sec-active':''}" title="${(sec.name||'').replace(/'/g,"&#39;")}" style="display:flex;align-items:center" onclick="_treeNavSecClick('${sec.id}')">${dot}<span class="tn-sec-label" style="flex:1;pointer-events:none">${sec.name||'Untitled section'}</span>${secTotalStr}<span class="tn-toggle" onclick="event.stopPropagation();toggleTreeSection('${sec.id}')" style="padding:4px 6px">${collapsed?'▶':'▾'}</span></div>${parItems}</div>`;
   }).join('')
   + '<div style="padding:8px 10px;border-top:1px dashed var(--border);margin-top:4px">'
   + '<button class="btn btn-secondary btn-sm" style="width:100%" onclick="syncDOM();addSection()">+ Add section</button>'
@@ -11374,7 +11390,7 @@ async function forceReloadFromServer() {
     // 6. Refresh clients cache from dedicated API
     if (cData && Array.isArray(cData)) {
       window._clientsCache = cData;
-      window._nativeLS.setItem('proquote_clients', JSON.stringify(cData));
+      try { window._nativeLS.setItem('proquote_clients', JSON.stringify(cData)); } catch(e) {}
     }
 
     // 6. Re-render
@@ -11413,7 +11429,7 @@ async function rebuildClientsFromQuotes() {
     if (cRes.ok) {
       const cls = await cRes.json();
       window._clientsCache = Array.isArray(cls) ? cls : [];
-      window._nativeLS.setItem('proquote_clients', JSON.stringify(window._clientsCache));
+      try { window._nativeLS.setItem('proquote_clients', JSON.stringify(window._clientsCache)); } catch(e) {}
     }
     if (typeof renderClients  === 'function') renderClients();
     if (typeof renderDashboard === 'function') renderDashboard();
