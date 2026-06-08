@@ -6874,7 +6874,7 @@ function saveQuote(){
 function saveQuoteToClientBook(d) {
   // Store each revision under its full quoteRef so revisions appear as separate entries
   const storeRef = d.quoteRef || '';
-  if (!storeRef) return;
+  if (!storeRef || !(d.clientName || '').trim()) return;
   const storeData = { ...d };
 
   const clients = loadClients();
