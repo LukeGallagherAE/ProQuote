@@ -2541,6 +2541,9 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   // In-memory clients cache — populated by _initStorage from /api/clients
   window._clientsCache = [];
 
+  // In-memory pricelists cache — populated by _initStorage from /api/pricelists
+  window._plCache = { tabs: [], adonai: [] };
+
   // Token helpers — stored in native localStorage so the JWT survives the shim override
   function getToken() {
     return window._nativeLS ? window._nativeLS.getItem('pq_jwt') : null;
@@ -2691,11 +2694,12 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     const token = getToken();
     if (!token) { _loadFromNativeLS(); return; }
     try {
-      // Fetch settings, quotes, and clients in parallel
-      const [settingsRes, quotesRes, clientsRes] = await Promise.all([
-        fetch('/api/storage',  { headers: { 'Authorization': 'Bearer ' + token } }),
-        fetch('/api/quotes',   { headers: { 'Authorization': 'Bearer ' + token } }),
-        fetch('/api/clients',  { headers: { 'Authorization': 'Bearer ' + token } }),
+      // Fetch settings, quotes, clients, and pricelists in parallel
+      const [settingsRes, quotesRes, clientsRes, plRes] = await Promise.all([
+        fetch('/api/storage',     { headers: { 'Authorization': 'Bearer ' + token } }),
+        fetch('/api/quotes',      { headers: { 'Authorization': 'Bearer ' + token } }),
+        fetch('/api/clients',     { headers: { 'Authorization': 'Bearer ' + token } }),
+        fetch('/api/pricelists',  { headers: { 'Authorization': 'Bearer ' + token } }),
       ]);
 
       if (settingsRes.status === 401) { window._nativeClearToken(); return; }
@@ -2720,6 +2724,51 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
           try { window._clientsCache = JSON.parse(window._nativeLS.getItem('proquote_clients') || '[]'); } catch(e) { window._clientsCache = []; }
         }
       } catch(e) { window._clientsCache = []; }
+
+      // Load pricelists from dedicated API
+      try {
+        if (plRes && plRes.ok) {
+          const lists = await plRes.json();
+          const adonai = lists.find(l => l.is_adonai);
+          window._plCache.adonai = adonai ? (adonai.items || []) : [];
+          window._plCache.tabs   = lists.filter(l => !l.is_adonai).map(l => ({
+            id: l.id, name: l.name, meta: l.meta || {}, items: l.items || []
+          }));
+          // Clear old localStorage blobs now that server is authoritative
+          ['proquote_custom_tabs','proquote_adonai_pl','proquote_pl_meta','proquote_pl_versions'].forEach(k => {
+            try { window._nativeLS.removeItem(k); } catch(e) {}
+          });
+        } else {
+          // Server has no pricelists yet — migrate from localStorage (one-time)
+          try {
+            const oldTabs    = JSON.parse(window._nativeLS.getItem('proquote_custom_tabs') || '[]');
+            const oldAdonai  = JSON.parse(window._nativeLS.getItem('proquote_adonai_pl')   || '[]');
+            const oldMeta    = JSON.parse(window._nativeLS.getItem('proquote_pl_meta')     || '{}');
+            const oldVersions= JSON.parse(window._nativeLS.getItem('proquote_pl_versions') || '{}');
+            if (oldAdonai.length) {
+              const aid = 'adonai';
+              await fetch('/api/pricelists/' + aid, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ name: 'Adonai', is_adonai: true, meta: { versions: oldVersions[aid] || [] }, items: oldAdonai }),
+              });
+              window._plCache.adonai = oldAdonai;
+            }
+            for (const tab of oldTabs) {
+              const meta = { ...(oldMeta[tab.id] || {}), versions: oldVersions[tab.id] || [] };
+              await fetch('/api/pricelists/' + tab.id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ name: tab.name, is_adonai: false, meta, items: tab.items || [] }),
+              });
+              window._plCache.tabs.push({ id: tab.id, name: tab.name, meta, items: tab.items || [] });
+            }
+            ['proquote_custom_tabs','proquote_adonai_pl','proquote_pl_meta','proquote_pl_versions'].forEach(k => {
+              try { window._nativeLS.removeItem(k); } catch(e) {}
+            });
+          } catch(e) { console.warn('[ProQuote] PL migration failed:', e.message); }
+        }
+      } catch(e) { console.warn('[ProQuote] PL load failed:', e.message); }
 
       // Primary quotes source: /api/quotes (individual rows, survives blob failures)
       if (quotesRes.ok) {
@@ -5032,12 +5081,9 @@ function deletePlTab(tabId) {
   }
 
   saveCustomTabs(tabs.filter(t => t.id !== tabId));
-  // Remove version history
-  try {
-    const versions = JSON.parse(localStorage.getItem('proquote_pl_versions') || '{}');
-    delete versions[tabId];
-    localStorage.setItem('proquote_pl_versions', JSON.stringify(versions));
-  } catch(e) {}
+  // Delete from server
+  const _delToken = window._nativeLS && window._nativeLS.getItem('pq_jwt');
+  if (_delToken) fetch('/api/pricelists/' + tabId, { method: 'DELETE', headers: { Authorization: 'Bearer ' + _delToken } }).catch(() => {});
   // Clean up DOM
   const stale = document.getElementById('pl-sub-' + tabId);
   if (stale) stale.remove();
@@ -8758,10 +8804,23 @@ const ADONAI_KEY = 'proquote_adonai_pl';
 const PL_META_KEY = 'proquote_pl_meta';
 
 function loadPlVersions() {
-  try { return JSON.parse(localStorage.getItem('proquote_pl_versions') || '{}'); } catch(e) { return {}; }
+  const result = {};
+  (window._plCache?.tabs || []).forEach(t => { if (t.meta?.versions) result[t.id] = t.meta.versions; });
+  if (window._plCache?.adonaiVersions) result['adonai'] = window._plCache.adonaiVersions;
+  return result;
 }
 function savePlVersions(v) {
-  try { localStorage.setItem('proquote_pl_versions', JSON.stringify(v)); } catch(e) {}
+  const tabs = loadCustomTabs();
+  let changed = false;
+  tabs.forEach(t => {
+    if (v[t.id] !== undefined) { t.meta = t.meta || {}; t.meta.versions = v[t.id]; changed = true; }
+  });
+  if (changed) saveCustomTabs(tabs);
+  if (v['adonai'] !== undefined) {
+    window._plCache = window._plCache || { tabs: [], adonai: [] };
+    window._plCache.adonaiVersions = v['adonai'];
+    _queuePlSync('adonai', true);
+  }
 }
 function savePlVersionSnapshot(tabId, fileName, items) {
   const versions = loadPlVersions();
@@ -8867,10 +8926,17 @@ function restorePlVersion(tabId, versionIdx, btn) {
 }
 
 function loadPLMeta() {
-  try { return JSON.parse(localStorage.getItem(PL_META_KEY) || '{}'); } catch(e) { return {}; }
+  const result = {};
+  (window._plCache?.tabs || []).forEach(t => { if (t.meta) result[t.id] = t.meta; });
+  return result;
 }
 function savePLMeta(meta) {
-  try { localStorage.setItem(PL_META_KEY, JSON.stringify(meta)); } catch(e) {}
+  const tabs = loadCustomTabs();
+  let changed = false;
+  tabs.forEach(t => {
+    if (meta[t.id]) { t.meta = { ...t.meta, ...meta[t.id] }; changed = true; }
+  });
+  if (changed) saveCustomTabs(tabs);
 }
 
 // ── Import Pricelist Wizard ───────────────────────────────────────────────────
@@ -9414,11 +9480,13 @@ function getPLBadge(tabId) {
 }
 
 function loadAdonai() {
-  try { return JSON.parse(localStorage.getItem(ADONAI_KEY) || '[]'); } catch(e) { return []; }
+  return Array.isArray(window._plCache?.adonai) ? window._plCache.adonai : [];
 }
 function saveAdonai(items) {
-  try { localStorage.setItem(ADONAI_KEY, JSON.stringify(items)); } catch(e) {}
+  window._plCache = window._plCache || { tabs: [], adonai: [] };
+  window._plCache.adonai = Array.isArray(items) ? items : [];
   invalidatePlCache();
+  _queuePlSync('adonai', true);
 }
 
 function syncToAdonai(name, price, unit) {
@@ -9606,9 +9674,16 @@ function loadCustomPL() { try{return JSON.parse(localStorage.getItem(CUSTOM_PL_K
 function saveCustomPL(items) { try{localStorage.setItem(CUSTOM_PL_KEY,JSON.stringify(items));}catch(e){} }
 
 // Custom tab data
-const CUSTOM_TABS_KEY = 'proquote_custom_tabs';
-function loadCustomTabs() { try{return JSON.parse(localStorage.getItem(CUSTOM_TABS_KEY)||'[]');}catch(e){return[];} }
-function saveCustomTabs(tabs) { try{localStorage.setItem(CUSTOM_TABS_KEY,JSON.stringify(tabs));}catch(e){} invalidatePlCache(); }
+const CUSTOM_TABS_KEY = 'proquote_custom_tabs'; // legacy key — kept for migration reference only
+function loadCustomTabs() {
+  return Array.isArray(window._plCache?.tabs) ? window._plCache.tabs : [];
+}
+function saveCustomTabs(tabs) {
+  window._plCache = window._plCache || { tabs: [], adonai: [] };
+  window._plCache.tabs = Array.isArray(tabs) ? tabs : [];
+  invalidatePlCache();
+  tabs.forEach(t => _queuePlSync(t.id, false));
+}
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 let _activeTab = 'quote';
@@ -10932,6 +11007,34 @@ async function _flushClientsNow() {
 }
 window._flushClientsNow = _flushClientsNow;
 
+// ── Pricelist server sync ─────────────────────────────────────────────────────
+const _plSyncTimers = {};
+function _queuePlSync(id, isAdonai) {
+  clearTimeout(_plSyncTimers[id]);
+  _plSyncTimers[id] = setTimeout(() => _flushPlNow(id, isAdonai), 1500);
+}
+async function _flushPlNow(id, isAdonai) {
+  const token = window._nativeLS && window._nativeLS.getItem('pq_jwt');
+  if (!token) return;
+  try {
+    let body;
+    if (isAdonai) {
+      const adonaiMeta = window._plCache?.adonaiVersions ? { versions: window._plCache.adonaiVersions } : {};
+      body = { name: 'Adonai', is_adonai: true, meta: adonaiMeta, items: window._plCache.adonai || [] };
+    } else {
+      const tab = (window._plCache.tabs || []).find(t => t.id === id);
+      if (!tab) return;
+      body = { name: tab.name, is_adonai: false, meta: tab.meta || {}, items: tab.items || [] };
+    }
+    await fetch('/api/pricelists/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+  } catch(e) { console.warn('[ProQuote] PL sync failed:', e.message); }
+}
+window._flushPlNow = _flushPlNow;
+
 // Returns a map of quoteRef → live status flags from the in-memory _quotes array.
 // Used to overlay real-time status onto stored data in dashboard / all-quotes views.
 function _liveStatusMap() {
@@ -11345,17 +11448,19 @@ async function forceReloadFromServer() {
     // 1. Clear pending-deletes so nothing gets wrongly filtered out
     window._nativeLS.setItem('proquote_pending_deletes', '[]');
 
-    // 2. Fetch every quote, settings, and clients from the server
-    const [qRes, sRes, cRes] = await Promise.all([
-      fetch('/api/quotes',  { headers: { Authorization: 'Bearer ' + token } }),
-      fetch('/api/storage', { headers: { Authorization: 'Bearer ' + token } }),
-      fetch('/api/clients', { headers: { Authorization: 'Bearer ' + token } }),
+    // 2. Fetch every quote, settings, clients, and pricelists from the server
+    const [qRes, sRes, cRes, plRes2] = await Promise.all([
+      fetch('/api/quotes',     { headers: { Authorization: 'Bearer ' + token } }),
+      fetch('/api/storage',    { headers: { Authorization: 'Bearer ' + token } }),
+      fetch('/api/clients',    { headers: { Authorization: 'Bearer ' + token } }),
+      fetch('/api/pricelists', { headers: { Authorization: 'Bearer ' + token } }),
     ]);
     if (!qRes.ok) { showToast('Server error — could not fetch quotes', 3000); return; }
 
     const qRows  = await qRes.json();
     const sData  = sRes.ok ? await sRes.json() : {};
     const cData  = cRes.ok ? await cRes.json() : null;
+    const plData = plRes2.ok ? await plRes2.json() : null;
 
     // 3. Parse all server quotes, merge with any in-memory quotes not on server
     const serverIds = new Set(qRows.map(r => r.id));
@@ -11393,7 +11498,18 @@ async function forceReloadFromServer() {
       try { window._nativeLS.setItem('proquote_clients', JSON.stringify(cData)); } catch(e) {}
     }
 
-    // 6. Re-render
+    // 7. Refresh pricelists cache
+    if (plData && Array.isArray(plData)) {
+      const adonai = plData.find(l => l.is_adonai);
+      window._plCache.adonai = adonai ? (adonai.items || []) : [];
+      window._plCache.tabs   = plData.filter(l => !l.is_adonai).map(l => ({
+        id: l.id, name: l.name, meta: l.meta || {}, items: l.items || []
+      }));
+      invalidatePlCache();
+      if (typeof updateCustomPlSubTabs === 'function') updateCustomPlSubTabs();
+    }
+
+    // 8. Re-render
     const active = merged.find(q => q.id === _activeQuoteId && !q._binned)
                 || merged.filter(q => !q._binned && !q._hiddenTab).pop();
     if (active) {
@@ -14037,7 +14153,6 @@ function init(){
 // ── Workspace save / load ─────────────────────────────────────────────────────
 const WS_KEYS = [
   'proquote_profile','proquote_biz_prefs',
-  'proquote_adonai_pl','proquote_custom_pl','proquote_custom_tabs','proquote_pl_meta',
   'proquote_custom_items','proquote_item_templates','proquote_labour_times',
   'proquote_custom_cats','proquote_cat_colors','proquote_zone_presets',
   'proquote_variations','proquote-theme'

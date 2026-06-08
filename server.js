@@ -27,7 +27,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/auth',    authRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/quotes',  quotesRoutes);
-app.use('/api/clients', clientsRoutes);
+app.use('/api/clients',    clientsRoutes);
+app.use('/api/pricelists', require('./routes/pricelists'));
 app.use('/api/email',   requireAuth, emailRoutes);
 app.use('/api/ai',      require('./routes/ai'));
 app.use('/api/pdf',     requireAuth, require('./routes/pdf'));
@@ -456,7 +457,43 @@ async function migrateQuotesToClients() {
   }
 }
 
+async function migratePricelists() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS pricelists (
+        id         TEXT NOT NULL,
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        name       TEXT NOT NULL DEFAULT '',
+        is_adonai  BOOLEAN NOT NULL DEFAULT FALSE,
+        meta       JSONB NOT NULL DEFAULT '{}',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (id, user_id)
+      )
+    `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS pricelist_items (
+        id           BIGSERIAL PRIMARY KEY,
+        pricelist_id TEXT NOT NULL,
+        user_id      INTEGER NOT NULL REFERENCES users(id),
+        sort_order   INTEGER NOT NULL DEFAULT 0,
+        code         TEXT NOT NULL DEFAULT '',
+        d1           TEXT NOT NULL DEFAULT '',
+        d2           TEXT NOT NULL DEFAULT '',
+        category     TEXT NOT NULL DEFAULT '',
+        unit         TEXT NOT NULL DEFAULT 'EA',
+        price        NUMERIC(14,6) NOT NULL DEFAULT 0,
+        extras       JSONB NOT NULL DEFAULT '{}'
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_pl_items ON pricelist_items(pricelist_id, user_id)`);
+    console.log('[ProQuote] migratePricelists: done.');
+  } catch (err) {
+    console.error('[ProQuote] migratePricelists failed:', err);
+  }
+}
+
 // Run migration in the background after server is up
-migrateAuth().then(() => seedUser()).then(() => migrateClients()).then(() => migrateQuotesToClients()).catch(err => {
+migrateAuth().then(() => seedUser()).then(() => migrateClients()).then(() => migrateQuotesToClients()).then(() => migratePricelists()).catch(err => {
   console.error('[ProQuote] Startup migration failed:', err);
 });
