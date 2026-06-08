@@ -10,6 +10,7 @@ const bcrypt      = require('bcryptjs');
 
 const storageRoutes  = require('./routes/storage');
 const quotesRoutes   = require('./routes/quotes');
+const clientsRoutes  = require('./routes/clients');
 const emailRoutes    = require('./routes/email');
 const authRoutes     = require('./routes/auth');
 const requireAuth    = require('./middleware/requireAuth');
@@ -26,6 +27,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/auth',    authRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/quotes',  quotesRoutes);
+app.use('/api/clients', clientsRoutes);
 app.use('/api/email',   requireAuth, emailRoutes);
 app.use('/api/ai',      require('./routes/ai'));
 app.use('/api/pdf',     requireAuth, require('./routes/pdf'));
@@ -211,7 +213,85 @@ app.listen(PORT, () => {
   console.log(`ProQuote 2.1 running at http://localhost:${PORT}`);
 });
 
+// ── Clients/Jobs migration ────────────────────────────────────────────────────
+// Creates the clients and jobs tables, then migrates any existing proquote_clients
+// JSON blob (stored in the settings table) into the new relational tables.
+async function migrateClients() {
+  try {
+    // 1. Create tables
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS clients (
+        id         TEXT NOT NULL,
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        name       TEXT NOT NULL DEFAULT '',
+        company    TEXT NOT NULL DEFAULT '',
+        phone      TEXT NOT NULL DEFAULT '',
+        email      TEXT NOT NULL DEFAULT '',
+        address    TEXT NOT NULL DEFAULT '',
+        notes      TEXT NOT NULL DEFAULT '',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (id, user_id)
+      )
+    `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS jobs (
+        id         TEXT NOT NULL,
+        client_id  TEXT NOT NULL,
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        name       TEXT NOT NULL DEFAULT '',
+        address    TEXT NOT NULL DEFAULT '',
+        job_number TEXT NOT NULL DEFAULT '',
+        quotes     JSONB NOT NULL DEFAULT '[]',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (id, user_id)
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_clients_user ON clients(user_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_user ON jobs(user_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_jobs_client ON jobs(client_id, user_id)`);
+
+    // 2. Migrate any proquote_clients blobs from the settings table
+    const { rows } = await db.query(
+      `SELECT s.value, s.user_id FROM settings s
+       WHERE s.key = 'proquote_clients' AND s.user_id IS NOT NULL AND s.value IS NOT NULL AND s.value != '[]'`
+    );
+    for (const row of rows) {
+      // Skip if this user already has clients (already migrated)
+      const { rows: existing } = await db.query(
+        'SELECT 1 FROM clients WHERE user_id = $1 LIMIT 1', [row.user_id]
+      );
+      if (existing.length) continue;
+
+      let clients;
+      try { clients = JSON.parse(row.value); } catch (e) { continue; }
+      if (!Array.isArray(clients) || !clients.length) continue;
+
+      for (const c of clients) {
+        const cid = String(c.id || Date.now());
+        await db.query(
+          `INSERT INTO clients (id, user_id, name, company, phone, email, address, notes)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`,
+          [cid, row.user_id, c.name||'', c.company||'', c.phone||'', c.email||'', c.address||'', c.notes||'']
+        );
+        for (const j of (c.jobs || [])) {
+          const jid = String(j.id || (Date.now() + Math.random()));
+          await db.query(
+            `INSERT INTO jobs (id, client_id, user_id, name, address, job_number, quotes)
+             VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`,
+            [jid, cid, row.user_id, j.name||'', j.address||'', j.jobNumber||j.job_number||'', JSON.stringify(j.quotes||[])]
+          );
+        }
+      }
+      console.log(`[ProQuote] Clients migration: migrated ${clients.length} clients for user ${row.user_id}`);
+    }
+  } catch (err) {
+    console.error('[ProQuote] migrateClients failed:', err);
+  }
+}
+
 // Run migration in the background after server is up
-migrateAuth().then(() => seedUser()).catch(err => {
+migrateAuth().then(() => seedUser()).then(() => migrateClients()).catch(err => {
   console.error('[ProQuote] Startup migration failed:', err);
 });

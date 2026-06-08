@@ -2534,6 +2534,9 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   // Keep a direct reference to the real localStorage BEFORE we override it
   window._nativeLS = window.localStorage;
 
+  // In-memory clients cache — populated by _initStorage from /api/clients
+  window._clientsCache = [];
+
   // Token helpers — stored in native localStorage so the JWT survives the shim override
   function getToken() {
     return window._nativeLS ? window._nativeLS.getItem('pq_jwt') : null;
@@ -2684,10 +2687,11 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     const token = getToken();
     if (!token) { _loadFromNativeLS(); return; }
     try {
-      // Fetch settings metadata and individual quotes in parallel
-      const [settingsRes, quotesRes] = await Promise.all([
-        fetch('/api/storage', { headers: { 'Authorization': 'Bearer ' + token } }),
-        fetch('/api/quotes',  { headers: { 'Authorization': 'Bearer ' + token } }),
+      // Fetch settings, quotes, and clients in parallel
+      const [settingsRes, quotesRes, clientsRes] = await Promise.all([
+        fetch('/api/storage',  { headers: { 'Authorization': 'Bearer ' + token } }),
+        fetch('/api/quotes',   { headers: { 'Authorization': 'Bearer ' + token } }),
+        fetch('/api/clients',  { headers: { 'Authorization': 'Bearer ' + token } }),
       ]);
 
       if (settingsRes.status === 401) { window._nativeClearToken(); return; }
@@ -2696,24 +2700,22 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       if (settingsRes.ok) {
         const data = await settingsRes.json();
         Object.assign(_ls, data);
-        // Merge any clients that exist in native LS but not on server (handles
-        // the case where a flush was in-flight when the tab closed last time).
-        try {
-          const nativeRaw = window._nativeLS.getItem('proquote_clients');
-          if (nativeRaw) {
-            const nativeCls = JSON.parse(nativeRaw);
-            const serverCls = (() => { try { return JSON.parse(_ls['proquote_clients'] || '[]'); } catch(e) { return []; } })();
-            const serverIds = new Set(serverCls.map(c => String(c.id)));
-            const missing = nativeCls.filter(c => !serverIds.has(String(c.id)));
-            if (missing.length) {
-              _ls['proquote_clients'] = JSON.stringify([...missing, ...serverCls]);
-              _markDirty(); // push merged list back to server
-            }
-          }
-        } catch(e) {}
       } else {
         _loadFromNativeLS();
       }
+
+      // Load clients from dedicated relational API
+      try {
+        if (clientsRes && clientsRes.ok) {
+          const cls = await clientsRes.json();
+          window._clientsCache = Array.isArray(cls) ? cls : [];
+          // Mirror to native LS for offline fallback
+          window._nativeLS.setItem('proquote_clients', JSON.stringify(window._clientsCache));
+        } else {
+          // Fallback: use native LS data (offline or migration pending)
+          try { window._clientsCache = JSON.parse(window._nativeLS.getItem('proquote_clients') || '[]'); } catch(e) { window._clientsCache = []; }
+        }
+      } catch(e) { window._clientsCache = []; }
 
       // Primary quotes source: /api/quotes (individual rows, survives blob failures)
       if (quotesRes.ok) {
@@ -9664,7 +9666,10 @@ function switchTab(tab) {
 
 function deleteAllQuotes() {
   if (!confirm('Delete ALL quotes, clients, and projects?\n\nThis cannot be undone.')) return;
-  try { localStorage.removeItem('proquote_clients'); } catch(e) {}
+  // Clear clients cache and sync empty list to server
+  window._clientsCache = [];
+  try { window._nativeLS.removeItem('proquote_clients'); } catch(e) {}
+  if (window._flushClientsNow) window._flushClientsNow();
   try { localStorage.removeItem('proquote_session_quotes'); } catch(e) {}
   try { localStorage.removeItem('proquote_active_id'); } catch(e) {}
   if (typeof _quotes !== 'undefined') { _quotes.length = 0; }
@@ -10805,8 +10810,30 @@ function toggleSidebar() {
 const CLIENT_KEY = 'proquote_clients';
 
 function loadClients() {
+  // Primary: in-memory cache populated from /api/clients at startup
+  if (Array.isArray(window._clientsCache)) return window._clientsCache;
+  // Fallback: localStorage for offline / pre-init calls
   try { return JSON.parse(localStorage.getItem(CLIENT_KEY) || '[]'); } catch(e) { return []; }
 }
+
+// Debounced sync of the full client list to /api/clients/sync
+let _clientSyncTimer = null;
+function _queueClientSync() {
+  clearTimeout(_clientSyncTimer);
+  _clientSyncTimer = setTimeout(_flushClientsNow, 1500);
+}
+async function _flushClientsNow() {
+  const token = window._nativeLS && window._nativeLS.getItem('pq_jwt');
+  if (!token) return;
+  try {
+    await fetch('/api/clients/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(window._clientsCache || []),
+    });
+  } catch(e) { /* will retry next save */ }
+}
+window._flushClientsNow = _flushClientsNow;
 
 // Returns a map of quoteRef → live status flags from the in-memory _quotes array.
 // Used to overlay real-time status onto stored data in dashboard / all-quotes views.
@@ -10825,7 +10852,10 @@ function _liveStatusMap() {
   return map;
 }
 function saveClients(clients) {
-  try { localStorage.setItem(CLIENT_KEY, JSON.stringify(clients)); } catch(e) {}
+  // Update in-memory cache and native LS, then queue server sync
+  window._clientsCache = Array.isArray(clients) ? clients : [];
+  try { window._nativeLS.setItem(CLIENT_KEY, JSON.stringify(window._clientsCache)); } catch(e) {}
+  _queueClientSync();
 }
 
 function onClientNameInput(val) {
@@ -11218,15 +11248,17 @@ async function forceReloadFromServer() {
     // 1. Clear pending-deletes so nothing gets wrongly filtered out
     window._nativeLS.setItem('proquote_pending_deletes', '[]');
 
-    // 2. Fetch every quote from the server
-    const [qRes, sRes] = await Promise.all([
+    // 2. Fetch every quote, settings, and clients from the server
+    const [qRes, sRes, cRes] = await Promise.all([
       fetch('/api/quotes',  { headers: { Authorization: 'Bearer ' + token } }),
       fetch('/api/storage', { headers: { Authorization: 'Bearer ' + token } }),
+      fetch('/api/clients', { headers: { Authorization: 'Bearer ' + token } }),
     ]);
     if (!qRes.ok) { showToast('Server error — could not fetch quotes', 3000); return; }
 
     const qRows  = await qRes.json();
     const sData  = sRes.ok ? await sRes.json() : {};
+    const cData  = cRes.ok ? await cRes.json() : null;
 
     // 3. Parse all server quotes, merge with any in-memory quotes not on server
     const serverIds = new Set(qRows.map(r => r.id));
@@ -11253,17 +11285,15 @@ async function forceReloadFromServer() {
     });
     if (mx > _id) _id = mx;
 
-    // 5. Restore settings from server (includes clients)
+    // 5. Restore settings from server
     if (Object.keys(sData).length) {
       Object.assign(localStorage, sData);
-      // Merge clients same way _initStorage does
-      try {
-        const nativeCls = JSON.parse(window._nativeLS.getItem('proquote_clients') || '[]');
-        const serverCls = (() => { try { return JSON.parse(sData['proquote_clients'] || '[]'); } catch(e) { return []; } })();
-        const serverIds2 = new Set(serverCls.map(c => String(c.id)));
-        const missing = nativeCls.filter(c => !serverIds2.has(String(c.id)));
-        if (missing.length) localStorage.setItem('proquote_clients', JSON.stringify([...missing, ...serverCls]));
-      } catch(e) {}
+    }
+
+    // 6. Refresh clients cache from dedicated API
+    if (cData && Array.isArray(cData)) {
+      window._clientsCache = cData;
+      window._nativeLS.setItem('proquote_clients', JSON.stringify(cData));
     }
 
     // 6. Re-render
@@ -13884,7 +13914,7 @@ function init(){
 
 // ── Workspace save / load ─────────────────────────────────────────────────────
 const WS_KEYS = [
-  'proquote_profile','proquote_biz_prefs','proquote_clients',
+  'proquote_profile','proquote_biz_prefs',
   'proquote_adonai_pl','proquote_custom_pl','proquote_custom_tabs','proquote_pl_meta',
   'proquote_custom_items','proquote_item_templates','proquote_labour_times',
   'proquote_custom_cats','proquote_cat_colors','proquote_zone_presets',
