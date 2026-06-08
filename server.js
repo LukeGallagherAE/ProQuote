@@ -291,7 +291,114 @@ async function migrateClients() {
   }
 }
 
+// ── Backfill clients/jobs from quotes table ───────────────────────────────────
+// Scans every quote that has a clientName and creates the corresponding client
+// and job records if they don't already exist. Safe to run on every startup —
+// it only INSERTs missing rows and merges missing quote snapshots.
+async function migrateQuotesToClients() {
+  try {
+    const { rows: allRows } = await db.query(
+      'SELECT user_id, data FROM quotes WHERE user_id IS NOT NULL AND data IS NOT NULL'
+    );
+    if (!allRows.length) return;
+
+    // Group parsed quotes by user_id
+    const byUser = {};
+    for (const row of allRows) {
+      let data;
+      try { data = typeof row.data === 'string' ? JSON.parse(row.data) : row.data; } catch { continue; }
+      const f = data.fields || data;
+      const clientName = (f.clientName || '').trim();
+      if (!clientName) continue;
+      if (!byUser[row.user_id]) byUser[row.user_id] = [];
+      byUser[row.user_id].push({ data, f });
+    }
+
+    let counter = 0;
+    const nextId = () => String(Date.now() + (++counter));
+
+    for (const [userId, quotes] of Object.entries(byUser)) {
+      // Load existing clients for this user (keyed by lowercase name)
+      const { rows: existingClients } = await db.query(
+        'SELECT id, name FROM clients WHERE user_id = $1', [userId]
+      );
+      const clientIdByName = new Map(existingClients.map(c => [c.name.toLowerCase(), c.id]));
+
+      // Group quotes by clientName → jobName
+      const clientMap = new Map();
+      for (const { data, f } of quotes) {
+        const clientName = (f.clientName || '').trim();
+        const jobName    = (f.jobName    || '').trim() || 'General';
+        if (!clientName) continue;
+        if (!clientMap.has(clientName)) clientMap.set(clientName, new Map());
+        if (!clientMap.get(clientName).has(jobName)) clientMap.get(clientName).set(jobName, []);
+        clientMap.get(clientName).get(jobName).push({ data, f });
+      }
+
+      for (const [clientName, jobMap] of clientMap) {
+        // Create client if not present
+        let clientId = clientIdByName.get(clientName.toLowerCase());
+        if (!clientId) {
+          clientId = nextId();
+          const firstF = [...jobMap.values()][0][0].f;
+          await db.query(
+            `INSERT INTO clients (id, user_id, name, phone, email, address, company, notes)
+             VALUES ($1,$2,$3,$4,$5,$6,'','') ON CONFLICT DO NOTHING`,
+            [clientId, userId, clientName, firstF.clientPhone||'', firstF.clientEmail||'', firstF.siteAddr||'']
+          );
+          clientIdByName.set(clientName.toLowerCase(), clientId);
+        }
+
+        // Load existing jobs for this client
+        const { rows: existingJobs } = await db.query(
+          'SELECT id, name, quotes FROM jobs WHERE client_id = $1 AND user_id = $2',
+          [clientId, userId]
+        );
+        const jobByName = new Map(existingJobs.map(j => [j.name.toLowerCase(), j]));
+
+        for (const [jobName, jobQuotes] of jobMap) {
+          // Build lightweight quote snapshots (no sections — those live in the quotes table)
+          const snapshots = jobQuotes
+            .map(({ data, f }) => ({
+              quoteRef:    f.quoteRef    || '',
+              quoteDate:   f.quoteDate   || '',
+              _publishedAt: data._publishedAt || null,
+              _emailSentAt: data._emailSentAt || null,
+              _approvedAt:  data._approvedAt  || null,
+              _createdAt:   data._createdAt   || null,
+            }))
+            .filter(s => s.quoteRef);
+
+          const existingJob = jobByName.get(jobName.toLowerCase());
+          if (!existingJob) {
+            const firstF = jobQuotes[0].f;
+            await db.query(
+              `INSERT INTO jobs (id, client_id, user_id, name, address, job_number, quotes)
+               VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING`,
+              [nextId(), clientId, userId, jobName,
+               firstF.siteAddr||'', firstF.jobNumber||'', JSON.stringify(snapshots)]
+            );
+          } else {
+            // Merge in quote snapshots that aren't already stored
+            let stored = [];
+            try { stored = typeof existingJob.quotes === 'string' ? JSON.parse(existingJob.quotes) : (existingJob.quotes || []); } catch {}
+            const storedRefs = new Set(stored.map(s => s.quoteRef));
+            const toAdd = snapshots.filter(s => s.quoteRef && !storedRefs.has(s.quoteRef));
+            if (toAdd.length) {
+              await db.query('UPDATE jobs SET quotes = $1::jsonb WHERE id = $2',
+                [JSON.stringify([...stored, ...toAdd]), existingJob.id]);
+            }
+          }
+        }
+      }
+    }
+    console.log('[ProQuote] migrateQuotesToClients: done.');
+  } catch (err) {
+    console.error('[ProQuote] migrateQuotesToClients failed:', err);
+  }
+}
+
 // Run migration in the background after server is up
-migrateAuth().then(() => seedUser()).then(() => migrateClients()).catch(err => {
+migrateAuth().then(() => seedUser()).then(() => migrateClients()).then(() => migrateQuotesToClients()).catch(err => {
   console.error('[ProQuote] Startup migration failed:', err);
 });
