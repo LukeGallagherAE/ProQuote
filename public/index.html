@@ -1779,8 +1779,9 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     <div id="auto-rev-notice" style="display:none;margin:0 0 0 0;padding:12px 18px;background:#ff9f0a;color:#fff;border-radius:0 0 10px 10px;display:none;align-items:center;gap:10px;font-size:13px;font-weight:600;flex-wrap:wrap"></div>
     <div class="sections-scroll-wrap">
       <div id="sectionsWrap"></div>
-      <div style="display:flex;gap:8px;margin-top:4px;align-items:center">
+      <div style="display:flex;gap:8px;margin-top:4px;align-items:center;flex-wrap:wrap">
         <button class="btn btn-secondary" onclick="addSection()">+ Add section</button>
+        <button class="btn btn-secondary" onclick="openSubImportModal()" title="Import a subcontractor PDF quote and auto-generate line items">📄 Import sub quote</button>
         <button id="zone-wizard-btn" class="btn btn-secondary" style="display:none;color:var(--accent);border-color:var(--accent)" onclick="openZoneWizard()">🗂 Zone wizard</button>
       </div>
     </div>
@@ -2293,6 +2294,20 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
           </div>
         </div>
 
+        <!-- AI Integration -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px">AI Integration</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Used to import and interpret subcontractor quote PDFs</div>
+          <div class="field">
+            <label>Anthropic API Key</label>
+            <div style="display:flex;gap:8px">
+              <input type="password" id="pAnthropicKey" placeholder="sk-ant-…" style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;font-family:inherit" autocomplete="new-password">
+              <button class="btn btn-secondary btn-sm" onclick="saveAnthropicKey()">Save</button>
+            </div>
+            <div id="pAnthropicKeyStatus" style="font-size:11px;color:var(--muted);margin-top:5px"></div>
+          </div>
+        </div>
+
       </div>
 
       <!-- RIGHT column: Default Cost Rates + Item Categories + Zone Presets -->
@@ -2529,6 +2544,90 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   </div>
 </div>
 </div>
+
+<!-- Sub Import Modal -->
+<div class="overlay" id="subImportModal" style="display:none" onclick="if(event.target===this)closeSubImportModal()">
+  <div class="modal" style="max-width:680px;width:96%;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <!-- Header -->
+    <div style="padding:18px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="font-size:16px;font-weight:700;color:var(--text)">Import Subcontractor Quote</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px">Upload a PDF quote — AI will extract line items and apply your margin</div>
+    </div>
+
+    <!-- Step 1: upload form -->
+    <div id="sub-import-step1" style="padding:20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex:1">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field">
+          <label>Subcontractor name <span style="color:#ff3b30">*</span></label>
+          <input id="sub-imp-name" placeholder="e.g. ABC Electrical Pty Ltd" style="width:100%">
+        </div>
+        <div class="field">
+          <label>Their quote reference</label>
+          <input id="sub-imp-ref" placeholder="e.g. QT-2024-001">
+        </div>
+      </div>
+      <div class="field">
+        <label>Margin % <span style="font-size:11px;color:var(--muted)">(profit as % of sell price)</span></label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input id="sub-imp-margin" type="number" value="10" min="0" max="99" step="0.5" style="width:90px">
+          <span style="font-size:12px;color:var(--muted)" id="sub-imp-margin-preview">10% margin → cost ÷ 0.90 = sell price</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Quote PDF <span style="color:#ff3b30">*</span></label>
+        <label id="sub-imp-drop" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:28px;border:2px dashed var(--border2);border-radius:10px;cursor:pointer;text-align:center;transition:border-color .15s">
+          <span style="font-size:28px">📄</span>
+          <span style="font-size:13px;font-weight:600;color:var(--text)">Click to choose PDF</span>
+          <span id="sub-imp-filename" style="font-size:11px;color:var(--muted)">or drag and drop</span>
+          <input type="file" id="sub-imp-file" accept=".pdf" style="display:none" onchange="onSubImportFileChosen(this)">
+        </label>
+      </div>
+      <div id="sub-imp-error" style="display:none;padding:10px 14px;background:rgba(255,59,48,.08);border:1px solid rgba(255,59,48,.3);border-radius:8px;font-size:12px;color:#ff3b30"></div>
+    </div>
+
+    <!-- Step 2: preview -->
+    <div id="sub-import-step2" style="display:none;flex-direction:column;overflow:hidden;flex:1">
+      <div style="padding:14px 20px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--text)" id="sub-imp-preview-title">Preview</div>
+          <div style="font-size:11px;color:var(--muted)" id="sub-imp-preview-sub"></div>
+        </div>
+        <button onclick="subImportBackToStep1()" style="padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;cursor:pointer;font-family:inherit">← Back</button>
+      </div>
+      <div style="overflow-y:auto;flex:1;padding:0 20px 16px">
+        <!-- Cost/sell summary bar -->
+        <div style="display:flex;gap:16px;padding:10px 14px;background:var(--surface2);border-radius:8px;margin:14px 0 12px;font-size:12px">
+          <span>Items: <strong id="sub-imp-count">0</strong></span>
+          <span>Sub total: <strong id="sub-imp-cost-total">$0.00</strong></span>
+          <span>Your sell: <strong id="sub-imp-sell-total" style="color:var(--accent)">$0.00</strong></span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border)">
+              <th style="text-align:left;padding:6px 8px;color:var(--muted);font-weight:600">Description</th>
+              <th style="text-align:right;padding:6px 8px;color:var(--muted);font-weight:600;white-space:nowrap">Sub cost</th>
+              <th style="text-align:right;padding:6px 8px;color:var(--accent);font-weight:600;white-space:nowrap">Your sell</th>
+              <th style="width:28px"></th>
+            </tr>
+          </thead>
+          <tbody id="sub-imp-preview-tbody"></tbody>
+        </table>
+        <div id="sub-imp-exclusions-wrap" style="display:none;margin-top:14px;padding:12px 14px;background:var(--surface2);border-radius:8px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px">Exclusions (will be appended to quote notes)</div>
+          <div id="sub-imp-exclusions-list" style="font-size:12px;color:var(--text);line-height:1.7"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0">
+      <button class="btn btn-secondary" onclick="closeSubImportModal()">Cancel</button>
+      <button id="sub-imp-extract-btn" class="btn btn-primary" onclick="runSubImportExtract()">Extract items →</button>
+      <button id="sub-imp-confirm-btn" class="btn btn-primary" style="display:none" onclick="confirmSubImport()">Add to quote ✓</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── ProQuote 2.1 — API Storage Shim ─────────────────────────────────────────
 // Replaces localStorage with a server-backed PostgreSQL store.
@@ -6604,6 +6703,31 @@ function renderSection(sec,si){
       +'</div>';
   }).join('');
 
+  // Subcontractor internal notes (hidden from export)
+  const subNotesHtml = sec._isSubcontractor && sec._subNotes
+    ? '<div data-internal="true" style="display:flex;align-items:center;gap:8px;padding:6px 12px 6px 14px;background:rgba(200,160,74,.07);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted)">'
+        + '<span style="font-weight:700;color:var(--accent);white-space:nowrap">Sub:</span>'
+        + '<span>' + esc(sec._subNotes) + '</span>'
+        + '<button onclick="event.stopPropagation();_editSubNotes('+sec.id+')" style="margin-left:auto;padding:2px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:10px;cursor:pointer;font-family:inherit" title="Edit subcontractor details">Edit</button>'
+      + '</div>'
+    : '';
+
+  // Subcontractor cost vs sell summary
+  const subCostSellHtml = sec._isSubcontractor
+    ? (() => {
+        let costTotal = 0;
+        sec.parents.forEach(par => par.subitems.forEach(sub => {
+          const price = sub.item ? sub.item.p : (parseFloat(sub.customPrice) || 0);
+          costTotal += price * (sub.qty || 1);
+        }));
+        const sellTotal = c.total;
+        return '<div data-internal="true" style="display:flex;gap:16px;padding:4px 14px;font-size:11px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border)">'
+          + '<span>Sub cost: <strong style="color:var(--text)">$' + costTotal.toFixed(2) + '</strong></span>'
+          + '<span>Your sell: <strong style="color:var(--accent)">$' + sellTotal.toFixed(2) + '</strong></span>'
+        + '</div>';
+      })()
+    : '';
+
   return '<div class="sec-group" id="sec-'+sec.id+'">'
     +'<div class="sec-flat-hdr" style="border-top:3px solid '+col+'">'
       +'<div class="sfh-dot" style="background:'+col+'"></div>'
@@ -6617,6 +6741,8 @@ function renderSection(sec,si){
       +'</div>'
       +'<button class="btn-icon danger" onclick="syncDOM();removeSection('+sec.id+')">✕</button>'
     +'</div>'
+    +subNotesHtml
+    +subCostSellHtml
     +'<div class="sec-body">'
       +bodyHtml
       +'<div id="ai-sec-panel-'+sec.id+'"></div>'
@@ -7178,6 +7304,7 @@ function saveProfile(){
   }catch(e){}
 }
 function loadProfile(){
+  checkAnthropicKeyStatus();
   try{
     const raw = localStorage.getItem('proquote_profile');
     if(!raw) return;
@@ -7689,7 +7816,11 @@ function closeEmailPreview() {
 
 function captureQuoteHTML() {
   window._lastQuoteHTML = '';
+  // Temporarily hide internal-only elements (sub notes, cost/sell bars) from export
+  const internals = document.querySelectorAll('[data-internal="true"]');
+  internals.forEach(el => { el.dataset._wasVisible = el.style.display; el.style.display = 'none'; });
   try { doPrint(true); } catch(e) { console.error('PDF capture error:', e); }
+  internals.forEach(el => { el.style.display = el.dataset._wasVisible || ''; delete el.dataset._wasVisible; });
   return window._lastQuoteHTML;
 }
 
@@ -7726,6 +7857,290 @@ async function emailToSelf() {
   } catch(e) {
     showToast('❌ Could not reach server', 4000);
   }
+}
+
+// ── Anthropic API key (profile) ───────────────────────────────────────────────
+async function saveAnthropicKey() {
+  const key = document.getElementById('pAnthropicKey')?.value?.trim();
+  if (!key) return;
+  const token = window._nativeGetToken ? window._nativeGetToken() : (window._nativeLS && window._nativeLS.getItem('pq_jwt'));
+  if (!token) return;
+  const statusEl = document.getElementById('pAnthropicKeyStatus');
+  if (statusEl) statusEl.textContent = 'Saving…';
+  try {
+    const res = await fetch('/api/subimport/key', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ key }),
+    });
+    if (res.ok) {
+      if (statusEl) statusEl.textContent = '✅ Key saved';
+      const inp = document.getElementById('pAnthropicKey');
+      if (inp) { inp.value = ''; inp.placeholder = '●●●●●●●● (saved — enter new key to replace)'; }
+    } else {
+      const d = await res.json().catch(() => ({}));
+      if (statusEl) statusEl.textContent = '❌ ' + (d.error || 'Failed to save');
+    }
+  } catch(e) {
+    if (statusEl) statusEl.textContent = '❌ Error: ' + e.message;
+  }
+}
+
+async function checkAnthropicKeyStatus() {
+  const token = window._nativeGetToken ? window._nativeGetToken() : (window._nativeLS && window._nativeLS.getItem('pq_jwt'));
+  if (!token) return;
+  try {
+    const res = await fetch('/api/subimport/key', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.hasKey) {
+      const inp = document.getElementById('pAnthropicKey');
+      const statusEl = document.getElementById('pAnthropicKeyStatus');
+      if (inp) inp.placeholder = '●●●●●●●● (saved — enter new key to replace)';
+      if (statusEl) statusEl.textContent = '✅ API key is set';
+    }
+  } catch(e) {}
+}
+
+// ── Sub-import modal ──────────────────────────────────────────────────────────
+let _subImportItems = [];   // [{description, cost}]
+let _subImportExclusions = [];
+let _subImportMargin = 10;
+
+function openSubImportModal() {
+  _subImportItems = [];
+  _subImportExclusions = [];
+  document.getElementById('sub-imp-name').value = '';
+  document.getElementById('sub-imp-ref').value = '';
+  document.getElementById('sub-imp-margin').value = '10';
+  document.getElementById('sub-imp-filename').textContent = 'or drag and drop';
+  document.getElementById('sub-imp-file').value = '';
+  document.getElementById('sub-imp-error').style.display = 'none';
+  document.getElementById('sub-import-step1').style.display = 'flex';
+  document.getElementById('sub-import-step2').style.display = 'none';
+  document.getElementById('sub-imp-extract-btn').style.display = '';
+  document.getElementById('sub-imp-confirm-btn').style.display = 'none';
+  _subImportUpdateMarginPreview();
+  document.getElementById('subImportModal').style.display = 'flex';
+}
+
+function closeSubImportModal() {
+  document.getElementById('subImportModal').style.display = 'none';
+}
+
+function _subImportUpdateMarginPreview() {
+  const m = parseFloat(document.getElementById('sub-imp-margin')?.value) || 10;
+  const el = document.getElementById('sub-imp-margin-preview');
+  if (el) el.textContent = m + '% margin → cost ÷ ' + (1 - m/100).toFixed(2) + ' = sell price';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const marginInp = document.getElementById('sub-imp-margin');
+  if (marginInp) marginInp.addEventListener('input', _subImportUpdateMarginPreview);
+
+  // Drag-and-drop on the drop zone
+  const drop = document.getElementById('sub-imp-drop');
+  if (drop) {
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.style.borderColor = 'var(--accent)'; });
+    drop.addEventListener('dragleave', () => { drop.style.borderColor = 'var(--border2)'; });
+    drop.addEventListener('drop', e => {
+      e.preventDefault();
+      drop.style.borderColor = 'var(--border2)';
+      const f = e.dataTransfer.files[0];
+      if (f && f.type === 'application/pdf') {
+        document.getElementById('sub-imp-file').files; // can't set programmatically
+        onSubImportFileChosen(null, f);
+      } else {
+        showToast('Please drop a PDF file', 3000);
+      }
+    });
+  }
+});
+
+let _subImportFile = null;
+function onSubImportFileChosen(input, file) {
+  _subImportFile = file || (input && input.files[0]);
+  if (_subImportFile) {
+    document.getElementById('sub-imp-filename').textContent = _subImportFile.name;
+    document.getElementById('sub-imp-error').style.display = 'none';
+  }
+}
+
+async function runSubImportExtract() {
+  const name = document.getElementById('sub-imp-name').value.trim();
+  if (!name) { document.getElementById('sub-imp-name').focus(); showToast('Enter the subcontractor name', 3000); return; }
+  if (!_subImportFile) { showToast('Choose a PDF file first', 3000); return; }
+
+  const btn = document.getElementById('sub-imp-extract-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Extracting…';
+  document.getElementById('sub-imp-error').style.display = 'none';
+
+  try {
+    const token = window._nativeGetToken ? window._nativeGetToken() : (window._nativeLS && window._nativeLS.getItem('pq_jwt'));
+    const form = new FormData();
+    form.append('pdf', _subImportFile);
+    const res = await fetch('/api/subimport', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: form,
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const errEl = document.getElementById('sub-imp-error');
+      errEl.textContent = data.error || 'Extraction failed';
+      errEl.style.display = '';
+      return;
+    }
+    _subImportItems = data.items || [];
+    _subImportExclusions = data.exclusions || [];
+    _subImportMargin = parseFloat(document.getElementById('sub-imp-margin').value) || 10;
+    _subImportShowPreview();
+  } catch(e) {
+    const errEl = document.getElementById('sub-imp-error');
+    errEl.textContent = 'Could not reach server: ' + e.message;
+    errEl.style.display = '';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Extract items →';
+  }
+}
+
+function _subImportSellPrice(cost, marginPct) {
+  const m = Math.max(0, Math.min(99, marginPct)) / 100;
+  return m >= 1 ? cost : cost / (1 - m);
+}
+
+function _subImportShowPreview() {
+  const margin = _subImportMargin;
+  const subName = document.getElementById('sub-imp-name').value.trim();
+  const quoteRef = document.getElementById('sub-imp-ref').value.trim();
+
+  document.getElementById('sub-import-step1').style.display = 'none';
+  const step2 = document.getElementById('sub-import-step2');
+  step2.style.display = 'flex';
+  document.getElementById('sub-imp-extract-btn').style.display = 'none';
+  document.getElementById('sub-imp-confirm-btn').style.display = '';
+  document.getElementById('sub-imp-preview-title').textContent = subName + (quoteRef ? ' — ' + quoteRef : '');
+  document.getElementById('sub-imp-preview-sub').textContent = _subImportItems.length + ' items · ' + margin + '% margin';
+
+  let costTotal = 0, sellTotal = 0;
+  const tbody = document.getElementById('sub-imp-preview-tbody');
+  tbody.innerHTML = _subImportItems.map((item, i) => {
+    const sell = _subImportSellPrice(item.cost, margin);
+    costTotal += item.cost;
+    sellTotal += sell;
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:7px 8px;color:var(--text)">${escHtml(item.description)}</td>
+      <td style="padding:7px 8px;text-align:right;color:var(--muted);white-space:nowrap">$${item.cost.toFixed(2)}</td>
+      <td style="padding:7px 8px;text-align:right;color:var(--accent);font-weight:600;white-space:nowrap">$${sell.toFixed(2)}</td>
+      <td style="padding:4px"><button onclick="_subImportRemoveItem(${i})" style="padding:2px 7px;border-radius:4px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-size:11px" title="Remove">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('sub-imp-count').textContent = _subImportItems.length;
+  document.getElementById('sub-imp-cost-total').textContent = '$' + costTotal.toFixed(2);
+  document.getElementById('sub-imp-sell-total').textContent = '$' + sellTotal.toFixed(2);
+
+  const excWrap = document.getElementById('sub-imp-exclusions-wrap');
+  const excList = document.getElementById('sub-imp-exclusions-list');
+  if (_subImportExclusions.length) {
+    excList.innerHTML = _subImportExclusions.map(e => `• ${escHtml(e)}`).join('<br>');
+    excWrap.style.display = '';
+  } else {
+    excWrap.style.display = 'none';
+  }
+}
+
+function _subImportRemoveItem(idx) {
+  _subImportItems.splice(idx, 1);
+  _subImportShowPreview();
+}
+
+function _editSubNotes(sid) {
+  const sec = S.sections.find(s => s.id === sid);
+  if (!sec) return;
+  const current = sec._subNotes || '';
+  const val = prompt('Edit subcontractor details (name | quote ref):', current);
+  if (val === null) return;
+  sec._subNotes = val.trim();
+  fullRender();
+  scheduleSave();
+}
+
+function subImportBackToStep1() {
+  document.getElementById('sub-import-step1').style.display = 'flex';
+  document.getElementById('sub-import-step2').style.display = 'none';
+  document.getElementById('sub-imp-extract-btn').style.display = '';
+  document.getElementById('sub-imp-confirm-btn').style.display = 'none';
+}
+
+function confirmSubImport() {
+  if (!_subImportItems.length) { showToast('No items to import', 2000); return; }
+
+  const subName = document.getElementById('sub-imp-name').value.trim();
+  const quoteRef = document.getElementById('sub-imp-ref').value.trim();
+  const margin = _subImportMargin;
+
+  // Count existing subcontractor sections
+  const existingCount = S.sections.filter(s => s._isSubcontractor).length;
+  const sectionLabel = 'Subcontractor (' + (existingCount + 1) + ')';
+
+  // Build markup% from margin%: markup = margin / (100 - margin) * 100
+  const markupPct = margin >= 100 ? 999 : (margin / (100 - margin)) * 100;
+
+  const parents = _subImportItems.map(item => {
+    const sub = {
+      id: uid(), item: null,
+      customName: item.description,
+      customUnit: 'ea', customPrice: item.cost,
+      qty: 1, wireMin: 0, instMin: 0,
+      markup: Math.round(markupPct * 100) / 100,
+      cat: 'supply',
+    };
+    return {
+      id: uid(),
+      name: item.description,
+      description: '',
+      qty: 1, collapsed: false,
+      category: '',
+      lumpSum: false, lumpPrice: 0,
+      activeCats: { supply: true, wire: false, install: false },
+      subitems: [sub],
+      _isSubItem: true,
+    };
+  });
+
+  const section = {
+    id: uid(),
+    name: sectionLabel,
+    collapsed: false,
+    _isSubcontractor: true,
+    _subNotes: [subName, quoteRef].filter(Boolean).join(' | '),
+    parents,
+  };
+
+  S.sections.push(section);
+
+  // Append exclusions to quote notes
+  if (_subImportExclusions.length) {
+    const notesEl = document.getElementById('quoteNotes');
+    const current = (notesEl?.value || '').trimEnd();
+    const block = '\n\n' + sectionLabel + ' Exclusions:\n' + _subImportExclusions.map(e => '• ' + e).join('\n');
+    if (notesEl) notesEl.value = current + block;
+  }
+
+  closeSubImportModal();
+  fullRender();
+  scheduleSave();
+
+  // Scroll to the new section
+  setTimeout(() => {
+    const el = document.getElementById('sec-' + section.id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+
+  showToast('✅ ' + _subImportItems.length + ' items added as ' + sectionLabel, 4000);
 }
 
 function doEmailExport() {

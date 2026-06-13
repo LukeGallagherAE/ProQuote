@@ -29,6 +29,7 @@ app.use('/api/storage', storageRoutes);
 app.use('/api/quotes',  quotesRoutes);
 app.use('/api/clients',    clientsRoutes);
 app.use('/api/pricelists', require('./routes/pricelists'));
+app.use('/api/subimport', require('./routes/subimport'));
 app.use('/api/email',   requireAuth, emailRoutes);
 app.use('/api/ai',      require('./routes/ai'));
 app.use('/api/pdf',     requireAuth, require('./routes/pdf'));
@@ -145,6 +146,7 @@ async function migrateAuth() {
     `);
     await db.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)`);
     await db.query(`ALTER TABLE quotes   ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)`);
+    await db.query(`ALTER TABLE users    ADD COLUMN IF NOT EXISTS anthropic_api_key TEXT DEFAULT NULL`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_settings_user ON settings(user_id)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_quotes_user   ON quotes(user_id)`);
 
