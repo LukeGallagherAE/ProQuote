@@ -68,12 +68,14 @@ router.post('/', upload.single('pdf'), async (req, res) => {
           },
           {
             type: 'text',
-            text: `You are extracting line items from a subcontractor quote PDF.
+            text: `You are extracting data from a subcontractor quote PDF.
 
 Return ONLY a JSON object — no other text, no markdown, no explanation.
 
 Format:
 {
+  "subName": "Company name from the quote header",
+  "quoteRef": "Their quote or reference number",
   "items": [
     { "description": "Item description here", "cost": 1234.56 }
   ],
@@ -81,6 +83,8 @@ Format:
 }
 
 Rules:
+- "subName": the name of the company that issued this quote (from their letterhead or header). Empty string if not found.
+- "quoteRef": their quote number or reference (e.g. "QT-001", "Quote #2024-045"). Empty string if not found.
 - Extract every individual line item that has a dollar price
 - "cost" must be a plain number with no symbols or commas
 - All prices should be ex-GST. If a price appears to include GST, divide by 1.1
@@ -108,7 +112,12 @@ Rules:
       return res.status(422).json({ error: 'No priced line items found. The PDF may be a scanned image or contain no itemised pricing.' });
     }
 
-    res.json({ items, exclusions: parsed.exclusions || [] });
+    res.json({
+      subName:    (parsed.subName   || '').trim(),
+      quoteRef:   (parsed.quoteRef  || '').trim(),
+      items,
+      exclusions: parsed.exclusions || [],
+    });
   } catch (err) {
     if (err.message?.includes('Only PDF')) return res.status(400).json({ error: err.message });
     console.error('POST /api/subimport:', err.message);

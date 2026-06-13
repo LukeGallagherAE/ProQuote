@@ -7995,6 +7995,11 @@ async function runSubImportExtract() {
     _subImportItems = data.items || [];
     _subImportExclusions = data.exclusions || [];
     _subImportMargin = parseFloat(document.getElementById('sub-imp-margin').value) || 10;
+    // Pre-fill name and ref from AI extraction if the user hasn't typed them
+    const nameInp = document.getElementById('sub-imp-name');
+    const refInp  = document.getElementById('sub-imp-ref');
+    if (nameInp && !nameInp.value.trim() && data.subName)  nameInp.value = data.subName;
+    if (refInp  && !refInp.value.trim()  && data.quoteRef) refInp.value  = data.quoteRef;
     _subImportShowPreview();
   } catch(e) {
     const errEl = document.getElementById('sub-imp-error');
