@@ -2558,7 +2558,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     <div id="sub-import-step1" style="padding:20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex:1">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="field">
-          <label>Subcontractor name <span style="color:#ff3b30">*</span></label>
+          <label>Subcontractor name <span style="font-size:10px;color:var(--muted)">(auto-filled from PDF)</span></label>
           <input id="sub-imp-name" placeholder="e.g. ABC Electrical Pty Ltd" style="width:100%">
         </div>
         <div class="field">
@@ -7967,8 +7967,6 @@ function onSubImportFileChosen(input, file) {
 }
 
 async function runSubImportExtract() {
-  const name = document.getElementById('sub-imp-name').value.trim();
-  if (!name) { document.getElementById('sub-imp-name').focus(); showToast('Enter the subcontractor name', 3000); return; }
   if (!_subImportFile) { showToast('Choose a PDF file first', 3000); return; }
 
   const btn = document.getElementById('sub-imp-extract-btn');
@@ -8084,6 +8082,11 @@ function confirmSubImport() {
   if (!_subImportItems.length) { showToast('No items to import', 2000); return; }
 
   const subName = document.getElementById('sub-imp-name').value.trim();
+  if (!subName) {
+    subImportBackToStep1();
+    setTimeout(() => { document.getElementById('sub-imp-name').focus(); showToast('Enter the subcontractor name', 3000); }, 50);
+    return;
+  }
   const quoteRef = document.getElementById('sub-imp-ref').value.trim();
   const margin = _subImportMargin;
 
