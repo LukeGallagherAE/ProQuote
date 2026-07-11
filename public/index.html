@@ -3175,7 +3175,8 @@ function calcSection(sec) {
   let m=0,l=0,t=0,optT=0;
   for (const p of sec.parents) {
     const c=calcParent(p);
-    if (p.optional) { optT+=c.total; }
+    if (p.optional && p.selected === false) { /* excluded optional — skip entirely */ }
+    else if (p.optional) { optT+=c.total; }
     else { m+=c.matSell; l+=c.labSell; t+=c.total; }
   }
   return {matSell:m,labSell:l,total:t,optTotal:optT};
@@ -3194,7 +3195,7 @@ function calcAll() {
   let matCost = 0;
   for (const sec of S.sections)
     for (const par of sec.parents) {
-      if (par.optional) continue;
+      if (par.optional && par.selected === false) continue;
       for (const sub of par.subitems) {
         if (!subActive(sub,par)) continue;
         const unitPrice = sub.item ? sub.item.p : (parseFloat(sub.customPrice)||0);
@@ -3211,7 +3212,7 @@ function calcLabourMins() {
   let mins=0;
   for (const s of S.sections)
     for (const p of s.parents) {
-      if (p.optional) continue;
+      if (p.optional && p.selected === false) continue;
       const ac = p.activeCats || {supply:true,wire:true,install:true};
       for (const sub of p.subitems) {
         if (!subActive(sub,p)) continue;
@@ -3781,6 +3782,14 @@ function toggleOptional(sid, pid) {
   const s = S.sections.find(s => s.id === sid); if (!s) return;
   const par = s.parents.find(p => p.id === pid); if (!par) return;
   par.optional = !par.optional;
+  if (par.optional && par.selected === undefined) par.selected = true;
+  fullRender();
+}
+function toggleSelected(sid, pid) {
+  syncDOM();
+  const s = S.sections.find(s => s.id === sid); if (!s) return;
+  const par = s.parents.find(p => p.id === pid); if (!par) return;
+  par.selected = par.selected === false ? true : false;
   fullRender();
 }
 
@@ -5226,7 +5235,7 @@ function _calcQuoteTotal(q) {
   let total = 0;
   (q.sections || []).forEach(sec => {
     (sec.parents || []).forEach(par => {
-      if (par.optional) return;
+      if (par.optional && par.selected === false) return;
       const ac = par.activeCats || {supply:true, wire:true, install:true, program:true};
       let matSell = 0, labSell = 0;
       (par.subitems || []).forEach(sub => {
@@ -5297,6 +5306,8 @@ function diffQuotes(prevQ, newQ) {
     // Optional toggle
     if (!!np.optional !== !!pp.optional)
       changes.push(prefix + (np.optional ? ' — marked optional' : ' — no longer optional'));
+    if (np.optional && (np.selected===false) !== (pp.selected===false))
+      changes.push(prefix + (np.selected===false ? ' — excluded from quote' : ' — included in quote'));
 
     // Subitems by ID
     const prevSubs = {}, newSubs = {};
@@ -6126,10 +6137,15 @@ function renderParent(sid,par,pi,total){
   const ac=par.activeCats||{supply:true,wire:true,install:true,program:true};
   const _swiPartial = !par.lumpSum && (!ac.supply || !ac.wire || !ac.install || !ac.program);
   const menuBtn='<button class="parent-menu-btn" onclick="showParentMenu('+sid+','+par.id+',this)" title="Move / duplicate / remove">⋮</button>';
-  const optPill = '<label onclick="event.stopPropagation()" title="Mark as optional extra — shown separately on quote with client checkbox" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;user-select:none">'
+  const isSelected = par.selected !== false;
+  const optPill = '<label onclick="event.stopPropagation()" title="Mark as optional extra — shown separately on quote" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;user-select:none">'
     + '<span style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:'+(par.optional?'rgba(220,130,0,1)':'var(--muted)')+';transition:color .15s">Optional</span>'
     + '<input type="checkbox" '+(par.optional?'checked':'')+' onclick="event.stopPropagation();toggleOptional('+sid+','+par.id+')" style="width:15px;height:15px;accent-color:#e08000;cursor:pointer;margin:0">'
-    + '</label>';
+    + '</label>'
+    + (par.optional ? '<button onclick="event.stopPropagation();toggleSelected('+sid+','+par.id+')" title="'+(isSelected?'Click to exclude from quote total':'Click to include in quote total')+'" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px 4px;border-radius:5px;border:1.5px solid '+(isSelected?'rgba(0,160,80,.5)':'rgba(180,0,0,.3)')+';background:'+(isSelected?'rgba(0,160,80,.08)':'rgba(180,0,0,.06)')+';cursor:pointer">'
+      + '<span style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:'+(isSelected?'#008040':'#b00000')+'">Incl.</span>'
+      + '<span style="font-size:9px;font-weight:700;color:'+(isSelected?'#008040':'#b00000')+'">'+(isSelected?'✓':'✗')+'</span>'
+      + '</button>' : '');
   const _photos = _getPhotos(par);
   const photoThumb = _photos.length
     ? _photos.slice(0,4).map((src,i) =>
@@ -6208,7 +6224,7 @@ function renderParent(sid,par,pi,total){
     : '<span class="par-desc-add" onclick="event.stopPropagation();addParentDesc('+par.id+')" title="Add description">+ desc</span>';
 
   return '<div class="parent-item'+(_inPanel?' in-panel':'')+'" id="par-'+par.id+'" ondragover="_dragParId!=null?_onParDragOver(event,'+sid+','+par.id+'):(event.preventDefault(),event.stopPropagation(),this.classList.add(\'drag-over\'))" ondragleave="this.classList.remove(\'drag-over\');this.classList.remove(\'item-drag-over\')" ondrop="_dragParId!=null?_onParDrop(event,'+sid+','+par.id+'):(dropParentPhoto(event,'+sid+','+par.id+'),this.classList.remove(\'drag-over\'))">'+
-  (par.optional ? '<div style="position:absolute;inset:0;border:2px dashed rgba(255,165,0,.35);border-radius:4px;pointer-events:none"></div>' : '')+
+  (par.optional ? '<div style="position:absolute;inset:0;border:2px dashed '+(par.selected===false?'rgba(180,0,0,.3)':'rgba(255,165,0,.35)')+';border-radius:4px;pointer-events:none"></div>' : '')+
     '<div class="parent-header" onclick="if(!([\'INPUT\',\'TEXTAREA\',\'BUTTON\',\'SELECT\'].includes(event.target.tagName)||event.target.closest(\'.ph-actions\')))openSubitemPanel(\''+sid+'\',\''+par.id+'\')">'+
       parDragHandle+
       '<span style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;color:'+(_inPanel?'var(--accent)':'var(--muted)')+';flex-shrink:0">'+(_inPanel?'▾':'▸')+'</span>'+
@@ -7352,6 +7368,8 @@ function doPrint(){
           if (prevAC.install  && !newAC.install) details.push('install removed');
           if (!!np.optional !== !!pp.optional)
             details.push(np.optional ? 'marked optional' : 'no longer optional');
+          if (np.optional && (np.selected===false) !== (pp.selected===false))
+            details.push(np.selected===false ? 'excluded from quote' : 'included in quote');
           if (!!np.lumpSum !== !!pp.lumpSum)
             details.push(np.lumpSum ? 'switched to lump sum' : 'switched to itemised');
           if (np.lumpSum && pp.lumpSum && (np.lumpPrice||0) !== (pp.lumpPrice||0))
@@ -7661,9 +7679,10 @@ function doPrint(){
         const lbl = installLabelPdf(par);
         const isLast = idx===g.pars.length-1;
         const isOpt = !!par.optional;
-        const rowBg = isOpt ? '#fffbf0' : '#fff';
+        const isExcluded = isOpt && par.selected === false;
+        const rowBg = isOpt ? (isExcluded ? '#fff8f8' : '#fffbf0') : '#fff';
         const optCheckbox = isOpt
-          ? '<input type="checkbox" class="opt-cb" checked data-amt="'+Number(pc.total).toFixed(2)+'" onchange="pdfRecalc()" style="margin-right:6px;width:14px;height:14px;accent-color:#e08000;flex-shrink:0;cursor:pointer">'
+          ? '<input type="checkbox" class="opt-cb" '+(isExcluded?'':'checked')+' data-amt="'+Number(pc.total).toFixed(2)+'" onchange="pdfRecalc()" style="margin-right:6px;width:14px;height:14px;accent-color:#e08000;flex-shrink:0;cursor:pointer">'
           : '';
         const optBadge = isOpt ? '<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;background:#fff3cd;color:#b06000;border:1px solid rgba(200,140,0,.3);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle">Optional</span>' : '';
         const discCell = hasDisc ? (pc.discAmt>0
@@ -7986,6 +8005,7 @@ function _quoteFingerprint() {
       sec.name + ':' + sec.parents.map(p =>
         [p.name||'', p.description||'', p.qty||1, p.category||'',
          JSON.stringify((p.activeCats||{})),
+         (p.optional?1:0),(p.selected===false?0:1),
          p.subitems.map(s =>
            [s.item||'', s.customName||'', s.qty||1, s.wireMin||0, s.instMin||0, s.progMin||0,
             s.unitPrice||0, s.markupPct||0, s.unit||''].join('~')
@@ -8158,7 +8178,7 @@ function _calcStoredQuote(qq) {
   let total=0, profit=0;
   for (const sec of (qq.sections||[])) {
     for (const par of (sec.parents||[])) {
-      if (par.optional) continue;
+      if (par.optional && par.selected === false) continue;
       const pQty = parseFloat(par.qty)||1;
       let pMat=0,pLab=0,pMatCost=0,pLabCost=0;
       for (const sub of (par.subitems||[])) {
