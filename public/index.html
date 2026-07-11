@@ -3193,12 +3193,14 @@ function calcAll() {
   // Material cost = iterate and sum cost (before markup)
   let matCost = 0;
   for (const sec of S.sections)
-    for (const par of sec.parents)
+    for (const par of sec.parents) {
+      if (par.optional) continue;
       for (const sub of par.subitems) {
         if (!subActive(sub,par)) continue;
         const unitPrice = sub.item ? sub.item.p : (parseFloat(sub.customPrice)||0);
         matCost += unitPrice * (sub.qty||1) * (par.qty||1);
       }
+    }
   const matProfit = m - matCost;
   const totalProfit = matProfit + labourProfit;
   const totalCost = matCost + labourCost;
@@ -3209,6 +3211,7 @@ function calcLabourMins() {
   let mins=0;
   for (const s of S.sections)
     for (const p of s.parents) {
+      if (p.optional) continue;
       const ac = p.activeCats || {supply:true,wire:true,install:true};
       for (const sub of p.subitems) {
         if (!subActive(sub,p)) continue;
