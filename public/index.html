@@ -303,12 +303,12 @@ html.dark .parent-item:focus-within{background:var(--blue-bg)}
 .cat-tag:hover{background:var(--blue);color:#fff}
 
 .subitems-wrap{background:var(--surface2);border-top:1px solid var(--border);overflow-x:auto}
-.sub-col-headers{display:grid;grid-template-columns:44px 1fr 32px 50px 42px 42px 60px 60px 60px 70px 28px;gap:6px;padding:5px 12px;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1}
+.sub-col-headers{display:grid;grid-template-columns:44px 1fr 32px 50px 42px 42px 42px 60px 60px 60px 70px 28px;gap:6px;padding:5px 12px;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1}
 .sub-col-headers span{text-align:center}
 .sub-col-headers span:nth-child(2){text-align:left}
 .sub-col-headers .r{text-align:right}
 
-.subitem-row{display:grid;grid-template-columns:44px 1fr 32px 50px 42px 42px 60px 60px 60px 70px 28px;gap:6px;padding:3px 12px;align-items:center;min-height:30px;border-bottom:1px solid var(--border);transition:background .08s}
+.subitem-row{display:grid;grid-template-columns:44px 1fr 32px 50px 42px 42px 42px 60px 60px 60px 70px 28px;gap:6px;padding:3px 12px;align-items:center;min-height:30px;border-bottom:1px solid var(--border);transition:background .08s}
 .subitem-row>*{min-width:0}
 .subitem-row:nth-child(odd){background:var(--surface)}
 .subitem-row:nth-child(even){background:var(--surface2)}
@@ -1687,6 +1687,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
         <div class="sh" style="margin-bottom:10px">Pricing</div>
         <div style="display:flex;flex-direction:column;gap:8px">
           <div class="field"><label>Labour sell rate ($/hr)</label><input type="number" id="labourRate" value="100" min="0" oninput="clearTimeout(window._lrDeb);window._lrDeb=setTimeout(()=>{syncDOM();fullRender();},300)"></div>
+          <div class="field"><label>Programming rate ($/hr)</label><input type="number" id="programmingRate" value="100" min="0" oninput="clearTimeout(window._prDeb);window._prDeb=setTimeout(()=>{syncDOM();fullRender();},300)"></div>
           <div class="field"><label>Labour cost rate ($/hr)</label><input type="number" id="labourCostRate" value="75" min="0" oninput="renderTotals();scheduleSave()"></div>
           <div class="field">
             <label>Default markup %</label>
@@ -2275,6 +2276,7 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
 
           <div class="field"><label>Labour sell ($/hr)</label><input id="pLabourSell" type="number" value="100" min="0" oninput="saveProfile()"></div>
           <div class="field"><label>Labour cost ($/hr)</label><input id="pLabourCost" type="number" value="75" min="0" oninput="saveProfile()"></div>
+          <div class="field"><label>Programming rate ($/hr)</label><input id="pProgSell" type="number" value="100" min="0" oninput="saveProfile()"></div>
           <div class="field"><label>Deposit (%)</label><input id="pDeposit" type="number" value="20" min="0" max="100" step="1" oninput="saveProfile()"></div>
         </div>
 
@@ -2759,7 +2761,7 @@ function _newQuoteState(overrides) {
       jobName:'', jobNumber:'', siteAddr:'',
       quoteRef:'Q-' + new Date().getFullYear() + '-001',
       quoteDate: new Date().toISOString().slice(0,10),
-      labourRate: profileRate('pLabourSell', 100), labourCostRate: profileRate('pLabourCost', 75), defaultMarkup: profileRate('pMarkup', 100), depositAmount: profileRate('pDeposit', 20), quoteNotes:''
+      labourRate: profileRate('pLabourSell', 100), labourCostRate: profileRate('pLabourCost', 75), programmingRate: profileRate('pProgSell', 100), defaultMarkup: profileRate('pMarkup', 100), depositAmount: profileRate('pDeposit', 20), quoteNotes:''
     },
     ...overrides
   };
@@ -2767,7 +2769,7 @@ function _newQuoteState(overrides) {
 
 function _captureFields() {
   const ids = ['clientName','clientPhone','clientEmail','jobName','jobNumber',
-    'siteAddr','quoteRef','quoteDate','labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes','grandTotalValue'];
+    'siteAddr','quoteRef','quoteDate','labourRate','labourCostRate','programmingRate','defaultMarkup','depositAmount','quoteNotes','grandTotalValue'];
   const fields = {};
   ids.forEach(id => { const el = document.getElementById(id); if(el) fields[id] = el.value||''; });
   const gtActive = document.getElementById('grandTotalActive');
@@ -2990,7 +2992,7 @@ function loadTemplates() {
 function saveTemplate(par) {
   if (!par.name || par.name === 'New Item') return;
   // Only save if there are at least some filled sub-items
-  const filledSubs = par.subitems.filter(s => s.item || s.customName || s.wireMin || s.instMin);
+  const filledSubs = par.subitems.filter(s => s.item || s.customName || s.wireMin || s.instMin || s.progMin);
   if (!filledSubs.length) return;
   const templates = loadTemplates();
   const key = par.name.trim().toLowerCase();
@@ -3011,6 +3013,7 @@ function saveTemplate(par) {
       qty: s.qty || 1,
       wireMin: s.wireMin || 0,
       instMin: s.instMin || 0,
+      progMin: s.progMin || 0,
       markup: s.markup || 100,
       cat: s.cat || 'supply'
     })),
@@ -3058,6 +3061,7 @@ function applyTemplate(sid, pid, template) {
     qty: s.qty || 1,
     wireMin: s.wireMin || 0,
     instMin: s.instMin || 0,
+    progMin: s.progMin || 0,
     markup: s.markup || 100,
     cat: s.cat || 'supply'
   }));
@@ -3122,16 +3126,17 @@ function newParent(name) {
   return { id:uid(), name:name||'', description:'', qty:1, collapsed:false,
            category:'',
            lumpSum:false, lumpPrice:0,
-           activeCats:{supply:true,wire:true,install:true},
+           activeCats:{supply:true,wire:true,install:true,program:true},
            subitems:[] };
 }
 function newSubitem(cat) {
   return { id:uid(), item:null, customName:'', customUnit:'EA', customPrice:0,
-           qty:1, wireMin:0, instMin:0, markup:defMarkup(), cat:cat||'supply' };
+           qty:1, wireMin:0, instMin:0, progMin:0, markup:defMarkup(), cat:cat||'supply' };
 }
 
 // ── Calc ──────────────────────────────────────────────────────────────────────
 function lr() { return parseFloat(document.getElementById('labourRate')?.value||100); }
+function pr() { return parseFloat(document.getElementById('programmingRate')?.value||100); }
 function fmt(n) { return '$'+Number(n||0).toFixed(2); }
 function subActive(sub, par) {
   if (!par||!par.activeCats) return true;
@@ -3147,6 +3152,7 @@ function calcSub(sub, par) {
   const ac = par?.activeCats || {supply:true,wire:true,install:true};
   if (sub.cat==='wire')    labSell = ((sub.wireMin||0)*(sub.qty||1)/60)*lr();
   if (sub.cat==='install') labSell = ((sub.instMin||0)*(sub.qty||1)/60)*lr();
+  if (sub.cat==='program') labSell = ((sub.progMin||0)*(sub.qty||1)/60)*pr();
   // Supply items can carry install labour — only counted if install is active
   if (sub.cat==='supply' && ac.install) labSell = ((sub.instMin||0)*(sub.qty||1)/60)*lr();
   return {matSell,labSell,total:matSell+labSell,active:true};
@@ -3208,6 +3214,7 @@ function calcLabourMins() {
         if (!subActive(sub,p)) continue;
         if (sub.cat==='wire')    mins+=(sub.wireMin||0)*(sub.qty||1)*(p.qty||1);
         if (sub.cat==='install') mins+=(sub.instMin||0)*(sub.qty||1)*(p.qty||1);
+        if (sub.cat==='program') mins+=(sub.progMin||0)*(sub.qty||1)*(p.qty||1);
         if (sub.cat==='supply' && ac.install) mins+=(sub.instMin||0)*(sub.qty||1)*(p.qty||1);
       }
     }
@@ -3234,6 +3241,7 @@ function syncDOM() {
         const sm=document.getElementById('sm-'+sub.id); if(sm) sub.markup=parseFloat(sm.value)||0;
         const sw=document.getElementById('sw-'+sub.id); if(sw) sub.wireMin=parseFloat(sw.value)||0;
         const si=document.getElementById('si-'+sub.id); if(si) sub.instMin=parseFloat(si.value)||0;
+        const sp=document.getElementById('sp-'+sub.id); if(sp) sub.progMin=parseFloat(sp.value)||0;
         const scp=document.getElementById('scp-'+sub.id); if(scp) sub.customPrice=parseFloat(scp.value)||0;
         const scu=document.getElementById('scu-'+sub.id); if(scu) sub.customUnit=scu.value;
         const ss=document.getElementById('ss-'+sub.id); if(ss&&!sub.item) sub.customName=ss.value;
@@ -3241,6 +3249,7 @@ function syncDOM() {
           const subLabel = sub.item ? sub.item.d1 : sub.customName;
           if (subLabel && sub.cat==='wire' && sub.wireMin>0) recordLabourTime(subLabel,'wire',sub.wireMin);
           if (subLabel && (sub.cat==='install'||(sub.cat==='supply'&&sub.instMin>0))) recordLabourTime(subLabel,'install',sub.instMin);
+          if (subLabel && sub.cat==='program' && sub.progMin>0) recordLabourTime(subLabel,'program',sub.progMin);
           if (!sub.item && sub.customName && sub.customName.length>=2 && sub.customPrice>0) {
             saveToCustomLib(sub.customName, sub.customPrice, sub.customUnit||'EA');
           }
@@ -3287,6 +3296,7 @@ function setSubQty(subid, val)        { const s=_findSub(subid); if(s) _numSet((
 function setSubMarkup(subid, val)     { const s=_findSub(subid); if(s) _numSet(()=>{ s.markup=parseFloat(val)||0; }); }
 function setSubWireMin(subid, val)    { const s=_findSub(subid); if(s) _numSet(()=>{ s.wireMin=parseFloat(val)||0; }); }
 function setSubInstMin(subid, val)    { const s=_findSub(subid); if(s) _numSet(()=>{ s.instMin=parseFloat(val)||0; }); }
+function setSubProgMin(subid, val)    { const s=_findSub(subid); if(s) _numSet(()=>{ s.progMin=parseFloat(val)||0; }); }
 function setSubCustomPrice(subid, val){ const s=_findSub(subid); if(s) _numSet(()=>{ s.customPrice=parseFloat(val)||0; }); }
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
@@ -3539,13 +3549,13 @@ function setItemCat(parId, value) {
 function toggleSubCat(sid,pid,subid) {
   const p=getP(sid,pid); if(!p) return;
   const sub=p.subitems.find(s=>s.id===subid); if(!sub) return;
-  const cats=['supply','wire','install'];
+  const cats=['supply','wire','install','program'];
   sub.cat=cats[(cats.indexOf(sub.cat)+1)%cats.length]; fullRender();
 }
 function toggleActiveCat(sid,pid,cat) {
   syncDOM();
   const p=getP(sid,pid); if(!p) return;
-  if(!p.activeCats) p.activeCats={supply:true,wire:true,install:true};
+  if(!p.activeCats) p.activeCats={supply:true,wire:true,install:true,program:true};
   p.activeCats[cat]=!p.activeCats[cat]; fullRender();
 }
 function toggleParent(sid,pid) { const p=getP(sid,pid); if(p){p.collapsed=!p.collapsed;fullRender();} }
@@ -3554,7 +3564,7 @@ function toggleLumpSum(sid,pid) { syncDOM(); const p=getP(sid,pid); if(p){p.lump
 function openParentSettingsMenu(sid,pid,btn) {
   document.querySelectorAll('.par-settings-dd').forEach(m=>m.remove());
   const p=getP(sid,pid); if(!p) return;
-  const ac=p.activeCats||{supply:true,wire:true,install:true};
+  const ac=p.activeCats||{supply:true,wire:true,install:true,program:true};
   const rect=btn.getBoundingClientRect();
   const m=document.createElement('div');
   m.className='par-settings-dd';
@@ -3572,6 +3582,7 @@ function openParentSettingsMenu(sid,pid,btn) {
   m.appendChild(row('Supply',ac.supply,()=>toggleActiveCat(sid,pid,'supply')));
   m.appendChild(row('Wire',ac.wire,()=>toggleActiveCat(sid,pid,'wire')));
   m.appendChild(row('Install',ac.install,()=>toggleActiveCat(sid,pid,'install')));
+  m.appendChild(row('Program',ac.program,()=>toggleActiveCat(sid,pid,'program')));
   const sep=document.createElement('div');sep.style.cssText='height:1px;background:var(--border);margin:3px 0';m.appendChild(sep);
   m.appendChild(row('Fixed price ($)',p.lumpSum,()=>toggleLumpSum(sid,pid)));
   document.body.appendChild(m);
@@ -4073,6 +4084,7 @@ function newQuoteTabDirect() {
       quoteDate:    new Date().toISOString().slice(0,10),
       labourRate:   prevFields.labourRate   || '100',
       labourCostRate: prevFields.labourCostRate || '75',
+      programmingRate: prevFields.programmingRate || '100',
       defaultMarkup: prevFields.defaultMarkup || '100',
       quoteNotes:   ''
     }
@@ -4800,9 +4812,9 @@ function generateClientQuote() {
   const catOrderFn = cat => { const i=allCatsOrderedPdf.indexOf(cat||''); return i===-1?allCatsOrderedPdf.length:i; };
   const CAT_COLORS_CQ = {'Power':'#d94f00','Lighting':'#e8a000','Data':'#1a4fa0','Switchboard':'#444','HVAC':'#0077aa','AV':'#7a3aa0','Automation':'#1a7a4a','Intercom':'#a01a3a','':'#888'};
   const installLbl = par => {
-    const ac=par.activeCats||{supply:true,wire:true,install:true};
-    const p=[];if(ac.supply)p.push('Supply');if(ac.wire)p.push('Wire');if(ac.install)p.push('Install');
-    if(!p.length)return'';if(p.length===3)return'Supply, Wire and Install';return p.join(' and ');
+    const ac=par.activeCats||{supply:true,wire:true,install:true,program:true};
+    const p=[];if(ac.supply)p.push('Supply');if(ac.wire)p.push('Wire');if(ac.install)p.push('Install');if(ac.program)p.push('Program');
+    if(!p.length)return'';if(p.length===4)return'Supply, Wire and Install';return p.join(' and ');
   };
 
   // Build line items
@@ -5207,11 +5219,12 @@ function _getRevisionFamily(q) {
 
 function _calcQuoteTotal(q) {
   const labourRate = Number(q.fields?.labourRate) || 100;
+  const programmingRate = Number(q.fields?.programmingRate) || 100;
   let total = 0;
   (q.sections || []).forEach(sec => {
     (sec.parents || []).forEach(par => {
       if (par.optional) return;
-      const ac = par.activeCats || {supply:true, wire:true, install:true};
+      const ac = par.activeCats || {supply:true, wire:true, install:true, program:true};
       let matSell = 0, labSell = 0;
       (par.subitems || []).forEach(sub => {
         if (!ac[sub.cat]) return;
@@ -5221,6 +5234,7 @@ function _calcQuoteTotal(q) {
         let labS = 0;
         if (sub.cat === 'wire')    labS = ((sub.wireMin||0) * (sub.qty||1) / 60) * labourRate;
         if (sub.cat === 'install') labS = ((sub.instMin||0) * (sub.qty||1) / 60) * labourRate;
+        if (sub.cat === 'program') labS = ((sub.progMin||0) * (sub.qty||1) / 60) * programmingRate;
         if (sub.cat === 'supply' && ac.install) labS = ((sub.instMin||0) * (sub.qty||1) / 60) * labourRate;
         matSell += matS; labSell += labS;
       });
@@ -5266,14 +5280,16 @@ function diffQuotes(prevQ, newQ) {
       changes.push(prefix + ' — qty ' + (pp.qty || 1) + ' → ' + (np.qty || 1));
 
     // activeCats toggles
-    const prevAC = pp.activeCats || {supply:true, wire:true, install:true};
-    const newAC  = np.activeCats || {supply:true, wire:true, install:true};
+    const prevAC = pp.activeCats || {supply:true, wire:true, install:true, program:true};
+    const newAC  = np.activeCats || {supply:true, wire:true, install:true, program:true};
     if (!prevAC.supply &&  newAC.supply) changes.push(prefix + ' — supply added');
     if ( prevAC.supply && !newAC.supply) changes.push(prefix + ' — supply removed');
     if (!prevAC.wire   &&  newAC.wire)   changes.push(prefix + ' — wiring added');
     if ( prevAC.wire   && !newAC.wire)   changes.push(prefix + ' — wiring removed');
     if (!prevAC.install &&  newAC.install) changes.push(prefix + ' — install added');
     if ( prevAC.install && !newAC.install) changes.push(prefix + ' — install removed');
+    if (!prevAC.program &&  newAC.program) changes.push(prefix + ' — program added');
+    if ( prevAC.program && !newAC.program) changes.push(prefix + ' — program removed');
 
     // Optional toggle
     if (!!np.optional !== !!pp.optional)
@@ -5308,6 +5324,13 @@ function diffQuotes(prevQ, newQ) {
         if (!oi && ni)       changes.push(prefix + ' — install time set to ' + ni + ' min');
         else if (oi && !ni)  changes.push(prefix + ' — install time cleared');
         else                 changes.push(prefix + ' — install ' + oi + ' → ' + ni + ' min');
+      }
+      // program time
+      if (ns.cat === 'program' && (ns.progMin || 0) !== (ps.progMin || 0)) {
+        const op = ps.progMin || 0, np2 = ns.progMin || 0;
+        if (!op && np2)      changes.push(prefix + ' — program time set to ' + np2 + ' min');
+        else if (op && !np2) changes.push(prefix + ' — program time cleared');
+        else                 changes.push(prefix + ' — program ' + op + ' → ' + np2 + ' min');
       }
       // price
       const np_ = ns.item ? (ns.item.p || 0) : (parseFloat(ns.customPrice) || 0);
@@ -5738,7 +5761,7 @@ function wizCreate() {
     siteAddr:    document.getElementById('wiz-job-addr').value.trim(),
     quoteRef:    document.getElementById('wiz-quote-ref').value.trim(),
     quoteDate:   new Date().toISOString().slice(0,10),
-    labourRate: profileRate('pLabourSell', 100), labourCostRate: profileRate('pLabourCost', 75), defaultMarkup: profileRate('pMarkup', 100), depositAmount: profileRate('pDeposit', 20), quoteNotes:''
+    labourRate: profileRate('pLabourSell', 100), labourCostRate: profileRate('pLabourCost', 75), programmingRate: profileRate('pProgSell', 100), defaultMarkup: profileRate('pMarkup', 100), depositAmount: profileRate('pDeposit', 20), quoteNotes:''
   };
 
   // Duplicate mode: copy sections directly, skip zones step
@@ -6012,7 +6035,7 @@ function renderSubitemPanel() {
   const c = calcParent(par);
   const subHtml = par.subitems.map(sub => renderSubitem(_subPanelSid, _subPanelPid, par, sub)).join('');
 
-  const ac = par.activeCats || {supply:true,wire:true,install:true};
+  const ac = par.activeCats || {supply:true,wire:true,install:true,program:true};
   panel.innerHTML =
     '<div class="sip-header">'
       + '<div class="sip-title">' + esc(par.name || 'Untitled') + '<span style="font-weight:400;color:var(--muted);margin-left:8px;font-size:11px">' + esc(sec.name || '') + '</span></div>'
@@ -6020,6 +6043,7 @@ function renderSubitemPanel() {
         + '<button class="swi-pill'+(ac.supply?'':' off')+'" onclick="toggleActiveCat('+_subPanelSid+','+_subPanelPid+',\'supply\')" title="Toggle Supply cost">S</button>'
         + '<button class="swi-pill'+(ac.wire?'':' off')+'" onclick="toggleActiveCat('+_subPanelSid+','+_subPanelPid+',\'wire\')" title="Toggle Wire cost">W</button>'
         + '<button class="swi-pill'+(ac.install?'':' off')+'" onclick="toggleActiveCat('+_subPanelSid+','+_subPanelPid+',\'install\')" title="Toggle Install cost">I</button>'
+        + '<button class="swi-pill'+(ac.program?'':' off')+'" onclick="toggleActiveCat('+_subPanelSid+','+_subPanelPid+',\'program\')" title="Toggle Program cost">P</button>'
         + '<button class="swi-pill'+(par.lumpSum?' lump-on':'')+'" onclick="toggleLumpSum('+_subPanelSid+','+_subPanelPid+')" title="Lump sum mode">$</button>'
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:10px;margin-left:auto;flex-shrink:0">'
@@ -6027,11 +6051,12 @@ function renderSubitemPanel() {
         + '<button onclick="syncDOM();addSubitem(\'' + _subPanelSid + '\',\'' + _subPanelPid + '\',\'supply\')" style="padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text)">+ Supply</button>'
         + '<button onclick="syncDOM();addSubitem(\'' + _subPanelSid + '\',\'' + _subPanelPid + '\',\'wire\')" style="padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text)">+ Wire</button>'
         + '<button onclick="syncDOM();addSubitem(\'' + _subPanelSid + '\',\'' + _subPanelPid + '\',\'install\')" style="padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text)">+ Install</button>'
+        + '<button onclick="syncDOM();addSubitem(\'' + _subPanelSid + '\',\'' + _subPanelPid + '\',\'program\')" style="padding:3px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text)">+ Program</button>'
         + '<button onclick="closeSubitemPanel()" style="padding:3px 8px;font-size:13px;border-radius:5px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);line-height:1">✕</button>'
       + '</div>'
     + '</div>'
     + '<div class="sip-body">'
-      + '<div class="sub-col-headers"><span>Type</span><span>Sub-item</span><span>Qty</span><span>Markup</span><span>Wire</span><span>Inst</span><span class="r">Unit $</span><span class="r">Mat</span><span class="r">Lab</span><span class="r">Total</span><span></span></div>'
+      + '<div class="sub-col-headers"><span>Type</span><span>Sub-item</span><span>Qty</span><span>Markup</span><span>Wire</span><span>Inst</span><span>Prog</span><span class="r">Unit $</span><span class="r">Mat</span><span class="r">Lab</span><span class="r">Total</span><span></span></div>'
       + subHtml
       + '<div id="ai-sub-panel-' + _subPanelPid + '"></div>'
     + '</div>';
@@ -6095,8 +6120,8 @@ function renderSection(sec,si){
 
 function renderParent(sid,par,pi,total){
   const c=calcParent(par);
-  const ac=par.activeCats||{supply:true,wire:true,install:true};
-  const _swiPartial = !par.lumpSum && (!ac.supply || !ac.wire || !ac.install);
+  const ac=par.activeCats||{supply:true,wire:true,install:true,program:true};
+  const _swiPartial = !par.lumpSum && (!ac.supply || !ac.wire || !ac.install || !ac.program);
   const menuBtn='<button class="parent-menu-btn" onclick="showParentMenu('+sid+','+par.id+',this)" title="Move / duplicate / remove">⋮</button>';
   const optPill = '<label onclick="event.stopPropagation()" title="Mark as optional extra — shown separately on quote with client checkbox" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;user-select:none">'
     + '<span style="font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:'+(par.optional?'rgba(220,130,0,1)':'var(--muted)')+';transition:color .15s">Optional</span>'
@@ -6146,6 +6171,7 @@ function renderParent(sid,par,pi,total){
   (par.subitems||[]).forEach(sub => {
     if (sub.cat==='wire' && ac.wire) _labMins += (sub.wireMin||0)*(sub.qty||1);
     if (sub.cat==='install' && ac.install) _labMins += (sub.instMin||0)*(sub.qty||1);
+    if (sub.cat==='program' && ac.program) _labMins += (sub.progMin||0)*(sub.qty||1);
     if (sub.cat==='supply' && ac.install) _labMins += (sub.instMin||0)*(sub.qty||1);
   });
   _labMins *= (par.qty||1);
@@ -6208,7 +6234,8 @@ function renderSubitem(sid,pid,par,sub){
   const hasItem=!!sub.item;
   const isWire=sub.cat==='wire';
   const isInstall=sub.cat==='install';
-  const catLabel=sub.cat==='supply'?'Supply':sub.cat==='wire'?'Wire':'Install';
+  const isProgram=sub.cat==='program';
+  const catLabel=sub.cat==='supply'?'Supply':sub.cat==='wire'?'Wire':sub.cat==='install'?'Install':'Program';
   const displayVal=hasItem?(sub.item.d1+(sub.item.d2?' — '+sub.item.d2:'')):(sub.customName||'');
   const placeholder=isWire?'Search or type a description…':isInstall?'Search or type a description…':'Search pricelist or type a custom item…';
 
@@ -6246,6 +6273,11 @@ function renderSubitem(sid,pid,par,sub){
     ? '<input type="number" id="si-'+sub.id+'" value="'+sub.instMin+'" min="0" placeholder="'+(instSug||'0')+'" onchange="setSubInstMin('+sub.id+',this.value)" style="text-align:center" title="Install labour minutes'+(isSupply?' (counted when Install is active)':'')+'">'
     : '<input type="number" id="si-'+sub.id+'" value="'+sub.instMin+'" style="display:none"><span style="text-align:center;color:var(--border2);font-size:11px">—</span>';
 
+  const progSug = !sub.progMin ? suggestLabourTime(subLabel,'program') : null;
+  const progField = isProgram
+    ? '<input type="number" id="sp-'+sub.id+'" value="'+(sub.progMin||0)+'" min="0" placeholder="'+(progSug||'0')+'" onchange="setSubProgMin('+sub.id+',this.value)" style="text-align:center" title="Programming labour minutes per item">'
+    : '<input type="number" id="sp-'+sub.id+'" value="'+(sub.progMin||0)+'" style="display:none"><span style="text-align:center;color:var(--border2);font-size:11px">—</span>';
+
   const menuBtn='<div class="ctx-anchor" style="position:relative">'+
     '<button class="btn-icon" draggable="true" ondragstart="_onSubDragStart(event,'+sid+','+pid+','+sub.id+')" onclick="showSubMenu('+sid+','+pid+','+sub.id+',this)" title="Drag to reorder · Click for options" style="font-size:14px;font-weight:700;line-height:1;cursor:grab">⋮</button>'+
   '</div>';
@@ -6269,6 +6301,7 @@ function renderSubitem(sid,pid,par,sub){
     '</div>'+
     wireField+
     instField+
+    progField+
     unitPriceCell+
     '<span class="nc mat'+(active?'':' off')+'">'+(c.matSell>0?fmt(c.matSell):'—')+'</span>'+
     '<span class="nc lab'+(active?'':' off')+'">'+(c.labSell>0?fmt(c.labSell):'—')+'</span>'+
@@ -6325,7 +6358,7 @@ function acceptSubSugs(pid){
   for(const[i,sug]of(window._aiSubList||[]).entries()){
     if(!window._aiSubChk?.has(i))continue;
     const sub=newSubitem(sug.cat);
-    sub.qty=sug.qty||1;sub.wireMin=sug.wireMin||0;sub.instMin=sug.instMin||0;sub.markup=sug.markup||100;
+    sub.qty=sug.qty||1;sub.wireMin=sug.wireMin||0;sub.instMin=sug.instMin||0;sub.progMin=sug.progMin||0;sub.markup=sug.markup||100;
     if(sug.plItem)sub.item=sug.plItem;
     else sub.customName=sug.name||'';
     par.subitems.push(sub);
@@ -6421,7 +6454,7 @@ function setRolodexStatus(msg, color) {
 
 function saveQuote(){
   syncDOM();
-  const d={clientName:document.getElementById('clientName')?.value||'',clientPhone:document.getElementById('clientPhone')?.value||'',clientEmail:document.getElementById('clientEmail')?.value||'',jobName:document.getElementById('jobName')?.value||'',jobNumber:document.getElementById('jobNumber')?.value||'',siteAddr:document.getElementById('siteAddr')?.value||'',quoteRef:document.getElementById('quoteRef')?.value||'',quoteDate:document.getElementById('quoteDate')?.value||'',labourRate:document.getElementById('labourRate')?.value||'100',labourCostRate:document.getElementById('labourCostRate')?.value||'75',defaultMarkup:document.getElementById('defaultMarkup')?.value||'100',depositAmount:document.getElementById('depositAmount')?.value||'20',notes:document.getElementById('quoteNotes')?.value||'',sections:S.sections};
+  const d={clientName:document.getElementById('clientName')?.value||'',clientPhone:document.getElementById('clientPhone')?.value||'',clientEmail:document.getElementById('clientEmail')?.value||'',jobName:document.getElementById('jobName')?.value||'',jobNumber:document.getElementById('jobNumber')?.value||'',siteAddr:document.getElementById('siteAddr')?.value||'',quoteRef:document.getElementById('quoteRef')?.value||'',quoteDate:document.getElementById('quoteDate')?.value||'',labourRate:document.getElementById('labourRate')?.value||'100',labourCostRate:document.getElementById('labourCostRate')?.value||'75',programmingRate:document.getElementById('programmingRate')?.value||'100',defaultMarkup:document.getElementById('defaultMarkup')?.value||'100',depositAmount:document.getElementById('depositAmount')?.value||'20',notes:document.getElementById('quoteNotes')?.value||'',sections:S.sections};
   // Auto-save to client book if client name filled
   if (d.clientName) saveQuoteToClientBook(d);
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:'application/json'}));a.download=(d.quoteRef||'quote')+'.json';a.click();
@@ -6476,11 +6509,12 @@ function loadQuote(){
         saveActiveQuoteState();
         // Create a new quote tab for the loaded file
         const fields={};
-        ['clientName','clientPhone','clientEmail','jobName','jobNumber','siteAddr','quoteRef','quoteDate','labourRate','labourCostRate','defaultMarkup','depositAmount'].forEach(k=>fields[k]=d[k]||'');
+        ['clientName','clientPhone','clientEmail','jobName','jobNumber','siteAddr','quoteRef','quoteDate','labourRate','labourCostRate','programmingRate','defaultMarkup','depositAmount'].forEach(k=>fields[k]=d[k]||'');
         fields.quoteNotes = d.notes || d.quoteNotes || '';
         // Apply profile defaults for any blank rate fields
         if (!fields.labourRate)      fields.labourRate      = profileRate('pLabourSell', 100);
         if (!fields.labourCostRate)  fields.labourCostRate  = profileRate('pLabourCost', 75);
+        if (!fields.programmingRate) fields.programmingRate = profileRate('pProgSell', 100);
         if (!fields.defaultMarkup)   fields.defaultMarkup   = profileRate('pMarkup', 100);
         if (!fields.depositAmount)   fields.depositAmount   = profileRate('pDeposit', 20);
         const sections = d.sections||[];
@@ -6626,7 +6660,7 @@ function showOpenQuoteDropdown(anchorEl) {
 }
 
 // ── PROFILE ───────────────────────────────────────────────────────────────────
-const PROFILE_IDS = ['pBizName','pABN','pPhone','pEmail','pLic','pPreparedBy','pValidity','pMarkup','pLabourSell','pLabourCost','pDeposit','pBankName','pBankBSB','pBankAcc'];
+const PROFILE_IDS = ['pBizName','pABN','pPhone','pEmail','pLic','pPreparedBy','pValidity','pMarkup','pLabourSell','pLabourCost','pProgSell','pDeposit','pBankName','pBankBSB','pBankAcc'];
 function saveProfile(){
   try{
     const data = {};
@@ -7375,13 +7409,14 @@ function doPrint(){
 
     // Build install type label
     function installLabel(par) {
-      const ac = par.activeCats || {supply:true,wire:true,install:true};
+      const ac = par.activeCats || {supply:true,wire:true,install:true,program:true};
       const parts = [];
       if (ac.supply)  parts.push('Supply');
       if (ac.wire)    parts.push('Wire');
       if (ac.install) parts.push('Install');
+      if (ac.program) parts.push('Program');
       if (!parts.length) return '';
-      if (parts.length === 3) return 'Supply and Install';
+      if (parts.length === 4) return 'Supply and Install';
       return parts.join(' and ');
     }
 
@@ -7441,7 +7476,7 @@ function doPrint(){
             const activeSubs = par.subitems.filter(sub => {
               if (!subActive(sub, par)) return false;
               const hasName = sub.item || (sub.customName && sub.customName.trim());
-              const hasLabour = (sub.wireMin||0) > 0 || (sub.instMin||0) > 0;
+              const hasLabour = (sub.wireMin||0) > 0 || (sub.instMin||0) > 0 || (sub.progMin||0) > 0;
               return hasName || hasLabour;
             });
             const subRows = activeSubs.map(sub => {
@@ -7451,7 +7486,7 @@ function doPrint(){
               const sc = calcSub(sub, par);
               const catBadgeColor = getCatColor(sub.cat);
               const catLabel = sub.cat ? ('<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:'+catBadgeColor+';margin-right:6px">'+esc(sub.cat)+'</span>') : '';
-              const labMin = (sub.cat === 'wire' ? sub.wireMin : sub.instMin) || 0;
+              const labMin = (sub.cat === 'wire' ? sub.wireMin : sub.cat === 'program' ? sub.progMin : sub.instMin) || 0;
               const meta = [];
               if (sub.qty && sub.qty !== 1) meta.push('×' + sub.qty);
               if (labMin > 0) meta.push(labMin + ' min labour');
@@ -7506,13 +7541,14 @@ function doPrint(){
     'Automation':'#1a7a4a','Intercom':'#a01a3a',''  :  '#888'
   };
   const installLabelPdf = par => {
-    const ac = par.activeCats||{supply:true,wire:true,install:true};
+    const ac = par.activeCats||{supply:true,wire:true,install:true,program:true};
     const parts=[];
     if(ac.supply) parts.push('Supply');
     if(ac.wire)   parts.push('Wire');
     if(ac.install)parts.push('Install');
+    if(ac.program)parts.push('Program');
     if(!parts.length) return '';
-    if(parts.length===3) return 'Supply, Wire and Install';
+    if(parts.length===4) return 'Supply, Wire and Install';
     return parts.join(' and ');
   };
   const dateStr = date ? new Date(date).toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}) : new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'});
@@ -7941,14 +7977,14 @@ function doPrint(){
 function _quoteFingerprint() {
   try {
     // Capture everything that matters — strip only photo data (base64 blobs)
-    const fields = ['clientName','jobName','jobNumber','siteAddr','quoteRef','quoteDate','labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes']
+    const fields = ['clientName','jobName','jobNumber','siteAddr','quoteRef','quoteDate','labourRate','labourCostRate','programmingRate','defaultMarkup','depositAmount','quoteNotes']
       .map(id => (document.getElementById(id)||{}).value||'').join('|');
     const sections = S.sections.map(sec =>
       sec.name + ':' + sec.parents.map(p =>
         [p.name||'', p.description||'', p.qty||1, p.category||'',
          JSON.stringify((p.activeCats||{})),
          p.subitems.map(s =>
-           [s.item||'', s.customName||'', s.qty||1, s.wireMin||0, s.instMin||0,
+           [s.item||'', s.customName||'', s.qty||1, s.wireMin||0, s.instMin||0, s.progMin||0,
             s.unitPrice||0, s.markupPct||0, s.unit||''].join('~')
          ).join(';')
         ].join('|')
@@ -8100,8 +8136,9 @@ function setStatusManual(status) {
 function _calcStoredQuote(qq) {
   const labRate = parseFloat(qq.labourRate || qq.fields?.labourRate || 100);
   const labCostRate = parseFloat(qq.labourCostRate || qq.fields?.labourCostRate || 75);
+  const progRate = parseFloat(qq.programmingRate || qq.fields?.programmingRate || 100);
   function _sub(sub, par) {
-    const ac = par.activeCats || {supply:true,wire:true,install:true};
+    const ac = par.activeCats || {supply:true,wire:true,install:true,program:true};
     if (!ac[sub.cat]) return {matSell:0,labSell:0,matCost:0,labCost:0};
     const mk = (sub.markup||0)/100;
     const unitPrice = sub.item ? sub.item.p : (parseFloat(sub.customPrice)||0);
@@ -8110,8 +8147,9 @@ function _calcStoredQuote(qq) {
     const matSellAmt = matCostAmt * (1+mk);
     const wMin = sub.cat==='wire' ? (parseFloat(sub.wireMin)||0) : 0;
     const iMin = (sub.cat==='install'||(sub.cat==='supply'&&ac.install)) ? (parseFloat(sub.instMin)||0) : 0;
-    const labSellAmt = ((wMin+iMin)*qty/60)*labRate;
-    const labCostAmt = ((wMin+iMin)*qty/60)*labCostRate;
+    const pMin = sub.cat==='program' ? (parseFloat(sub.progMin)||0) : 0;
+    const labSellAmt = ((wMin+iMin)*qty/60)*labRate + (pMin*qty/60)*progRate;
+    const labCostAmt = ((wMin+iMin+pMin)*qty/60)*labCostRate;
     return {matSell:matSellAmt, labSell:labSellAmt, matCost:matCostAmt, labCost:labCostAmt};
   }
   let total=0, profit=0;
@@ -10488,7 +10526,7 @@ function loadJobQuote(client, jobIdx, quoteIdx) {
   // Build the fields object from the stored quote
   const fields = {};
   ['clientName','clientPhone','clientEmail','jobName','jobNumber','siteAddr','quoteRef','quoteDate',
-   'labourRate','labourCostRate','defaultMarkup','depositAmount'].forEach(k => { fields[k] = q[k]||''; });
+   'labourRate','labourCostRate','programmingRate','defaultMarkup','depositAmount'].forEach(k => { fields[k] = q[k]||''; });
   fields.quoteNotes = q.notes || q.quoteNotes || '';
 
   // Advance the ID counter past any IDs already in the loaded sections
@@ -10772,7 +10810,7 @@ function executeMergeWizard() {
   function buildFields(r) {
     const f = {};
     ['clientName','clientPhone','clientEmail','jobName','jobNumber','siteAddr','quoteRef','quoteDate',
-     'labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes'].forEach(k => {
+     'labourRate','labourCostRate','programmingRate','defaultMarkup','depositAmount','quoteNotes'].forEach(k => {
       f[k] = r.qq[k] || r.qq.fields?.[k] || '';
     });
     f.clientName = f.clientName || r.clientName;
@@ -11068,7 +11106,7 @@ function openQuoteFromAll(i) {
   // Fallback: build from stored client book data (for old quotes not in _quotes)
   const fields = {};
   ['clientName','clientPhone','clientEmail','jobName','jobNumber','siteAddr','quoteRef','quoteDate',
-   'labourRate','labourCostRate','defaultMarkup','depositAmount','quoteNotes'].forEach(k => {
+   'labourRate','labourCostRate','programmingRate','defaultMarkup','depositAmount','quoteNotes'].forEach(k => {
     fields[k] = r.qq[k] || r.qq.fields?.[k] || '';
   });
   fields.clientName = fields.clientName || r.clientName;
@@ -13186,6 +13224,7 @@ function swizFinish(skip) {
     pMarkup:     document.getElementById('sw-markup').value.trim() || '100',
     pLabourSell: document.getElementById('sw-laboursell').value.trim() || '100',
     pLabourCost: document.getElementById('sw-labourcost').value.trim() || '75',
+    pProgSell:   document.getElementById('sw-progsell')?.value.trim() || '100',
     pDeposit:    document.getElementById('sw-deposit').value.trim() || '20',
   };
   try { localStorage.setItem('proquote_profile', JSON.stringify(profile)); } catch(e){}
