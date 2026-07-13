@@ -58,7 +58,7 @@ app.post('/q/:token/accept', async (req, res) => {
   const { clientName, signature, selections } = req.body;
   if (!clientName) return res.status(400).json({ error: 'clientName required' });
   try {
-    const { rows } = await db.query('SELECT id, accepted_at FROM quote_links WHERE token = $1', [req.params.token]);
+    const { rows } = await db.query('SELECT accepted_at FROM quote_links WHERE token = $1', [req.params.token]);
     if (!rows.length) return res.status(404).json({ error: 'Quote not found' });
     if (rows[0].accepted_at) return res.json({ ok: true }); // idempotent
     await db.query(
@@ -180,6 +180,8 @@ async function migrateAuth() {
     await db.query(`ALTER TABLE quote_links ADD COLUMN IF NOT EXISTS client_name TEXT`);
     await db.query(`ALTER TABLE quote_links ADD COLUMN IF NOT EXISTS client_sig  TEXT`);
     await db.query(`ALTER TABLE quote_links ADD COLUMN IF NOT EXISTS selections  JSONB`);
+    // The old schema had html TEXT NOT NULL — drop the NOT NULL so new rows (which use quote_data) can omit it
+    await db.query(`ALTER TABLE quote_links ALTER COLUMN html DROP NOT NULL`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_quote_links_token ON quote_links(token)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_quote_links_user  ON quote_links(user_id)`);
 
