@@ -12004,11 +12004,11 @@ function importQuotes() {
         const ref = q.fields?.quoteRef || q.quoteRef || '';
         if (ref && existingRefs.has(ref)) { skipped++; return; }
         if (ref) existingRefs.add(ref);
-        // Re-assign ID to avoid collisions; keep as hidden tab
+        // Re-assign ID to avoid collisions
         const nq = {
           ...q,
           id: 'q-imp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-          _hiddenTab: true,
+          _hiddenTab: false,
           _importedAt: Date.now(),
         };
         // Re-stamp section / parent / subitem IDs to avoid collisions with existing data
@@ -14708,16 +14708,13 @@ function init(){
   // Load custom company logo if set
   loadCompanyLogo();
   // Initialise quote tab system.
-  // Load ALL saved quotes from server into memory (marked _hiddenTab=true so they
-  // don't appear as open tabs). This keeps the full revision graph in memory so
-  // the revision system, Open Existing dropdown, and Quotes page all work correctly.
-  // Then add one fresh blank quote as the only visible tab.
+  // Load ALL saved quotes from storage into memory — all visible as tabs.
   const _sqRaw = localStorage.getItem('proquote_session_quotes');
   if (_sqRaw) {
     try {
       const restored = JSON.parse(_sqRaw);
       if (Array.isArray(restored) && restored.length) {
-        _quotes = restored.map(q => ({ ...q, _hiddenTab: true }));
+        _quotes = restored.map(q => ({ ...q, _hiddenTab: false }));
         // Advance _id counter past every ID used in restored quotes
         let _maxId = 0;
         for (const rq of _quotes) {
@@ -15553,7 +15550,8 @@ async function submitPassword() {
         if (!sqRaw) { setSaveStatus('synced'); return; }
         const restored = JSON.parse(sqRaw);
         if (!Array.isArray(restored) || !restored.length) { setSaveStatus('synced'); return; }
-        // Replace in-memory quotes entirely with fresh server data
+        // Replace in-memory quotes entirely with fresh server data.
+        // All quotes are always visible — nothing gets hidden on load.
         let _maxId = _id;
         _quotes = restored.map(q => {
           for (const s of (q.sections || [])) {
@@ -15563,14 +15561,13 @@ async function submitPassword() {
               for (const sub of (p.subitems || [])) { if (sub.id >= _maxId) _maxId = sub.id + 1; }
             }
           }
-          return { ...q, _hiddenTab: true };
+          return { ...q, _hiddenTab: false };
         });
         if (_maxId > _id) _id = _maxId;
         const aid = localStorage.getItem('proquote_active_id');
         const roots = _quotes.filter(q => !q._parentRef && !q._binned);
         const target = (aid && _quotes.find(q => q.id === aid && !q._binned)) || roots[roots.length - 1];
         if (target) {
-          _getRevisionFamily(target).forEach(m => { m._hiddenTab = false; });
           _activeQuoteId = target.id;
           S.sections = JSON.parse(JSON.stringify(target.sections || []));
           _restoreFields(target.fields || {});
@@ -15622,6 +15619,7 @@ window._initStorage().then(() => {
     const restored = JSON.parse(sqRaw);
     if (!Array.isArray(restored) || !restored.length) { setSaveStatus('synced'); return; }
     // Replace in-memory quotes with freshest available data (server if JWT, nativeLS otherwise)
+    // All quotes are always visible — nothing gets hidden on load.
     let _maxId = _id;
     _quotes = restored.map(q => {
       for (const s of (q.sections || [])) {
@@ -15631,7 +15629,7 @@ window._initStorage().then(() => {
           for (const sub of (p.subitems || [])) { if (sub.id >= _maxId) _maxId = sub.id + 1; }
         }
       }
-      return { ...q, _hiddenTab: true };
+      return { ...q, _hiddenTab: false };
     });
     if (_maxId > _id) _id = _maxId;
     const savedActiveId = localStorage.getItem('proquote_active_id');
@@ -15639,7 +15637,6 @@ window._initStorage().then(() => {
     const targetQ = (savedActiveId && _quotes.find(q => q.id === savedActiveId && !q._binned))
                  || roots[roots.length - 1];
     if (targetQ) {
-      _getRevisionFamily(targetQ).forEach(m => { m._hiddenTab = false; });
       if (targetQ.id !== _activeQuoteId) {
         _activeQuoteId = targetQ.id;
         S.sections = JSON.parse(JSON.stringify(targetQ.sections || []));
