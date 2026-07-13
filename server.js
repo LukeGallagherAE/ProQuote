@@ -15,6 +15,7 @@ const emailRoutes    = require('./routes/email');
 const authRoutes     = require('./routes/auth');
 const requireAuth    = require('./middleware/requireAuth');
 const db             = require('./db');
+const { apiRouter: shareApiRouter, renderQuotePage } = require('./routes/share');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -33,6 +34,37 @@ app.use('/api/subimport', require('./routes/subimport'));
 app.use('/api/email',   requireAuth, emailRoutes);
 app.use('/api/ai',      require('./routes/ai'));
 app.use('/api/pdf',     requireAuth, require('./routes/pdf'));
+app.use('/api/share',   shareApiRouter);
+
+// Public client quote pages
+app.get('/q/:token', async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT * FROM quote_links WHERE token = $1', [req.params.token]);
+    if (!rows.length) return res.status(404).send('<h1 style="font-family:sans-serif;padding:40px">Quote not found or link has expired.</h1>');
+    res.send(renderQuotePage(rows[0]));
+  } catch (err) {
+    console.error('GET /q/:token:', err);
+    res.status(500).send('<h1 style="font-family:sans-serif;padding:40px">Server error — please try again later.</h1>');
+  }
+});
+
+app.post('/q/:token/accept', async (req, res) => {
+  const { clientName, signature, selections } = req.body;
+  if (!clientName) return res.status(400).json({ error: 'clientName required' });
+  try {
+    const { rows } = await db.query('SELECT id, accepted_at FROM quote_links WHERE token = $1', [req.params.token]);
+    if (!rows.length) return res.status(404).json({ error: 'Quote not found' });
+    if (rows[0].accepted_at) return res.json({ ok: true }); // idempotent
+    await db.query(
+      `UPDATE quote_links SET accepted_at=NOW(), client_name=$1, client_sig=$2, selections=$3 WHERE token=$4`,
+      [clientName, signature || null, JSON.stringify(selections || {}), req.params.token]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('POST /q/:token/accept:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
 
 // Health check + build info
 const _buildDate = (() => {
@@ -149,6 +181,21 @@ async function migrateAuth() {
     await db.query(`ALTER TABLE users    ADD COLUMN IF NOT EXISTS anthropic_api_key TEXT DEFAULT NULL`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_settings_user ON settings(user_id)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_quotes_user   ON quotes(user_id)`);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS quote_links (
+        id          BIGSERIAL PRIMARY KEY,
+        token       TEXT UNIQUE NOT NULL,
+        user_id     INTEGER REFERENCES users(id),
+        quote_data  JSONB NOT NULL,
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        accepted_at TIMESTAMPTZ,
+        client_name TEXT,
+        client_sig  TEXT,
+        selections  JSONB
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_quote_links_token ON quote_links(token)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_quote_links_user  ON quote_links(user_id)`);
 
 
     // 2. Check if users table is empty

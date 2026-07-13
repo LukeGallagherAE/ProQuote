@@ -2541,7 +2541,18 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
       <button class="btn btn-primary" style="flex:1" onclick="doPrintExport()">Export PDF</button>
       <button class="btn btn-secondary" style="flex:1" id="download-pdf-btn" onclick="doDownloadPDF()">⬇ Download PDF</button>
       <button class="btn btn-secondary" style="flex:1" onclick="doEmailExport()">✉ Email Quote</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="shareQuote()">🔗 Share Link</button>
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+    </div>
+
+    <!-- Share link result panel (shown after shareQuote()) -->
+    <div id="share-result" style="display:none;margin-top:16px;padding:14px;background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:8px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--blue);margin-bottom:8px">Client Link</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="share-url" type="text" readonly style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text);font-family:monospace">
+        <button class="btn btn-secondary" onclick="copyShareLink()" style="white-space:nowrap;flex-shrink:0">Copy</button>
+      </div>
+      <div id="share-status" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
     </div>
   </div>
 </div>
@@ -8307,6 +8318,120 @@ async function confirmSendEmail() {
 
 function doPrintExport(){
   doPrint();
+}
+
+async function shareQuote() {
+  syncDOM();
+  const btn = document.querySelector('[onclick="shareQuote()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '🔗 Generating…'; }
+
+  try {
+    // Build profile snapshot from live DOM inputs
+    const pv = k => document.getElementById(k)?.value || '';
+    const profile = {
+      bizName:    pv('pBizName') || 'Adonai Electrical',
+      abn:        pv('pABN'),
+      lic:        pv('pLic'),
+      phone:      pv('pPhone'),
+      email:      pv('pEmail'),
+      preparedBy: pv('pPreparedBy'),
+      bankName:   pv('pBankName'),
+      bankBSB:    pv('pBankBSB'),
+      bankAcc:    pv('pBankAcc'),
+    };
+
+    // Build fields snapshot
+    const fv = k => document.getElementById(k)?.value || '';
+    const fields = {
+      clientName:  fv('clientName'),
+      clientPhone: fv('clientPhone'),
+      clientEmail: fv('clientEmail'),
+      siteAddr:    fv('siteAddr'),
+      quoteRef:    fv('quoteRef'),
+      quoteDate:   fv('quoteDate'),
+      quoteNotes:  fv('quoteNotes'),
+    };
+
+    // Build sections with pre-calculated totals
+    const sectionsSnap = S.sections.map(sec => ({
+      id:   sec.id,
+      name: sec.name,
+      parents: (sec.parents || []).map(par => {
+        const c = calcParent(par);
+        return {
+          id:          par.id,
+          name:        par.name,
+          description: par.description,
+          qty:         par.qty,
+          optional:    par.optional || false,
+          selected:    par.selected !== false,
+          _total:      c.total,
+          _matSell:    c.matSell,
+          _labSell:    c.labSell,
+          _discAmt:    c.discAmt || 0,
+        };
+      }),
+    }));
+
+    const token = window._nativeGetToken ? window._nativeGetToken() : null;
+    const res = await fetch('/api/share', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body:    JSON.stringify({ quoteData: { fields, profile, sections: sectionsSnap } }),
+    });
+    if (!res.ok) throw new Error('Server error ' + res.status);
+    const { token: shareToken } = await res.json();
+
+    const url = window.location.origin + '/q/' + shareToken;
+    const urlInput = document.getElementById('share-url');
+    urlInput.value = url;
+    document.getElementById('share-result').style.display = '';
+
+    // Poll for acceptance status every 30 s
+    _pollShareToken = shareToken;
+    _pollShareStatus();
+
+  } catch (err) {
+    console.error('shareQuote:', err);
+    alert('Could not generate share link — please try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔗 Share Link'; }
+  }
+}
+
+function copyShareLink() {
+  const inp = document.getElementById('share-url');
+  if (!inp) return;
+  inp.select();
+  try {
+    navigator.clipboard.writeText(inp.value).catch(() => document.execCommand('copy'));
+  } catch(e) { document.execCommand('copy'); }
+  const btn = document.querySelector('[onclick="copyShareLink()"]');
+  if (btn) { const t = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = t, 1800); }
+}
+
+var _pollShareToken = null;
+function _pollShareStatus() {
+  if (!_pollShareToken) return;
+  const token = window._nativeGetToken ? window._nativeGetToken() : null;
+  fetch('/api/share/' + _pollShareToken + '/status', {
+    headers: { 'Authorization': 'Bearer ' + token }
+  })
+  .then(r => r.ok ? r.json() : null)
+  .then(d => {
+    const el = document.getElementById('share-status');
+    if (!el) return;
+    if (d && d.accepted_at) {
+      el.style.color = '#008040';
+      el.textContent = '✓ Accepted by ' + (d.client_name || 'client') + ' on ' + new Date(d.accepted_at).toLocaleDateString('en-AU', {day:'numeric',month:'short',year:'numeric'});
+      _pollShareToken = null; // stop polling
+    } else {
+      el.style.color = 'var(--muted)';
+      el.textContent = 'Waiting for client acceptance…';
+      setTimeout(_pollShareStatus, 30000);
+    }
+  })
+  .catch(() => {});
 }
 
 function doPrint(_captureOnly){
