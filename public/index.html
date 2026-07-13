@@ -15546,14 +15546,20 @@ async function submitPassword() {
     setSaveStatus('syncing');
     window._initStorage().then(() => {
       try {
-        const sqRaw = localStorage.getItem('proquote_session_quotes');
-        if (!sqRaw) { setSaveStatus('synced'); return; }
-        const restored = JSON.parse(sqRaw);
-        if (!Array.isArray(restored) || !restored.length) { setSaveStatus('synced'); return; }
-        // Replace in-memory quotes entirely with fresh server data.
-        // All quotes are always visible — nothing gets hidden on load.
+        // Merge nativeLS + server quotes — server wins on conflicts, but nativeLS-only
+        // quotes (never saved to server because they were background tabs) are kept too.
+        const _mergedMap = new Map();
+        try {
+          const _nativeArr = JSON.parse(window._nativeLS?.getItem('proquote_session_quotes') || '[]');
+          if (Array.isArray(_nativeArr)) _nativeArr.forEach(q => { if (q?.id) _mergedMap.set(q.id, q); });
+        } catch(e) {}
+        try {
+          const _serverArr = JSON.parse(localStorage.getItem('proquote_session_quotes') || '[]');
+          if (Array.isArray(_serverArr)) _serverArr.forEach(q => { if (q?.id) _mergedMap.set(q.id, q); });
+        } catch(e) {}
+        if (!_mergedMap.size) { setSaveStatus('synced'); return; }
         let _maxId = _id;
-        _quotes = restored.map(q => {
+        _quotes = [..._mergedMap.values()].map(q => {
           for (const s of (q.sections || [])) {
             if (s.id >= _maxId) _maxId = s.id + 1;
             for (const p of (s.parents || [])) {
@@ -15576,6 +15582,8 @@ async function submitPassword() {
         try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e) {}
         loadProfile();
         loadCompanyLogo();
+        // Save all now-visible quotes to server so they're never lost again
+        if (window._saveQuoteToServer) _quotes.filter(q => !q._binned).forEach(q => window._saveQuoteToServer(q));
         renderQuoteTabs();
         if (_activeTab === 'dashboard')  renderDashboard();
         if (_activeTab === 'quotes-all') renderQuotesAll();
@@ -15614,14 +15622,23 @@ init();
 setSaveStatus('syncing');
 window._initStorage().then(() => {
   try {
-    const sqRaw = localStorage.getItem('proquote_session_quotes');
-    if (!sqRaw) { setSaveStatus('synced'); return; }
-    const restored = JSON.parse(sqRaw);
-    if (!Array.isArray(restored) || !restored.length) { setSaveStatus('synced'); return; }
-    // Replace in-memory quotes with freshest available data (server if JWT, nativeLS otherwise)
-    // All quotes are always visible — nothing gets hidden on load.
+    // Merge nativeLS quotes + server quotes so nothing is lost.
+    // Server data wins when both have the same ID (fresher), but nativeLS-only
+    // quotes (never pushed to server because they were background tabs) are kept too.
+    const mergedMap = new Map();
+    try {
+      const nativeRaw = window._nativeLS?.getItem('proquote_session_quotes');
+      const nativeArr = JSON.parse(nativeRaw || '[]');
+      if (Array.isArray(nativeArr)) nativeArr.forEach(q => { if (q?.id) mergedMap.set(q.id, q); });
+    } catch(e) {}
+    try {
+      const serverRaw = localStorage.getItem('proquote_session_quotes');
+      const serverArr = JSON.parse(serverRaw || '[]');
+      if (Array.isArray(serverArr)) serverArr.forEach(q => { if (q?.id) mergedMap.set(q.id, q); });
+    } catch(e) {}
+    if (!mergedMap.size) { setSaveStatus('synced'); return; }
     let _maxId = _id;
-    _quotes = restored.map(q => {
+    _quotes = [...mergedMap.values()].map(q => {
       for (const s of (q.sections || [])) {
         if (s.id >= _maxId) _maxId = s.id + 1;
         for (const p of (s.parents || [])) {
@@ -15647,6 +15664,8 @@ window._initStorage().then(() => {
     try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e) {}
     loadProfile();
     loadCompanyLogo();
+    // Save all now-visible quotes to server so they're never lost again
+    if (window._saveQuoteToServer) _quotes.filter(q => !q._binned).forEach(q => window._saveQuoteToServer(q));
     renderQuoteTabs();
     if (_activeTab === 'dashboard')   renderDashboard();
     if (_activeTab === 'quotes-all')  renderQuotesAll();
