@@ -15549,31 +15549,32 @@ async function submitPassword() {
     setSaveStatus('syncing');
     window._initStorage().then(() => {
       try {
-        const raw = localStorage.getItem('proquote_session_quotes');
-        if (!raw) { setSaveStatus('synced'); return; }
-        const restored = JSON.parse(raw);
+        const sqRaw = localStorage.getItem('proquote_session_quotes');
+        if (!sqRaw) { setSaveStatus('synced'); return; }
+        const restored = JSON.parse(sqRaw);
         if (!Array.isArray(restored) || !restored.length) { setSaveStatus('synced'); return; }
-        const existingIds = new Set(_quotes.map(q => q.id));
-        for (const q of restored) {
-          if (!existingIds.has(q.id)) {
-            for (const s of (q.sections||[])) {
-              if (s.id >= _id) _id = s.id + 1;
-              for (const p of (s.parents||[])) {
-                if (p.id >= _id) _id = p.id + 1;
-                for (const sub of (p.subitems||[])) { if (sub.id >= _id) _id = sub.id + 1; }
-              }
+        // Replace in-memory quotes entirely with fresh server data
+        let _maxId = _id;
+        _quotes = restored.map(q => {
+          for (const s of (q.sections || [])) {
+            if (s.id >= _maxId) _maxId = s.id + 1;
+            for (const p of (s.parents || [])) {
+              if (p.id >= _maxId) _maxId = p.id + 1;
+              for (const sub of (p.subitems || [])) { if (sub.id >= _maxId) _maxId = sub.id + 1; }
             }
-            _quotes.push({ ...q, _hiddenTab: true });
           }
-        }
-        const savedActiveId = localStorage.getItem('proquote_active_id');
-        const targetQ = (savedActiveId && _quotes.find(q => q.id === savedActiveId))
-                     || _quotes[_quotes.length - 1];
-        if (targetQ && targetQ.id !== _activeQuoteId) {
-          _getRevisionFamily(targetQ).forEach(m => { m._hiddenTab = false; });
-          loadQuoteState(targetQ.id);
-        } else if (targetQ) {
-          _getRevisionFamily(targetQ).forEach(m => { m._hiddenTab = false; });
+          return { ...q, _hiddenTab: true };
+        });
+        if (_maxId > _id) _id = _maxId;
+        const aid = localStorage.getItem('proquote_active_id');
+        const roots = _quotes.filter(q => !q._parentRef && !q._binned);
+        const target = (aid && _quotes.find(q => q.id === aid && !q._binned)) || roots[roots.length - 1];
+        if (target) {
+          _getRevisionFamily(target).forEach(m => { m._hiddenTab = false; });
+          _activeQuoteId = target.id;
+          S.sections = JSON.parse(JSON.stringify(target.sections || []));
+          _restoreFields(target.fields || {});
+          fullRender();
         }
         try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e) {}
         loadProfile();
