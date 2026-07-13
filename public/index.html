@@ -3162,9 +3162,7 @@ function _persistSession() {
     localStorage.setItem('proquote_session_quotes', quotesJson);
     if (_activeQuoteId) localStorage.setItem('proquote_active_id', _activeQuoteId);
     localStorage.setItem('proquote_saved_at', Date.now().toString());
-    // Only debounce-save quotes that are actively open in tabs; hidden quotes are
-    // already on the server and don't need to be re-queued on every scheduleSave.
-    if (window._saveQuoteToServer) { _quotes.filter(q => !q._hiddenTab).forEach(q => window._saveQuoteToServer(q)); }
+    if (window._saveQuoteToServer) { _quotes.filter(q => !q._binned).forEach(q => window._saveQuoteToServer(q)); }
   } catch(e) { console.error('[ProQuote] localStorage write failed:', e); }
 }
 
@@ -15584,6 +15582,16 @@ async function submitPassword() {
         loadCompanyLogo();
         // Save all now-visible quotes to server so they're never lost again
         if (window._saveQuoteToServer) _quotes.filter(q => !q._binned).forEach(q => window._saveQuoteToServer(q));
+        // If clients table is empty but we have quotes with clientNames, rebuild silently
+        if ((!window._clientsCache || !window._clientsCache.length) && _quotes.some(q => q.fields?.clientName)) {
+          const _rebToken = window._nativeLS?.getItem('pq_jwt');
+          if (_rebToken) fetch('/api/rebuild-clients', { method: 'POST', headers: { Authorization: 'Bearer ' + _rebToken } })
+            .then(r => r.ok ? r.json() : null)
+            .then(() => fetch('/api/clients', { headers: { Authorization: 'Bearer ' + _rebToken } }))
+            .then(r => r && r.ok ? r.json() : null)
+            .then(cls => { if (Array.isArray(cls) && cls.length) { window._clientsCache = cls; renderClients(); renderDashboard(); } })
+            .catch(() => {});
+        }
         renderQuoteTabs();
         if (_activeTab === 'dashboard')  renderDashboard();
         if (_activeTab === 'quotes-all') renderQuotesAll();
@@ -15666,6 +15674,16 @@ window._initStorage().then(() => {
     loadCompanyLogo();
     // Save all now-visible quotes to server so they're never lost again
     if (window._saveQuoteToServer) _quotes.filter(q => !q._binned).forEach(q => window._saveQuoteToServer(q));
+    // If clients table is empty but we have quotes with clientNames, rebuild silently
+    if ((!window._clientsCache || !window._clientsCache.length) && _quotes.some(q => q.fields?.clientName)) {
+      const _rebToken = window._nativeLS?.getItem('pq_jwt');
+      if (_rebToken) fetch('/api/rebuild-clients', { method: 'POST', headers: { Authorization: 'Bearer ' + _rebToken } })
+        .then(r => r.ok ? r.json() : null)
+        .then(() => fetch('/api/clients', { headers: { Authorization: 'Bearer ' + _rebToken } }))
+        .then(r => r && r.ok ? r.json() : null)
+        .then(cls => { if (Array.isArray(cls) && cls.length) { window._clientsCache = cls; renderClients(); renderDashboard(); } })
+        .catch(() => {});
+    }
     renderQuoteTabs();
     if (_activeTab === 'dashboard')   renderDashboard();
     if (_activeTab === 'quotes-all')  renderQuotesAll();
@@ -15677,6 +15695,7 @@ window._initStorage().then(() => {
 
 // ── ONE-TIME CLEANUP: remove all Q-2026-001 quotes (including revisions) ─
 (function _cleanup2026001() {
+  if (localStorage.getItem('_cleanup2026001_done')) return;
   function _is2026001(ref) {
     const r = (ref || '').toLowerCase();
     return r.includes('2026-001') || r.includes('2026001');
@@ -15735,7 +15754,7 @@ window._initStorage().then(() => {
         try { const d = typeof r.data === 'string' ? JSON.parse(r.data) : r.data; ref = d?.fields?.quoteRef || ''; } catch(e) {}
         return _is2026001(r.name || '') || _is2026001(ref);
       });
-      if (!targets.length) return;
+      if (!targets.length) { localStorage.setItem('_cleanup2026001_done', '1'); return; }
       try {
         const pd = JSON.parse(window._nativeLS.getItem('proquote_pending_deletes') || '[]');
         targets.forEach(r => { if (!pd.includes(r.id)) pd.push(r.id); });
@@ -15748,6 +15767,7 @@ window._initStorage().then(() => {
           await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
         }
       }
+      localStorage.setItem('_cleanup2026001_done', '1');
     } catch(e) { console.warn('[ProQuote] Cleanup error:', e); }
   }, 3000);
 })();

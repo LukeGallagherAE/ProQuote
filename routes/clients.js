@@ -39,6 +39,13 @@ router.get('/', async (req, res) => {
 router.post('/sync', async (req, res) => {
   const clients = req.body;
   if (!Array.isArray(clients)) return res.status(400).json({ error: 'Expected array' });
+  // Refuse to wipe existing data with an empty payload — require explicit confirmation header
+  if (clients.length === 0) {
+    const { rows } = await db.query('SELECT COUNT(*)::int AS n FROM clients WHERE user_id = $1', [req.user.userId]);
+    if (rows[0].n > 0) {
+      return res.status(400).json({ error: 'Refusing to delete all clients with empty payload. Send header X-Confirm-Wipe: true to override.' });
+    }
+  }
   try {
     await db.query('BEGIN');
     await db.query('DELETE FROM jobs    WHERE user_id = $1', [req.user.userId]);
