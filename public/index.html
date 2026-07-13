@@ -15617,31 +15617,35 @@ init();
 setSaveStatus('syncing');
 window._initStorage().then(() => {
   try {
-    const raw = localStorage.getItem('proquote_session_quotes');
-    if (!raw) { setSaveStatus('synced'); return; }
-    const restored = JSON.parse(raw);
+    const sqRaw = localStorage.getItem('proquote_session_quotes');
+    if (!sqRaw) { setSaveStatus('synced'); return; }
+    const restored = JSON.parse(sqRaw);
     if (!Array.isArray(restored) || !restored.length) { setSaveStatus('synced'); return; }
-    const existingIds = new Set(_quotes.map(q => q.id));
-    for (const q of restored) {
-      if (!existingIds.has(q.id)) {
-        for (const s of (q.sections||[])) {
-          if (s.id >= _id) _id = s.id + 1;
-          for (const p of (s.parents||[])) {
-            if (p.id >= _id) _id = p.id + 1;
-            for (const sub of (p.subitems||[])) { if (sub.id >= _id) _id = sub.id + 1; }
-          }
+    // Replace in-memory quotes with freshest available data (server if JWT, nativeLS otherwise)
+    let _maxId = _id;
+    _quotes = restored.map(q => {
+      for (const s of (q.sections || [])) {
+        if (s.id >= _maxId) _maxId = s.id + 1;
+        for (const p of (s.parents || [])) {
+          if (p.id >= _maxId) _maxId = p.id + 1;
+          for (const sub of (p.subitems || [])) { if (sub.id >= _maxId) _maxId = sub.id + 1; }
         }
-        _quotes.push({ ...q, _hiddenTab: true });
       }
-    }
+      return { ...q, _hiddenTab: true };
+    });
+    if (_maxId > _id) _id = _maxId;
     const savedActiveId = localStorage.getItem('proquote_active_id');
+    const roots = _quotes.filter(q => !q._parentRef && !q._binned);
     const targetQ = (savedActiveId && _quotes.find(q => q.id === savedActiveId && !q._binned))
-                 || _quotes.filter(q => !q._binned).pop();
-    if (targetQ && targetQ.id !== _activeQuoteId) {
-      _getRevisionFamily(targetQ).forEach(m => { if (!m._binned) m._hiddenTab = false; });
-      loadQuoteState(targetQ.id);
-    } else if (targetQ) {
-      _getRevisionFamily(targetQ).forEach(m => { if (!m._binned) m._hiddenTab = false; });
+                 || roots[roots.length - 1];
+    if (targetQ) {
+      _getRevisionFamily(targetQ).forEach(m => { m._hiddenTab = false; });
+      if (targetQ.id !== _activeQuoteId) {
+        _activeQuoteId = targetQ.id;
+        S.sections = JSON.parse(JSON.stringify(targetQ.sections || []));
+        _restoreFields(targetQ.fields || {});
+      }
+      fullRender();
     }
     try { _customCats = JSON.parse(localStorage.getItem('proquote_custom_cats') || '[]'); } catch(e) {}
     loadProfile();
