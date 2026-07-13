@@ -36,12 +36,18 @@ app.use('/api/ai',      require('./routes/ai'));
 app.use('/api/pdf',     requireAuth, require('./routes/pdf'));
 app.use('/api/share',   shareApiRouter);
 
-// Public client quote pages
+// Public client quote pages — handles both new (quote_data) and legacy (html) links
 app.get('/q/:token', async (req, res) => {
   try {
     const { rows } = await db.query('SELECT * FROM quote_links WHERE token = $1', [req.params.token]);
     if (!rows.length) return res.status(404).send('<h1 style="font-family:sans-serif;padding:40px">Quote not found or link has expired.</h1>');
-    res.send(renderQuotePage(rows[0]));
+    const link = rows[0];
+    // Legacy email-based links store pre-rendered HTML in the html column
+    if (!link.quote_data && link.html) {
+      res.set('Content-Type', 'text/html');
+      return res.send(link.html);
+    }
+    res.send(renderQuotePage(link));
   } catch (err) {
     console.error('GET /q/:token:', err);
     res.status(500).send('<h1 style="font-family:sans-serif;padding:40px">Server error — please try again later.</h1>');
@@ -130,32 +136,6 @@ app.get('/api/quote-response', async (req, res) => {
 </body></html>`);
 });
 
-// ── Hosted interactive quote view (public, no auth) ───────────────────────────
-// The email includes a link like /q/<token> that serves the interactive HTML.
-app.get('/q/:token', async (req, res) => {
-  try {
-    const { rows } = await db.query(
-      "SELECT html FROM quote_links WHERE token = $1 AND (expires_at IS NULL OR expires_at > NOW())",
-      [req.params.token]
-    );
-    if (!rows.length) {
-      return res.status(404).send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Link expired</title></head>
-        <body style="font-family:-apple-system,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
-          <div style="text-align:center;color:#555">
-            <div style="font-size:40px;margin-bottom:16px">🔗</div>
-            <h2 style="margin:0 0 8px">Quote link not found</h2>
-            <p style="margin:0;font-size:14px">This link may have expired or is invalid.</p>
-          </div>
-        </body></html>`);
-    }
-    res.set('Content-Type', 'text/html');
-    res.send(rows[0].html);
-  } catch (err) {
-    console.error('GET /q/:token:', err);
-    res.status(500).send('Server error');
-  }
-});
-
 // Serve the app for any non-API route (SPA fallback)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -186,7 +166,7 @@ async function migrateAuth() {
         id          BIGSERIAL PRIMARY KEY,
         token       TEXT UNIQUE NOT NULL,
         user_id     INTEGER REFERENCES users(id),
-        quote_data  JSONB NOT NULL,
+        quote_data  JSONB,
         created_at  TIMESTAMPTZ DEFAULT NOW(),
         accepted_at TIMESTAMPTZ,
         client_name TEXT,
@@ -194,6 +174,12 @@ async function migrateAuth() {
         selections  JSONB
       )
     `);
+    // Backfill columns added after the original quote_links schema (ALTER is no-op if column already exists)
+    await db.query(`ALTER TABLE quote_links ADD COLUMN IF NOT EXISTS quote_data  JSONB`);
+    await db.query(`ALTER TABLE quote_links ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ`);
+    await db.query(`ALTER TABLE quote_links ADD COLUMN IF NOT EXISTS client_name TEXT`);
+    await db.query(`ALTER TABLE quote_links ADD COLUMN IF NOT EXISTS client_sig  TEXT`);
+    await db.query(`ALTER TABLE quote_links ADD COLUMN IF NOT EXISTS selections  JSONB`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_quote_links_token ON quote_links(token)`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_quote_links_user  ON quote_links(user_id)`);
 
