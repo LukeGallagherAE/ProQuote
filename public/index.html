@@ -1599,6 +1599,10 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     <span class="rail-label">Clients</span>
   </button>
+  <button class="nav-rail-btn" id="rail-wholesalers" onclick="switchTab('wholesalers')" title="Wholesalers">
+    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V9l7-6 7 6v12"/><path d="M9 21v-6h6v6"/><path d="M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/></svg>
+    <span class="rail-label">Wholesalers</span>
+  </button>
   <button class="nav-rail-btn" id="rail-projects" onclick="switchTab('projects')" title="Projects">
     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
     <span class="rail-label">Projects</span>
@@ -2003,6 +2007,23 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
   </div>
 </div>
 
+<div id="page-wholesalers" class="tab-page" style="display:none">
+  <div class="bom-page">
+    <div class="bom-header">
+      <div>
+        <h1 class="bom-title">Wholesalers</h1>
+        <p class="bom-subtitle" id="wholesalers-count">Track supplier account debt</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-secondary btn-sm" onclick="openDebtEmailSettings()">✉ Email settings</button>
+        <button class="btn btn-secondary btn-sm" onclick="sendDebtSummaryNow()">Send summary now</button>
+        <button class="btn btn-primary btn-sm" onclick="addNewWholesaler()">+ New wholesaler</button>
+      </div>
+    </div>
+    <div id="wholesalers-content"></div>
+  </div>
+</div>
+
 <!-- ── PROJECTS TAB ── -->
 <div id="page-projects" class="tab-page" style="display:none">
   <div class="bom-page">
@@ -2065,6 +2086,56 @@ try { if (localStorage.getItem('proquote-theme')==='dark') document.getElementBy
     <div style="display:flex;gap:10px;margin-top:20px">
       <button class="btn btn-primary" style="flex:1" onclick="saveJobModal()">Save job</button>
       <button class="btn btn-secondary" onclick="closeJobModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── WHOLESALER EDIT MODAL ── -->
+<div class="overlay" id="wholesalerModal" style="display:none" onclick="if(event.target===this)closeWholesalerModal()">
+  <div class="modal" style="max-width:400px">
+    <h2 id="wholesalerModalTitle">New wholesaler</h2>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="field"><label>Name</label><input id="wm-name" placeholder="e.g. Rexel, CEE, Ideal Electrical"></div>
+      <div class="field"><label>Notes</label><textarea id="wm-notes" placeholder="Account number, contact, etc. (optional)" style="min-height:60px;resize:vertical"></textarea></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveWholesalerModal()">Save</button>
+      <button class="btn btn-secondary" onclick="closeWholesalerModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── WHOLESALER CHARGE MODAL ── -->
+<div class="overlay" id="chargeModal" style="display:none" onclick="if(event.target===this)closeChargeModal()">
+  <div class="modal" style="max-width:380px">
+    <h2>Add charge</h2>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="field"><label>Amount ($)</label><input id="chm-amount" type="number" step="0.01" min="0" placeholder="0.00"></div>
+      <div class="field"><label>Description</label><input id="chm-desc" placeholder="e.g. Invoice #12345 (optional)"></div>
+      <div class="field"><label>Date</label><input id="chm-date" type="date"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveChargeModal()">Add charge</button>
+      <button class="btn btn-secondary" onclick="closeChargeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── DEBT SUMMARY EMAIL SETTINGS MODAL ── -->
+<div class="overlay" id="debtEmailModal" style="display:none" onclick="if(event.target===this)closeDebtEmailModal()">
+  <div class="modal" style="max-width:380px">
+    <h2>Debt summary email</h2>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="dem-enabled" style="width:16px;height:16px">
+        Send automatically every month
+      </label>
+      <div class="field"><label>Send on day of month (1–28)</label><input id="dem-day" type="number" min="1" max="28" placeholder="1"></div>
+      <div class="field"><label>Send to</label><input id="dem-recipient" placeholder="you@example.com"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveDebtEmailModal()">Save</button>
+      <button class="btn btn-secondary" onclick="closeDebtEmailModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -10308,7 +10379,7 @@ function switchTab(tab) {
     if (_aqFlush && window._flushQuoteNow) window._flushQuoteNow(_aqFlush).catch(() => {});
   }
   // Track previous tab for back-button (only list/global pages count as "back" destinations)
-  const listTabs = ['dashboard','quotes-all','clients','projects'];
+  const listTabs = ['dashboard','quotes-all','clients','wholesalers','projects'];
   const isQuoteTool = tab === 'quote' || tab === 'bom' || tab === 'tracker' || tab === 'fittings' || tab === 'revisions';
   if (isQuoteTool && listTabs.includes(_activeTab)) {
     _prevTab = _activeTab;
@@ -10339,7 +10410,7 @@ function switchTab(tab) {
   const backBtn = document.getElementById('qsub-back');
   const backLabel = document.getElementById('qsub-back-label');
   if (backBtn) {
-    const labels = { dashboard:'Dashboard', 'quotes-all':'All Quotes', clients:'Clients', projects:'Projects' };
+    const labels = { dashboard:'Dashboard', 'quotes-all':'All Quotes', clients:'Clients', wholesalers:'Wholesalers', projects:'Projects' };
     if (isQuoteTool && _prevTab && labels[_prevTab]) {
       backBtn.style.display = 'flex';
       if (backLabel) backLabel.textContent = labels[_prevTab];
@@ -10419,6 +10490,7 @@ function switchTab(tab) {
   if (tab === 'dashboard') renderDashboard();
   if (tab === 'quotes-all') renderQuotesAll();
   if (tab === 'clients') renderClients();
+  if (tab === 'wholesalers') renderWholesalers();
   if (tab === 'projects') renderProjects();
   if (tab === 'bom') { syncDOM(); renderBOM(); }
   // BOM rendered on-demand via tab dropdown
@@ -13325,6 +13397,200 @@ function deleteClient(idx) {
   clients.splice(idx, 1);
   saveClients(clients);
   renderClients();
+}
+
+// ── Wholesalers — debt tracking ─────────────────────────────────────────────
+async function _whFetch(path, opts) {
+  const token = window._nativeLS && window._nativeLS.getItem('pq_jwt');
+  const res = await fetch('/api/wholesalers' + path, Object.assign({}, opts, {
+    headers: Object.assign({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') }, (opts && opts.headers) || {}),
+  }));
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+function _whMoney(n) {
+  return '$' + Number(n || 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+let _whExpanded = {};
+
+async function renderWholesalers() {
+  const el = document.getElementById('wholesalers-content');
+  if (!el) return;
+  el.innerHTML = '<div class="bom-empty"><p>Loading…</p></div>';
+  let list;
+  try { list = await _whFetch(''); }
+  catch (e) { el.innerHTML = '<div class="bom-empty"><p>Failed to load wholesalers: ' + esc(e.message) + '</p></div>'; return; }
+  window._wholesalersCache = list;
+
+  const total = list.reduce((s, w) => s + Number(w.balance || 0), 0);
+  const countEl = document.getElementById('wholesalers-count');
+  if (countEl) countEl.textContent = list.length + ' account' + (list.length !== 1 ? 's' : '') + ' — ' + _whMoney(total) + ' total owing';
+
+  if (!list.length) {
+    el.innerHTML = '<div class="bom-empty"><div style="font-size:48px;margin-bottom:12px">🏭</div><p>No wholesaler accounts yet. Add one to start tracking debt.</p></div>';
+    return;
+  }
+
+  const cards = list.map(w => {
+    const bal = Number(w.balance || 0);
+    const balColor = bal > 0 ? '#d92626' : 'var(--muted)';
+    const lastLine = w.lastChargeDate
+      ? 'Last charge: ' + new Date(w.lastChargeDate).toLocaleDateString('en-AU')
+      : 'No charges logged';
+    return '<div class="client-card" id="wc-' + w.id + '">'
+      + '<div class="client-card-main" style="cursor:pointer" onclick="toggleWholesalerCharges(\'' + w.id + '\')" title="View charge history">'
+        + '<div class="client-avatar" style="background:#3a4a6a">' + esc((w.name || '?').trim().slice(0, 2).toUpperCase()) + '</div>'
+        + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:15px;font-weight:700;color:var(--text)">' + esc(w.name || '') + '</div>'
+          + '<div style="font-size:12px;color:var(--muted);margin-top:2px">' + lastLine + '</div>'
+        + '</div>'
+        + '<div style="font-size:16px;font-weight:800;font-family:monospace;color:' + balColor + '">' + _whMoney(bal) + '</div>'
+        + '<div style="display:flex;gap:6px;flex-shrink:0" onclick="event.stopPropagation()">'
+          + '<button class="btn btn-secondary btn-sm" onclick="openChargeModal(\'' + w.id + '\')">+ Charge</button>'
+          + (bal > 0 ? '<button class="btn btn-secondary btn-sm" onclick="markWholesalerPaid(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g,"\\'") + '\')">Mark paid</button>' : '')
+          + '<button class="btn btn-secondary btn-sm" onclick="editWholesaler(\'' + w.id + '\')">Edit</button>'
+          + '<button class="btn btn-secondary btn-sm" style="color:var(--muted)" onclick="deleteWholesaler(\'' + w.id + '\',\'' + esc(w.name).replace(/'/g,"\\'") + '\')">✕</button>'
+        + '</div>'
+      + '</div>'
+      + '<div class="client-jobs-panel" id="wjobs-' + w.id + '" style="display:' + (_whExpanded[w.id] ? 'block' : 'none') + '"></div>'
+    + '</div>';
+  }).join('');
+
+  el.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' + cards + '</div>';
+
+  list.forEach(w => { if (_whExpanded[w.id]) _renderWholesalerCharges(w.id); });
+}
+
+async function toggleWholesalerCharges(id) {
+  _whExpanded[id] = !_whExpanded[id];
+  const panel = document.getElementById('wjobs-' + id);
+  if (!panel) return;
+  panel.style.display = _whExpanded[id] ? 'block' : 'none';
+  if (_whExpanded[id]) await _renderWholesalerCharges(id);
+}
+
+async function _renderWholesalerCharges(id) {
+  const panel = document.getElementById('wjobs-' + id);
+  if (!panel) return;
+  panel.innerHTML = '<div style="font-size:12px;color:var(--muted)">Loading…</div>';
+  let charges;
+  try { charges = await _whFetch('/' + id + '/charges'); }
+  catch (e) { panel.innerHTML = '<div style="font-size:12px;color:var(--muted)">Failed to load.</div>'; return; }
+  if (!charges.length) {
+    panel.innerHTML = '<div style="font-size:12px;color:var(--muted)">No charges logged yet.</div>';
+    return;
+  }
+  panel.innerHTML = '<div style="display:flex;flex-direction:column;gap:2px;margin:-10px -16px">' + charges.map(c =>
+    '<div style="display:flex;align-items:center;gap:10px;padding:6px 16px;font-size:12px;border-top:1px solid var(--border)">'
+    + '<span style="color:var(--muted);width:90px;flex-shrink:0">' + new Date(c.charge_date).toLocaleDateString('en-AU') + '</span>'
+    + '<span style="flex:1;color:var(--text)">' + esc(c.description || '—') + '</span>'
+    + '<span style="' + (c.paid ? 'color:var(--muted);text-decoration:line-through' : 'font-weight:700;color:var(--text)') + ';font-family:monospace">' + _whMoney(c.amount) + '</span>'
+    + (c.paid ? '<span style="font-size:10px;color:#2a9d4a;font-weight:700">PAID</span>' : '<span style="width:30px"></span>')
+    + '<button class="btn btn-secondary btn-sm" style="padding:2px 8px" onclick="deleteWholesalerCharge(\'' + c.id + '\',\'' + id + '\')">✕</button>'
+    + '</div>'
+  ).join('') + '</div>';
+}
+
+let _editingWholesalerId = null;
+function addNewWholesaler() {
+  _editingWholesalerId = null;
+  document.getElementById('wholesalerModalTitle').textContent = 'New wholesaler';
+  document.getElementById('wm-name').value = '';
+  document.getElementById('wm-notes').value = '';
+  document.getElementById('wholesalerModal').style.display = 'flex';
+}
+function editWholesaler(id) {
+  const w = (window._wholesalersCache || []).find(x => x.id === id);
+  if (!w) return;
+  _editingWholesalerId = id;
+  document.getElementById('wholesalerModalTitle').textContent = 'Edit wholesaler';
+  document.getElementById('wm-name').value = w.name || '';
+  document.getElementById('wm-notes').value = w.notes || '';
+  document.getElementById('wholesalerModal').style.display = 'flex';
+}
+function closeWholesalerModal() { document.getElementById('wholesalerModal').style.display = 'none'; }
+async function saveWholesalerModal() {
+  const name = document.getElementById('wm-name').value.trim();
+  const notes = document.getElementById('wm-notes').value.trim();
+  if (!name) { alert('Wholesaler name is required.'); return; }
+  try {
+    if (_editingWholesalerId) {
+      await _whFetch('/' + _editingWholesalerId, { method: 'PUT', body: JSON.stringify({ name, notes }) });
+    } else {
+      await _whFetch('', { method: 'POST', body: JSON.stringify({ name, notes }) });
+    }
+    closeWholesalerModal();
+    renderWholesalers();
+  } catch (e) { alert('Failed to save: ' + e.message); }
+}
+async function deleteWholesaler(id, name) {
+  if (!confirm('Delete "' + name + '" and its entire charge history? This cannot be undone.')) return;
+  try { await _whFetch('/' + id, { method: 'DELETE' }); delete _whExpanded[id]; renderWholesalers(); }
+  catch (e) { alert('Failed to delete: ' + e.message); }
+}
+async function markWholesalerPaid(id, name) {
+  if (!confirm('Mark all current charges for "' + name + '" as paid? This zeroes the balance and starts a new cycle.')) return;
+  try { await _whFetch('/' + id + '/mark-paid', { method: 'POST' }); renderWholesalers(); }
+  catch (e) { alert('Failed to update: ' + e.message); }
+}
+
+let _chargeWholesalerId = null;
+function openChargeModal(wholesalerId) {
+  _chargeWholesalerId = wholesalerId;
+  document.getElementById('chm-amount').value = '';
+  document.getElementById('chm-desc').value = '';
+  document.getElementById('chm-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('chargeModal').style.display = 'flex';
+}
+function closeChargeModal() { document.getElementById('chargeModal').style.display = 'none'; }
+async function saveChargeModal() {
+  const amount = parseFloat(document.getElementById('chm-amount').value);
+  const description = document.getElementById('chm-desc').value.trim();
+  const charge_date = document.getElementById('chm-date').value || null;
+  if (!amount || amount <= 0) { alert('Enter a valid amount.'); return; }
+  try {
+    await _whFetch('/' + _chargeWholesalerId + '/charges', { method: 'POST', body: JSON.stringify({ amount, description, charge_date }) });
+    closeChargeModal();
+    _whExpanded[_chargeWholesalerId] = true;
+    renderWholesalers();
+  } catch (e) { alert('Failed to add charge: ' + e.message); }
+}
+async function deleteWholesalerCharge(chargeId, wholesalerId) {
+  if (!confirm('Remove this charge?')) return;
+  try {
+    await _whFetch('/charges/' + chargeId, { method: 'DELETE' });
+    _whExpanded[wholesalerId] = true;
+    renderWholesalers();
+  } catch (e) { alert('Failed to delete: ' + e.message); }
+}
+
+async function openDebtEmailSettings() {
+  let config;
+  try { config = await _whFetch('/debt-email-config'); }
+  catch (e) { alert('Failed to load settings: ' + e.message); return; }
+  document.getElementById('dem-enabled').checked = !!config.enabled;
+  document.getElementById('dem-day').value = config.day || 1;
+  document.getElementById('dem-recipient').value = config.recipient || '';
+  document.getElementById('debtEmailModal').style.display = 'flex';
+}
+function closeDebtEmailModal() { document.getElementById('debtEmailModal').style.display = 'none'; }
+async function saveDebtEmailModal() {
+  const enabled = document.getElementById('dem-enabled').checked;
+  const day = parseInt(document.getElementById('dem-day').value, 10) || 1;
+  const recipient = document.getElementById('dem-recipient').value.trim();
+  try {
+    await _whFetch('/debt-email-config', { method: 'PUT', body: JSON.stringify({ enabled, day, recipient }) });
+    closeDebtEmailModal();
+  } catch (e) { alert('Failed to save: ' + e.message); }
+}
+async function sendDebtSummaryNow() {
+  try {
+    const result = await _whFetch('/send-summary', { method: 'POST' });
+    alert('Debt summary sent — total owing: ' + _whMoney(result.grandTotal || 0));
+  } catch (e) { alert('Failed to send: ' + e.message); }
 }
 
 function useClient(client) {

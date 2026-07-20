@@ -54,3 +54,32 @@ DROP TRIGGER IF EXISTS settings_updated_at ON settings;
 CREATE TRIGGER settings_updated_at
   BEFORE UPDATE ON settings
   FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+
+-- Wholesaler accounts (e.g. electrical supply houses) and the charges
+-- logged against them. Balance = SUM(amount) WHERE paid = FALSE.
+-- "Mark paid" flips all currently-unpaid charges to paid, starting a new cycle.
+CREATE TABLE IF NOT EXISTS wholesalers (
+  id         TEXT NOT NULL,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  name       TEXT NOT NULL DEFAULT '',
+  notes      TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS wholesaler_charges (
+  id            TEXT NOT NULL,
+  wholesaler_id TEXT NOT NULL,
+  user_id       INTEGER NOT NULL REFERENCES users(id),
+  amount        NUMERIC(12,2) NOT NULL,
+  description   TEXT NOT NULL DEFAULT '',
+  charge_date   DATE NOT NULL DEFAULT CURRENT_DATE,
+  paid          BOOLEAN NOT NULL DEFAULT FALSE,
+  paid_at       TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wholesalers_user       ON wholesalers(user_id);
+CREATE INDEX IF NOT EXISTS idx_wh_charges_wholesaler   ON wholesaler_charges(wholesaler_id, user_id);

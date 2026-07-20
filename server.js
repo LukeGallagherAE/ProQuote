@@ -16,6 +16,7 @@ const authRoutes     = require('./routes/auth');
 const requireAuth    = require('./middleware/requireAuth');
 const db             = require('./db');
 const { apiRouter: shareApiRouter, renderQuotePage } = require('./routes/share');
+const debtEmail      = require('./lib/debtEmail');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -29,6 +30,7 @@ app.use('/api/auth',    authRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/quotes',  quotesRoutes);
 app.use('/api/clients',    clientsRoutes);
+app.use('/api/wholesalers', require('./routes/wholesalers'));
 app.use('/api/pricelists', require('./routes/pricelists'));
 app.use('/api/subimport', require('./routes/subimport'));
 app.use('/api/email',   requireAuth, emailRoutes);
@@ -530,7 +532,51 @@ async function migratePricelists() {
   }
 }
 
+// ── Wholesaler debt tracking ──────────────────────────────────────────────────
+async function migrateWholesalers() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS wholesalers (
+        id         TEXT NOT NULL,
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        name       TEXT NOT NULL DEFAULT '',
+        notes      TEXT NOT NULL DEFAULT '',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (id, user_id)
+      )
+    `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS wholesaler_charges (
+        id            TEXT NOT NULL,
+        wholesaler_id TEXT NOT NULL,
+        user_id       INTEGER NOT NULL REFERENCES users(id),
+        amount        NUMERIC(12,2) NOT NULL,
+        description   TEXT NOT NULL DEFAULT '',
+        charge_date   DATE NOT NULL DEFAULT CURRENT_DATE,
+        paid          BOOLEAN NOT NULL DEFAULT FALSE,
+        paid_at       TIMESTAMPTZ,
+        created_at    TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (id, user_id)
+      )
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_wholesalers_user ON wholesalers(user_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_wh_charges_wholesaler ON wholesaler_charges(wholesaler_id, user_id)`);
+    console.log('[ProQuote] migrateWholesalers: done.');
+  } catch (err) {
+    console.error('[ProQuote] migrateWholesalers failed:', err);
+  }
+}
+
+// Checks hourly for any user whose monthly debt-summary email is due.
+function startDebtEmailScheduler() {
+  const CHECK_INTERVAL_MS = 60 * 60 * 1000;
+  const runCheck = () => debtEmail.checkAndSendScheduled().catch(err => console.error('[ProQuote] Debt email scheduler check failed:', err));
+  runCheck();
+  setInterval(runCheck, CHECK_INTERVAL_MS);
+}
+
 // Run migration in the background after server is up
-migrateAuth().then(() => seedUser()).then(() => migrateClients()).then(() => migrateQuotesToClients()).then(() => migratePricelists()).catch(err => {
+migrateAuth().then(() => seedUser()).then(() => migrateClients()).then(() => migrateQuotesToClients()).then(() => migratePricelists()).then(() => migrateWholesalers()).then(() => startDebtEmailScheduler()).catch(err => {
   console.error('[ProQuote] Startup migration failed:', err);
 });
